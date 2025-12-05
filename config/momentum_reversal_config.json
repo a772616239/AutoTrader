@@ -1,0 +1,18 @@
+{
+  "signal_parameters": {
+    "rsi_overbought": [70, 75, 80],  
+    "rsi_oversold": [25, 30, 35],
+    "deviation_threshold": [2.0, 2.5, 3.0],
+    "volume_ratio_threshold": [0.6, 0.7, 0.8]
+  },
+  "risk_parameters": {
+    "risk_per_trade": 0.015,
+    "daily_loss_limit": -0.03,
+    "max_drawdown_limit": -0.10
+  },
+  "filters": {
+    "min_market_cap": 1000000000,
+    "min_average_volume": 1000000,
+    "exclude_sectors": ["Financials", "Utilities"]
+  }
+}

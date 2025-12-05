@@ -2,7 +2,7 @@ import requests
 import json
 
 # 获取增强数据
-response = requests.get("http://localhost:8001/enhanced-data?symbol=AAPL&period=3mo")
+response = requests.get("http://localhost:8001/enhanced-data?symbol=TSLA&period=3mo")
 data = response.json()
 
 # 格式化为LLM友好格式
