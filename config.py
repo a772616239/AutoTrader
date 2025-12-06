@@ -24,12 +24,14 @@ CONFIG = {
             'MU', 'INTC', 'AMD', 'NFLX', 'BIDU', 'JD', 'BABA',
             'TCEHY', 'PYPL', 'SHOP', 'CRM', 'ORCL', 'IBM',
             'CSCO', 'QCOM', 'TXN', 'AVGO', 'ADBE', 'INTU',
-            'ZM', 'DOCU', 'SNOW', 'UBER', 'LYFT'
+            'ZM', 'DOCU', 'SNOW', 'UBER', 'LYFT', 'SPOT',
+            'TWTR', 'PINS', 'SQ', 'FSLY', 'OKTA', 'DDOG',
+            'CRWD', 'ZS', 'NET', 'WORK',
         ],
         'scan_interval_minutes': 1,
         'trading_hours': {
-            'start': '09:30',
-            'end': '16:00'
+            'start': '09:30',  # 美东时间 06:30（冬令时）或 05:30（夏令时），但 TWS 通常以本地时间计
+            'end': '16:00'     # 美东时间下午 4:00
         },
         'max_symbols_per_cycle': 50,
     },
@@ -50,6 +52,10 @@ CONFIG = {
         'take_profit_atr_multiple': 3.0,
         'ib_order_type': 'MKT',
         'ib_limit_offset': 0.01,
+        'trading_start_time': '09:30',
+        'trading_end_time': '16:00',
+        'avoid_open_hour': True,
+        'avoid_close_hour': True,
     },
     'strategy_a2': {  # Z-Score策略配置
         'initial_capital': 100000.0,
@@ -64,6 +70,9 @@ CONFIG = {
         'take_profit_pct': 0.05,
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.005,
+        'trading_start_time': '09:30',
+        'trading_end_time': '16:00',
+        'trading_hours_only': True,
     },
     'strategy_a3': {  # 双均线成交量突破策略配置
         'initial_capital': 100000.0,
@@ -82,6 +91,34 @@ CONFIG = {
         'max_holding_minutes': 60,
         'ib_order_type': 'MKT',
         'ib_limit_offset': 0.01,
+        'trading_start_time': '09:45',
+        'trading_end_time': '15:30',
+        'avoid_open_hour': True,
+        'avoid_close_hour': True,
+    },
+    'strategy_a4': {  # 回调交易策略配置（斐波那契回撤）
+        'initial_capital': 100000.0,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 10000.0,  # 单笔交易美元上限
+        'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+        'trend_ma_period': 80,              # 长期趋势均线
+        'trend_confirmation_bars': 3,      # 趋势确认K线数
+        'pullback_lookback': 20,            # 回撤识别窗口
+        'fibonacci_levels': [0.236, 0.382, 0.5, 0.618, 0.786],
+        'pullback_buy_ratio': [0.15, 0.7],   # 回撤买入位置
+        'pullback_sell_ratio': [0.15, 0.7],  # 反弹卖出位置
+        'volume_confirmation': True,
+        'min_volume_ratio': 1.0,
+        'stop_loss_pct': 0.03,
+        'take_profit_pct': 0.05,
+        'max_holding_days': 5,
+        'trading_start_time': '10:00',  # 避开开盘波动
+        'trading_end_time': '15:30',
+        'avoid_open_hour': True,
+        'avoid_close_hour': True,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
     }
 }
 
@@ -90,6 +127,7 @@ STRATEGY_CONFIG_MAP = {
     'a1': 'strategy_a1',
     'a2': 'strategy_a2',
     'a3': 'strategy_a3',
+    'a4': 'strategy_a4',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a1/a2/a3
@@ -97,22 +135,22 @@ STRATEGY_CONFIG_MAP = {
 # 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
 # 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
 default_symbols = CONFIG.get('trading', {}).get('symbols', [])
-default_symbol_map = {s: 'a3' for s in default_symbols}
+default_symbol_map = {s: 'a2' for s in default_symbols}
 
 # 允许事先存在的自定义映射覆盖默认值
 existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
 
 # 预设一些需要使用 a2 策略的标的（可按需修改）。仅在用户未显式设置时应用。
 preselect_a2 = {
-    'AAPL': 'a2',
-    'MSFT': 'a2',
-    'GOOGL':'a2',
-    'AMZN': 'a2',
-    'TSLA': 'a2',
-    'NVDA': 'a2',
-    'META': 'a2',
-    'INTC': 'a2',
-    'AMD':  'a2',
+    # 'AAPL': 'a2',
+    # 'MSFT': 'a2',
+    # 'GOOGL':'a2',
+    # 'AMZN': 'a2',
+    # 'TSLA': 'a2',
+    # 'NVDA': 'a2',
+    # 'META': 'a2',
+    # 'INTC': 'a2',
+    # 'AMD':  'a2',
 }
 
 merged_map = default_symbol_map.copy()
@@ -123,6 +161,7 @@ CONFIG['symbol_strategy_map'] = merged_map
 a1_symbols = [s for s, strat in merged_map.items() if strat == 'a1']
 a2_symbols = [s for s, strat in merged_map.items() if strat == 'a2']
 a3_symbols = [s for s, strat in merged_map.items() if strat == 'a3']
+a4_symbols = [s for s, strat in merged_map.items() if strat == 'a4']
 print(f"✅ 策略映射加载完成，共 {len(merged_map)} 个标的")
 if a1_symbols:
     print(f"   A1 策略 ({len(a1_symbols)} 个): {', '.join(sorted(a1_symbols[:5]))} {'...' if len(a1_symbols) > 5 else ''}")
@@ -130,3 +169,5 @@ if a2_symbols:
     print(f"   A2 策略 ({len(a2_symbols)} 个): {', '.join(sorted(a2_symbols[:5]))} {'...' if len(a2_symbols) > 5 else ''}")
 if a3_symbols:
     print(f"   A3 策略 ({len(a3_symbols)} 个): {', '.join(sorted(a3_symbols[:5]))} {'...' if len(a3_symbols) > 5 else ''}")
+if a4_symbols:
+    print(f"   A4 策略 ({len(a4_symbols)} 个): {', '.join(sorted(a4_symbols[:5]))} {'...' if len(a4_symbols) > 5 else ''}")

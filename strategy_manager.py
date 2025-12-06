@@ -14,6 +14,7 @@ import config as global_config
 from strategies.a1_momentum_reversal import A1MomentumReversalStrategy
 from strategies.a2_zscore import A2ZScoreStrategy
 from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
+from strategies.a4_pullback import A4PullbackStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ STRATEGY_CLASSES = {
     'a1': A1MomentumReversalStrategy,
     'a2': A2ZScoreStrategy,
     'a3': A3DualMAVolumeStrategy,
+    'a4': A4PullbackStrategy,
 }
 
 
