@@ -288,7 +288,7 @@ class DataProvider:
             
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f"✅ 获取技术指标成功: {symbol}")
+                # logger.info(f"✅ 获取技术指标成功: {symbol}")
                 return data.get('technical_indicators', {})
         except Exception as e:
             logger.error(f"获取技术指标失败 {symbol}: {e}")
@@ -440,7 +440,7 @@ class MomentumReversalEngine:
             return None
         
         price_deviation = (latest['Close'] - indicators[ma_key]) / indicators[ma_key] * 100
-        if abs(price_deviation) < 0.34:  # 温和偏离
+        if abs(price_deviation) < 0.3:  # 温和偏离0.34
             logger.info(f"{symbol} 价格偏离不足，非早盘动量: {price_deviation:.2f}%")
             return None
         
