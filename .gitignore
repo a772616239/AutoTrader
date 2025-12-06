@@ -1,3 +1,4 @@
 .DS_Store
 logs/trading_system.log
 logs/trading_system_fixed.log
+*.pyc
