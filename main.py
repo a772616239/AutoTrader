@@ -146,7 +146,11 @@ class TradingSystem:
                 'min_cash_buffer': 0.3,
                 'per_trade_notional_cap': 10000.0,
                 'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
-                'max_active_positions': 5
+                'max_active_positions': 5,
+                'default_max_signals_per_cycle': 3,
+                'max_signals_per_cycle': {
+                    'a2': 2,  # A2 每周期最多 2 个委托（主线程层面的限制）
+                }
             }
         }
         

@@ -35,7 +35,11 @@ class A2ZScoreStrategy(BaseStrategy):
             'min_zscore_magnitude': 1.5,  # 最小Z-Score绝对值
             'max_zscore_magnitude': 3.5,  # 最大Z-Score绝对值
             'volume_confirmation': True,  # 需要成交量确认
-            'min_volume_ratio': 1.2,  # 最小成交量比率
+            'min_volume_ratio': 2,  # 最小成交量比率（更严格）
+            'min_confidence': 0.65,  # 最小置信度才能发出信号
+            'min_price': 5.0,  # 最低价格过滤，避免极低价股票
+            'max_price': None,  # 最高价格过滤（可选）
+            'max_signals_per_cycle': 2,  # 本策略每周期最多执行的信号数量（仅在单实例下有效）
             
             # 风险管理
             'stop_loss_pct': 0.03,  # 止损百分比
@@ -267,6 +271,7 @@ class A2ZScoreStrategy(BaseStrategy):
                         indicators: Dict) -> List[Dict]:
         """生成交易信号"""
         signals = []
+        # 不在此处计数每周期下单，上限由主线程统一控制（避免工作线程提前耗尽名额）
         
         # 基本数据检查
         if data.empty or len(data) < max(self.config['zscore_lookback'], 30):
@@ -290,35 +295,53 @@ class A2ZScoreStrategy(BaseStrategy):
             # 超卖入场信号
             oversold_signal = self.detect_oversold_entry(symbol, data, indicators)
             if oversold_signal:
+                # 生成信号并做二次过滤（价格 / 置信度）
                 signal_hash = self._generate_signal_hash(oversold_signal)
                 if not self._is_signal_cooldown(signal_hash) and signal_hash not in self.executed_signals:
-                    # 计算ATR用于仓位管理
-                    if 'ATR' in indicators and indicators['ATR'] > 0:
-                        atr = indicators['ATR']
+                    price = oversold_signal.get('price', 0)
+                    min_p = float(self.config.get('min_price', 0) or 0)
+                    max_p = self.config.get('max_price')
+                    if price < min_p or (max_p and price > float(max_p)):
+                        logger.info(f"{symbol} 价格过滤：{price} 不在 [{min_p}, {max_p}] 范围内")
                     else:
-                        atr = data['Close'].std() * 0.01
-                    
-                    oversold_signal['position_size'] = self.calculate_position_size(oversold_signal, atr)
-                    oversold_signal['signal_hash'] = signal_hash
-                    if oversold_signal['position_size'] > 0:
-                        signals.append(oversold_signal)
-                        self.executed_signals.add(signal_hash)
+                        conf = oversold_signal.get('confidence', 0)
+                        if conf < float(self.config.get('min_confidence', 0.5)):
+                            logger.info(f"{symbol} 信号置信度太低: {conf:.2f} < {self.config.get('min_confidence')}")
+                        else:
+                            if 'ATR' in indicators and indicators['ATR'] > 0:
+                                atr = indicators['ATR']
+                            else:
+                                atr = data['Close'].std() * 0.01
+                            oversold_signal['position_size'] = self.calculate_position_size(oversold_signal, atr)
+                            oversold_signal['signal_hash'] = signal_hash
+                            if oversold_signal['position_size'] > 0:
+                                signals.append(oversold_signal)
+                                self.executed_signals.add(signal_hash)
             
             # 超买入场信号
             overbought_signal = self.detect_overbought_entry(symbol, data, indicators)
             if overbought_signal:
                 signal_hash = self._generate_signal_hash(overbought_signal)
                 if not self._is_signal_cooldown(signal_hash) and signal_hash not in self.executed_signals:
-                    if 'ATR' in indicators and indicators['ATR'] > 0:
-                        atr = indicators['ATR']
+                    price = overbought_signal.get('price', 0)
+                    min_p = float(self.config.get('min_price', 0) or 0)
+                    max_p = self.config.get('max_price')
+                    if price < min_p or (max_p and price > float(max_p)):
+                        logger.info(f"{symbol} 价格过滤：{price} 不在 [{min_p}, {max_p}] 范围内")
                     else:
-                        atr = data['Close'].std() * 0.01
-                    
-                    overbought_signal['position_size'] = self.calculate_position_size(overbought_signal, atr)
-                    overbought_signal['signal_hash'] = signal_hash
-                    if overbought_signal['position_size'] > 0:
-                        signals.append(overbought_signal)
-                        self.executed_signals.add(signal_hash)
+                        conf = overbought_signal.get('confidence', 0)
+                        if conf < float(self.config.get('min_confidence', 0.5)):
+                            logger.info(f"{symbol} 信号置信度太低: {conf:.2f} < {self.config.get('min_confidence')}")
+                        else:
+                            if 'ATR' in indicators and indicators['ATR'] > 0:
+                                atr = indicators['ATR']
+                            else:
+                                atr = data['Close'].std() * 0.01
+                            overbought_signal['position_size'] = self.calculate_position_size(overbought_signal, atr)
+                            overbought_signal['signal_hash'] = signal_hash
+                            if overbought_signal['position_size'] > 0:
+                                signals.append(overbought_signal)
+                                self.executed_signals.add(signal_hash)
         
         # 记录信号统计
         if signals:
