@@ -1,0 +1,31 @@
+2025-12-06 15:41:41,622 - MainController - INFO - === 启动量化交易系统 ===
+2025-12-06 15:41:41,623 - ib_manager - INFO - IB交易接口初始化: 127.0.0.1:7497 (clientId=10)
+2025-12-06 15:41:41,623 - data_provider - INFO - 数据提供器初始化 - http://localhost:8001
+2025-12-06 15:41:41,623 - ib_manager - INFO - 尝试连接IB [尝试 1/3]
+2025-12-06 15:41:41,623 - ib_insync.client - INFO - Connecting to 127.0.0.1:7497 with clientId 10...
+2025-12-06 15:41:41,624 - ib_insync.client - INFO - Connected
+2025-12-06 15:41:41,625 - ib_insync.client - INFO - Logged on to server version 176
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2104, reqId -1: \u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:usfarm.nj
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2104, reqId -1: \u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:hfarm
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2104, reqId -1: \u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:usopt.nj
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2104, reqId -1: \u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:cashfarm
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2104, reqId -1: \u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:usfarm
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2106, reqId -1: \u5386\u53f2\u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:euhmds
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2106, reqId -1: \u5386\u53f2\u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:apachmds
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2106, reqId -1: \u5386\u53f2\u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:fundfarm
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2106, reqId -1: \u5386\u53f2\u5e02\u573a\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:ushmds
+2025-12-06 15:41:41,626 - ib_insync.wrapper - INFO - Warning 2158, reqId -1: Sec-def\u6570\u636e\u573a\u8fde\u63a5\u6b63\u5e38:secdefhk
+2025-12-06 15:41:41,627 - ib_insync.client - INFO - API connection ready
+2025-12-06 15:41:41,627 - ib_insync.wrapper - INFO - position: Position(account='DUN241283', contract=Stock(conId=272093, symbol='MSFT', exchange='NASDAQ', currency='USD', localSymbol='MSFT', tradingClass='NMS'), position=-6.0, avgCost=481.29983335)
+2025-12-06 15:41:41,627 - ib_insync.wrapper - INFO - position: Position(account='DUN241283', contract=Stock(conId=265598, symbol='AAPL', exchange='NASDAQ', currency='USD', localSymbol='AAPL', tradingClass='NMS'), position=1.0, avgCost=281.52)
+2025-12-06 15:41:41,627 - ib_insync.wrapper - INFO - position: Position(account='DUN241283', contract=Stock(conId=76792991, symbol='TSLA', exchange='NASDAQ', currency='USD', localSymbol='TSLA', tradingClass='NMS'), position=248.0, avgCost=452.1172984)
+2025-12-06 15:41:41,829 - ib_insync.wrapper - INFO - updatePortfolio: PortfolioItem(contract=Stock(conId=265598, symbol='AAPL', right='0', primaryExchange='NASDAQ', currency='USD', localSymbol='AAPL', tradingClass='NMS'), position=1.0, marketPrice=279.0, marketValue=279.0, averageCost=281.52, unrealizedPNL=-2.52, realizedPNL=0.0, account='DUN241283')
+2025-12-06 15:41:41,829 - ib_insync.wrapper - INFO - updatePortfolio: PortfolioItem(contract=Stock(conId=272093, symbol='MSFT', right='0', primaryExchange='NASDAQ', currency='USD', localSymbol='MSFT', tradingClass='NMS'), position=-6.0, marketPrice=482.1300049, marketValue=-2892.78, averageCost=481.29983335, unrealizedPNL=-4.98, realizedPNL=0.0, account='DUN241283')
+2025-12-06 15:41:41,829 - ib_insync.wrapper - INFO - updatePortfolio: PortfolioItem(contract=Stock(conId=76792991, symbol='TSLA', right='0', primaryExchange='NASDAQ', currency='USD', localSymbol='TSLA', tradingClass='NMS'), position=248.0, marketPrice=454.6300049, marketValue=112748.24, averageCost=452.1172984, unrealizedPNL=623.15, realizedPNL=0.0, account='DUN241283')
+2025-12-06 15:41:41,929 - ib_insync.ib - INFO - Synchronization complete
+2025-12-06 15:41:41,929 - ib_manager - INFO - ✅ IB连接成功
+2025-12-06 15:41:41,929 - strategy_a1 - INFO - 策略引擎 Strategy_A1_MomentumReversal 已加载
+2025-12-06 15:41:41,929 - MainController - INFO - 已激活策略: Strategy_A1_MomentumReversal
+2025-12-06 15:41:41,929 - MainController - INFO - 系统就绪，开始主循环...
+2025-12-06 15:41:41,929 - MainController - INFO - 监控股票池: ['AAPL', 'TSLA', 'NVDA', 'AMD', 'SPY', 'QQQ']
+2025-12-06 15:42:42,021 - MainController - INFO - --- 执行扫描 (Strategy_A1_MomentumReversal) ---
