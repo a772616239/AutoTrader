@@ -395,7 +395,7 @@ class A5MultiFactorAI(BaseStrategy):
             momentum_score = self._calculate_momentum_score(data)
             
             # 因子最小值过滤 - 所有因子必须达到最低标准
-            min_factor_threshold = 0.3
+            min_factor_threshold = 0.33
             if liquidity_score < min_factor_threshold or momentum_score < min_factor_threshold:
                 logger.info(f"[{symbol}] A5 过滤: 流动性或动量因子过低 (流动性={liquidity_score:.2f}, 动量={momentum_score:.2f})")
                 return signals
