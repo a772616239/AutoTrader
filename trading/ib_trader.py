@@ -108,17 +108,36 @@ class IBTrader:
             
             trade = self.ib.placeOrder(contract, order)
 
-            # 等待短时以让 IB 更新订单状态
-            self.ib.sleep(2)
+            # 等待并轮询订单状态，给 TWS 一点时间处理（有时初始为 PendingSubmit）
+            max_wait_seconds = 10
+            waited = 0
+            status_str = None
+            while waited < max_wait_seconds:
+                self.ib.sleep(1)
+                waited += 1
+                status = getattr(trade, 'orderStatus', None)
+                status_str = getattr(status, 'status', None) if status else None
+                # 记录 trade.log 中的条目以便诊断（例如 Warning 110）
+                try:
+                    if getattr(trade, 'log', None):
+                        for entry in trade.log:
+                            logger.debug(f"order log: time={getattr(entry,'time',None)} status={getattr(entry,'status',None)} message={getattr(entry,'message',None)} errorCode={getattr(entry,'errorCode',None)}")
+                except Exception:
+                    pass
 
-            status = getattr(trade, 'orderStatus', None)
-            status_str = getattr(status, 'status', None) if status else None
+                if status_str in ['Filled', 'Submitted', 'PreSubmitted']:
+                    logger.info(f"✅ 订单提交成功 - ID: {getattr(getattr(trade,'order',None),'orderId',None)}, 状态: {status_str}")
+                    break
+                # 立即检测到被取消的情况，提前退出
+                if status_str in ['Cancelled', 'Inactive']:
+                    logger.warning(f"⚠️  订单被取消 - ID: {getattr(getattr(trade,'order',None),'orderId',None)}, 状态: {status_str}")
+                    break
 
+            # 最终状态处理
             if status_str in ['Filled', 'Submitted', 'PreSubmitted']:
-                logger.info(f"✅ 订单提交成功 - ID: {trade.order.orderId}, 状态: {status_str}")
                 return trade
             else:
-                logger.warning(f"⚠️  订单状态异常 - ID: {getattr(trade.order,'orderId',None)}, 状态: {status_str}")
+                logger.warning(f"⚠️  订单状态异常 - ID: {getattr(getattr(trade,'order',None),'orderId',None)}, 状态: {status_str}")
                 return trade
                 
         except Exception as e:

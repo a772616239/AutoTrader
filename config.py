@@ -97,16 +97,36 @@ STRATEGY_CONFIG_MAP = {
 # 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
 # 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
 default_symbols = CONFIG.get('trading', {}).get('symbols', [])
-default_symbol_map = {s: 'a2' for s in default_symbols}
+default_symbol_map = {s: 'a3' for s in default_symbols}
 
 # 允许事先存在的自定义映射覆盖默认值
 existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
 
 # 预设一些需要使用 a2 策略的标的（可按需修改）。仅在用户未显式设置时应用。
-# preselect_a2 = ['GOOGL', 'AMZN', 'INTC', 'CSCO', 'IBM', 'QCOM']
-# for s in preselect_a2:
-#     existing_map.setdefault(s, 'a3')
+preselect_a2 = {
+    'AAPL': 'a2',
+    'MSFT': 'a2',
+    'GOOGL':'a2',
+    'AMZN': 'a2',
+    'TSLA': 'a2',
+    'NVDA': 'a2',
+    'META': 'a2',
+    'INTC': 'a2',
+    'AMD':  'a2',
+}
 
 merged_map = default_symbol_map.copy()
-merged_map.update(existing_map)
+merged_map.update(preselect_a2)
 CONFIG['symbol_strategy_map'] = merged_map
+
+# 打印最终的策略映射
+a1_symbols = [s for s, strat in merged_map.items() if strat == 'a1']
+a2_symbols = [s for s, strat in merged_map.items() if strat == 'a2']
+a3_symbols = [s for s, strat in merged_map.items() if strat == 'a3']
+print(f"✅ 策略映射加载完成，共 {len(merged_map)} 个标的")
+if a1_symbols:
+    print(f"   A1 策略 ({len(a1_symbols)} 个): {', '.join(sorted(a1_symbols[:5]))} {'...' if len(a1_symbols) > 5 else ''}")
+if a2_symbols:
+    print(f"   A2 策略 ({len(a2_symbols)} 个): {', '.join(sorted(a2_symbols[:5]))} {'...' if len(a2_symbols) > 5 else ''}")
+if a3_symbols:
+    print(f"   A3 策略 ({len(a3_symbols)} 个): {', '.join(sorted(a3_symbols[:5]))} {'...' if len(a3_symbols) > 5 else ''}")
