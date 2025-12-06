@@ -45,20 +45,20 @@ def test_position_limit():
         },
     ]
     
-    logger.info(\"开始测试单股总仓位限制功能...\\n\")
+    logger.info("开始测试单股总仓位限制功能...\n")
     
     for test_case in test_cases:
-        logger.info(f\"测试: {test_case['name']}\")
+        logger.info(f"测试: {test_case['name']}")
         result = strategy.check_single_stock_position_limit(
             test_case['symbol'],
             test_case['new_value'],
             test_case['current_price']
         )
         
-        status = \"✅ PASS\" if result == test_case['expected'] else \"❌ FAIL\"
-        logger.info(f\"{status}\\n\")
+        status = "✅ PASS" if result == test_case['expected'] else "❌ FAIL"
+        logger.info(f"{status}\n")
     
-    logger.info(\"测试完成！\")
+    logger.info("测试完成！")
 
 if __name__ == '__main__':
     test_position_limit()

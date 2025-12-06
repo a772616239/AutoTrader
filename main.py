@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 动量反转日内交易系统 (多策略版本)
-支持随时切换A1动量反转策略和A2 Z-Score策略
+支持A1动量反转策略、A2 Z-Score策略和A3双均线成交量突破策略
 """
 import sys
 import os
@@ -19,6 +19,7 @@ from trading.ib_trader import IBTrader
 from data.data_provider import DataProvider
 from strategies.a1_momentum_reversal import A1MomentumReversalStrategy
 from strategies.a2_zscore import A2ZScoreStrategy
+from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
 
 warnings.filterwarnings('ignore')
 
@@ -47,6 +48,7 @@ class StrategyFactory:
     STRATEGIES = {
         'a1': A1MomentumReversalStrategy,
         'a2': A2ZScoreStrategy,
+        'a3': A3DualMAVolumeStrategy,
     }
     
     @classmethod
@@ -439,8 +441,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='多策略交易系统')
-    parser.add_argument('--strategy', '-s', choices=['a1', 'a2'], default='a1',
-                       help='初始策略 (a1: 动量反转, a2: Z-Score)')
+    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3'], default='a1',
+                       help='初始策略 (a1: 动量反转, a2: Z-Score, a3: 双均线成交量突破)')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='启用命令行交互模式')
     

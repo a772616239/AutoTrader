@@ -369,14 +369,22 @@ class BaseStrategy:
                 
                 if signals:
                     all_signals[symbol] = signals
+                    logger.info(f"  {symbol} 生成 {len(signals)} 个信号")
                     
                     # 执行信号
                     for signal in signals:
                         current_price = df['Close'].iloc[-1]
-                        self.execute_signal(signal, current_price)
+                        try:
+                            result = self.execute_signal(signal, current_price)
+                            logger.debug(f"  信号执行结果: {result}")
+                        except Exception as e:
+                            logger.error(f"  执行信号时出错: {e}")
+                            continue
                         
             except Exception as e:
                 logger.error(f"分析 {symbol} 时出错: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
                 continue
         
         return all_signals
