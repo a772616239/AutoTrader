@@ -601,8 +601,12 @@ class MomentumReversalEngine:
         return {
             # 资金管理
             'initial_capital': 100000.0,
-            'risk_per_trade': 0.02,
-            'max_position_size': 0.1,
+            'risk_per_trade': 0.01,
+            'max_position_size': 0.05,
+            'min_cash_buffer': 0.3,
+            'per_trade_notional_cap': 10000.0,
+            'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+            'max_active_positions': 5,
             
             # 时间分区
             'morning_session': ('09:30', '10:30'),
@@ -950,8 +954,50 @@ class MomentumReversalEngine:
         
         return None
     
+    def check_single_stock_position_limit(self, symbol: str, new_position_value: float, 
+                                          current_price: float) -> bool:
+        """
+        检查单股总仓位是否超过限制
+        
+        参数:
+            symbol: 股票代码
+            new_position_value: 新委托单的美元价值
+            current_price: 当前价格
+        
+        返回:
+            True: 仓位符合限制
+            False: 仓位超过限制
+        """
+        max_position_value = self.config.get('max_position_notional', 60000.0)
+        
+        # 获取已有持仓
+        existing_holding = self.get_holding_for_symbol(symbol)
+        existing_value = 0
+        if existing_holding:
+            # 已有持仓价值 = 持仓数量 × 当前价格
+            existing_value = existing_holding['position'] * current_price
+        
+        # 计算总仓位价值
+        total_position_value = existing_value + new_position_value
+        
+        logger.info(
+            f"{symbol} 仓位检查: 已持仓 {existing_holding['position'] if existing_holding else 0}股 "
+            f"(${existing_value:,.2f}), 新委托 ${new_position_value:,.2f}, "
+            f"总仓位 ${total_position_value:,.2f}, 限制 ${max_position_value:,.2f}"
+        )
+        
+        if total_position_value > max_position_value:
+            logger.warning(
+                f"❌ {symbol} 总仓位超过限制! 总值 ${total_position_value:,.2f} > "
+                f"限制 ${max_position_value:,.2f}, 拒绝下单"
+            )
+            return False
+        
+        logger.info(f"✅ {symbol} 仓位检查通过")
+        return True
+    
     def calculate_position_size(self, signal: Dict, atr: float) -> int:
-        """基于凯利公式和波动率计算仓位"""
+        """基于$10,000单笔上限计算仓位"""
         if atr <= 0:
             atr = signal['price'] * 0.02
         
@@ -975,14 +1021,23 @@ class MomentumReversalEngine:
         
         shares = int(risk_amount / risk_per_share)
         
-        # 确保至少1股
+        if self.config.get('max_active_positions') and len(self.positions) >= int(self.config['max_active_positions']):
+            return 0
+
         shares = max(1, shares)
-        
-        # 最大仓位限制
-        max_shares_value = self.equity * self.config['max_position_size']
+
+        # 单笔交易限制为$10,000美元，不受账户百分比限制
+        per_trade_cap = float(self.config.get('per_trade_notional_cap', 10000.0))
+        equity_buffered = self.equity * (1 - float(self.config.get('min_cash_buffer', 0.0)))
+        max_shares_value = min(per_trade_cap, equity_buffered)
         max_shares = int(max_shares_value / signal['price'])
         
-        return min(shares, max_shares)
+        result = min(shares, max_shares)
+        logger.info(
+            f"仓位计算: 价格 {signal['price']:.2f}, 权益 {self.equity:,.2f}, 目标股数 {shares}, "
+            f"上限股数 {max_shares}, 实际下单 {result} (单笔限额: ${per_trade_cap:,.2f})"
+        )
+        return result
     
     def generate_signals(self, symbol: str, data: pd.DataFrame, 
                         indicators: Dict) -> List[Dict]:
@@ -1058,6 +1113,12 @@ class MomentumReversalEngine:
         if not self.ib_trader:
             logger.error("未提供IB交易接口，无法执行交易")
             return {'status': 'REJECTED', 'reason': 'IB接口未初始化'}
+        
+        # 检查单股总仓位限制（仅对买入订单）
+        if signal['action'] == 'BUY':
+            new_position_value = signal['position_size'] * current_price
+            if not self.check_single_stock_position_limit(signal['symbol'], new_position_value, current_price):
+                return {'status': 'REJECTED', 'reason': '单股仓位超过限制'}
         
         # 创建交易记录
         trade = {

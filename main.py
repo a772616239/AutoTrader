@@ -132,10 +132,14 @@ class TradingSystem:
             },
             'strategy': {
                 'initial_capital': 100000.0,
-                'risk_per_trade': 0.02,
-                'max_position_size': 0.1,
+                'risk_per_trade': 0.01,
+                'max_position_size': 0.05,
                 'ib_order_type': 'MKT',
-                'ib_limit_offset': 0.01
+                'ib_limit_offset': 0.01,
+                'min_cash_buffer': 0.3,
+                'per_trade_notional_cap': 10000.0,
+                'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+                'max_active_positions': 5
             }
         }
         

@@ -51,8 +51,12 @@ class BaseStrategy:
         """默认配置 - 子类应该重写此方法"""
         return {
             'initial_capital': 100000.0,
-            'risk_per_trade': 0.02,
-            'max_position_size': 0.1,
+            'risk_per_trade': 0.01,
+            'max_position_size': 0.05,
+            'min_cash_buffer': 0.3,
+            'per_trade_notional_cap': 10000.0,
+            'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+            'max_active_positions': 5,
         }
     
     def get_strategy_name(self) -> str:
@@ -173,6 +177,10 @@ class BaseStrategy:
             except Exception as e:
                 logger.warning(f"获取IB可用资金失败: {e}")
         
+        if self.config.get('max_active_positions'):
+            if len(self.positions) >= int(self.config['max_active_positions']):
+                return 0
+
         risk_amount = self.equity * self.config['risk_per_trade']
         risk_amount *= signal.get('confidence', 0.5)
         
@@ -183,11 +191,21 @@ class BaseStrategy:
         shares = int(risk_amount / risk_per_share)
         shares = max(1, shares)
         
-        # 最大仓位限制
-        max_shares_value = self.equity * self.config['max_position_size']
+        # 最大仓位限制 - 基于$10,000美元单笔上限
+        equity_buffered = self.equity * (1 - float(self.config.get('min_cash_buffer', 0.0)))
+        per_trade_cap = float(self.config.get('per_trade_notional_cap', 10000.0))
+        max_shares_value = min(per_trade_cap, equity_buffered)
         max_shares = int(max_shares_value / signal['price'])
-        
-        return min(shares, max_shares)
+        result = min(shares, max_shares)
+        try:
+            logger.info(
+                f"仓位计算: 价格 {signal['price']:.2f}, 权益 {self.equity:,.2f}, 风险股数 {shares}, "
+                f"单笔上限 ${per_trade_cap:,.2f}, 可用缓冲 ${equity_buffered:,.2f}, "
+                f"上限股数 {max_shares}, 实际下单 {result}"
+            )
+        except Exception:
+            pass
+        return result
     
     def execute_signal(self, signal: Dict, current_price: float) -> Dict:
         """执行交易信号 - 子类可以重写此方法"""

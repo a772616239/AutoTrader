@@ -80,8 +80,9 @@ class MomentumReversalEngine:
             'volume_ratio_threshold': 0.7,  # 成交量萎缩阈值
             
             # 风险参数
-            'max_position_size': 0.1,  # 最大仓位比例
+            'max_position_size': 0.1,  # 最大仓位比例（已废弃，改用per_trade_notional_cap）
             'risk_per_trade': 0.02,  # 单笔交易风险
+            'per_trade_notional_cap': 10000.0,  # 单笔交易美元上限
             'daily_loss_limit': -0.05,  # 单日亏损上限
             'max_drawdown_limit': -0.15,  # 最大回撤上限
             
@@ -344,7 +345,7 @@ class MomentumReversalEngine:
     
     def _calculate_position_size(self, symbol: str, price: float, 
                                 confidence: float) -> int:
-        """基于凯利公式和波动率调整计算仓位大小"""
+        """基于$10,000单笔上限计算仓位大小"""
         
         # 1. 基础风险计算
         account_size = 100000  # 假设账户规模
@@ -361,8 +362,9 @@ class MomentumReversalEngine:
         # 4. 转换为股数
         shares = int(position_value / price)
         
-        # 5. 应用最大仓位限制
-        max_shares = int((account_size * self.config['max_position_size']) / price)
+        # 5. 应用单笔美元上限（不再受百分比限制）
+        per_trade_cap = float(self.config.get('per_trade_notional_cap', 10000.0))
+        max_shares = int(per_trade_cap / price)
         shares = min(shares, max_shares)
         
         return max(shares, 0)
