@@ -241,3 +241,50 @@ class IBTrader:
             if hasattr(contract, 'exchange'):
                 logger.info(f"  交易所: {contract.exchange}")
             logger.info("-" * 40)
+
+    def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict]:
+        """获取未完成订单列表"""
+        if not self.connected and not self.connect():
+            logger.error("IB未连接，无法获取未完成订单")
+            return []
+        try:
+            trades = self.ib.openTrades()
+            results: List[Dict] = []
+            for t in trades:
+                c = t.contract
+                if hasattr(c, 'secType') and c.secType == 'STK':
+                    if symbol and getattr(c, 'symbol', None) != symbol:
+                        continue
+                    o = t.order
+                    s = t.orderStatus
+                    results.append({
+                        'symbol': getattr(c, 'symbol', ''),
+                        'action': getattr(o, 'action', ''),
+                        'quantity': int(getattr(o, 'totalQuantity', 0) or 0),
+                        'order_type': getattr(o, 'orderType', ''),
+                        'limit_price': getattr(o, 'lmtPrice', None),
+                        'order_id': getattr(o, 'orderId', None),
+                        'status': getattr(s, 'status', ''),
+                        'remaining': int(getattr(s, 'remaining', 0) or 0),
+                    })
+            return results
+        except Exception as e:
+            logger.error(f"获取未完成订单时发生错误: {e}")
+            return []
+
+    def has_active_order(self, symbol: str, action: str, quantity: int,
+                         price: Optional[float] = None, tolerance: float = 0.02) -> bool:
+        """检查是否存在相同方向的未完成订单"""
+        orders = self.get_open_orders(symbol)
+        for o in orders:
+            if o.get('action') != action:
+                continue
+            qty_match = abs(int(o.get('quantity', 0)) - int(quantity)) <= max(1, int(quantity * tolerance))
+            price_match = True
+            lp = o.get('limit_price')
+            if price is not None and lp is not None and price > 0:
+                price_match = abs(lp - price) <= price * tolerance
+            if qty_match and price_match:
+                logger.info(f"检测到未完成订单重复: {symbol} {action} 数量{quantity} 订单ID {o.get('order_id')}")
+                return True
+        return False

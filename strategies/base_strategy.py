@@ -200,6 +200,16 @@ class BaseStrategy:
         if not self.ib_trader:
             return {'status': 'REJECTED', 'reason': 'IB接口未初始化'}
         
+        order_type_cfg = self.config.get('ib_order_type', 'MKT')
+        dedupe_price = None
+        if order_type_cfg == 'LMT':
+            if signal['action'] == 'BUY':
+                dedupe_price = current_price * (1 - self.config.get('ib_limit_offset', 0.01))
+            else:
+                dedupe_price = current_price * (1 + self.config.get('ib_limit_offset', 0.01))
+        if self.ib_trader.has_active_order(signal['symbol'], signal['action'], signal['position_size'], dedupe_price):
+            return {'status': 'REJECTED', 'reason': '存在未完成订单，避免重复下单'}
+
         # 创建交易记录
         trade = {
             'symbol': signal['symbol'],
