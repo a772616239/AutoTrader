@@ -349,6 +349,27 @@ class TradingSystem:
                         except Exception:
                             current_price = sig.get('price', 0)
 
+                    # 在主线程使用带 IB 的策略实例重新计算仓位，使用实时资金/持仓
+                    try:
+                        # 优先使用信号中的 ATR 指标
+                        atr = None
+                        if isinstance(sig.get('indicators'), dict) and sig['indicators'].get('ATR'):
+                            atr = sig['indicators'].get('ATR')
+                        # 否则尝试从历史数据计算近似ATR
+                        if atr is None:
+                            try:
+                                df = self.data_provider.get_intraday_data(symbol, interval='5m', lookback=30)
+                                if df is not None and not df.empty:
+                                    atr = (df['High'].rolling(20).max().iloc[-1] - df['Low'].rolling(20).min().iloc[-1]) / 20
+                            except Exception:
+                                atr = None
+
+                        new_size = exec_strategy.calculate_position_size(sig, atr)
+                        sig['position_size'] = new_size
+
+                    except Exception as e:
+                        logger.warning(f"重新计算仓位失败 ({symbol}): {e}")
+
                     try:
                         result = exec_strategy.execute_signal(sig, current_price)
                         logger.info(f"执行信号结果: {symbol} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")

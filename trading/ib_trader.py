@@ -87,6 +87,15 @@ class IBTrader:
             contract = self.get_contract(symbol)
             
             if order_type == 'LMT' and price is not None:
+                # 规范限价到合理的 tick（以美股为例，使用到分位精度）
+                try:
+                    orig_price = float(price)
+                    norm_price = round(orig_price, 2)
+                    if norm_price != orig_price:
+                        logger.debug(f"规范限价: {orig_price} -> {norm_price}")
+                    price = norm_price
+                except Exception:
+                    price = float(price)
                 order = LimitOrder(action, quantity, price)
             elif order_type == 'MKT':
                 order = MarketOrder(action, quantity)
@@ -98,14 +107,18 @@ class IBTrader:
                        f"({order_type} @ {price if price else '市价'})")
             
             trade = self.ib.placeOrder(contract, order)
+
+            # 等待短时以让 IB 更新订单状态
             self.ib.sleep(2)
-            
-            status = trade.orderStatus.status
-            if status in ['Filled', 'Submitted', 'PreSubmitted']:
-                logger.info(f"✅ 订单提交成功 - ID: {trade.order.orderId}, 状态: {status}")
+
+            status = getattr(trade, 'orderStatus', None)
+            status_str = getattr(status, 'status', None) if status else None
+
+            if status_str in ['Filled', 'Submitted', 'PreSubmitted']:
+                logger.info(f"✅ 订单提交成功 - ID: {trade.order.orderId}, 状态: {status_str}")
                 return trade
             else:
-                logger.warning(f"⚠️  订单状态异常 - ID: {trade.order.orderId}, 状态: {status}")
+                logger.warning(f"⚠️  订单状态异常 - ID: {getattr(trade.order,'orderId',None)}, 状态: {status_str}")
                 return trade
                 
         except Exception as e:

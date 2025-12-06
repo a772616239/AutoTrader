@@ -282,31 +282,61 @@ class BaseStrategy:
                 )
             
             if ib_trade:
-                trade['status'] = 'EXECUTED'
-                trade['order_id'] = ib_trade.order.orderId
-                trade['order_status'] = ib_trade.orderStatus.status
-                
-                # 添加信号到缓存
-                if 'signal_hash' in signal:
-                    self._add_signal_to_cache(signal['signal_hash'])
-                
-                # 更新本地持仓
-                if signal['action'] == 'BUY':
-                    if signal['symbol'] not in self.positions:
-                        self.positions[signal['symbol']] = {
-                            'size': signal['position_size'],
-                            'avg_cost': current_price,
-                            'entry_time': datetime.now()
-                        }
-                    else:
-                        old_pos = self.positions[signal['symbol']]
-                        total_size = old_pos['size'] + signal['position_size']
-                        total_cost = old_pos['size'] * old_pos['avg_cost'] + signal['position_size'] * current_price
-                        self.positions[signal['symbol']] = {
-                            'size': total_size,
-                            'avg_cost': total_cost / total_size,
-                            'entry_time': old_pos.get('entry_time', datetime.now())
-                        }
+                # 读取 IB 返回的订单状态并映射到内部状态
+                ib_status = None
+                try:
+                    ib_status = getattr(ib_trade, 'orderStatus', None)
+                    ib_status_str = ib_status.status if ib_status else None
+                except Exception:
+                    ib_status_str = None
+
+                trade['order_id'] = getattr(getattr(ib_trade, 'order', None), 'orderId', None)
+                trade['order_status'] = ib_status_str
+
+                # 映射 IB 的 orderStatus 到内部 status
+                status_map = {
+                    'PendingSubmit': 'PENDING',
+                    'PreSubmitted': 'PENDING',
+                    'Submitted': 'PENDING',
+                    'ApiPending': 'PENDING',
+                    'Filled': 'EXECUTED',
+                    'Cancelled': 'CANCELLED',
+                    'Inactive': 'FAILED'
+                }
+                mapped = status_map.get(ib_status_str, 'PENDING')
+                trade['status'] = mapped
+
+                # 如果已执行（Filled），则更新持仓并将信号加入缓存
+                if mapped == 'EXECUTED':
+                    if 'signal_hash' in signal:
+                        self._add_signal_to_cache(signal['signal_hash'])
+
+                    if signal['action'] == 'BUY':
+                        if signal['symbol'] not in self.positions:
+                            self.positions[signal['symbol']] = {
+                                'size': signal['position_size'],
+                                'avg_cost': current_price,
+                                'entry_time': datetime.now()
+                            }
+                        else:
+                            old_pos = self.positions[signal['symbol']]
+                            total_size = old_pos['size'] + signal['position_size']
+                            total_cost = old_pos['size'] * old_pos['avg_cost'] + signal['position_size'] * current_price
+                            self.positions[signal['symbol']] = {
+                                'size': total_size,
+                                'avg_cost': total_cost / total_size,
+                                'entry_time': old_pos.get('entry_time', datetime.now())
+                            }
+
+                # 记录交易历史（包含已提交/待处理/已执行等）
+                self.trade_history.append(trade)
+                self.trades_executed += 1
+
+                # 若为 PENDING，则记录警告信息
+                if mapped == 'PENDING':
+                    logger.warning(f"⚠️  订单状态异常或待处理 - ID: {trade.get('order_id')}, 状态: {ib_status_str}")
+
+                return trade
             else:
                 if signal['symbol'] in self.positions:
                     old_pos = self.positions[signal['symbol']]

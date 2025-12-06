@@ -94,14 +94,19 @@ STRATEGY_CONFIG_MAP = {
 
 # 每个标的分配策略示例: 将特定股票映射到 a1/a2/a3
 # 如果未在此映射中列出，则系统可选择默认策略或轮询分配
-CONFIG.setdefault('symbol_strategy_map', {
-    'AAPL': 'a1',
-    'MSFT': 'a1',
-    'GOOGL': 'a2',
-    'AMZN': 'a2',
-    'TSLA': 'a3',
-    'NVDA': 'a3',
-    'META': 'a1',
-    'INTC': 'a2',
-    'AMD': 'a3',
-})
+# 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
+# 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
+default_symbols = CONFIG.get('trading', {}).get('symbols', [])
+default_symbol_map = {s: 'a2' for s in default_symbols}
+
+# 允许事先存在的自定义映射覆盖默认值
+existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
+
+# 预设一些需要使用 a2 策略的标的（可按需修改）。仅在用户未显式设置时应用。
+# preselect_a2 = ['GOOGL', 'AMZN', 'INTC', 'CSCO', 'IBM', 'QCOM']
+# for s in preselect_a2:
+#     existing_map.setdefault(s, 'a3')
+
+merged_map = default_symbol_map.copy()
+merged_map.update(existing_map)
+CONFIG['symbol_strategy_map'] = merged_map
