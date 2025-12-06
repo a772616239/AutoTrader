@@ -16,6 +16,7 @@ from strategies.a1_momentum_reversal import A1MomentumReversalStrategy
 from strategies.a2_zscore import A2ZScoreStrategy
 from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
 from strategies.a4_pullback import A4PullbackStrategy
+from strategies.a5_multifactor_ai import A5MultiFactorAI
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ STRATEGY_CLASSES = {
     'a2': A2ZScoreStrategy,
     'a3': A3DualMAVolumeStrategy,
     'a4': A4PullbackStrategy,
+    'a5': A5MultiFactorAI,
 }
 
 

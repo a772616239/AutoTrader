@@ -119,6 +119,31 @@ CONFIG = {
         'avoid_close_hour': True,
         'ib_order_type': 'MKT',
         'ib_limit_offset': 0.01,
+    },
+    'strategy_a5': {  # 多因子AI融合策略配置
+        'initial_capital': 100000.0,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.06,
+        'per_trade_notional_cap': 6000.0,      # 单笔交易美元上限（严格）
+        'max_position_notional': 40000.0,      # 单股总仓位上限（美元，严格）
+        'min_confidence': 0.65,                # 最小信心度阈值（严格）
+        'min_price': 10.0,                     # 最小股价（严格，避免低价股）
+        'min_volume': 200000,                 # 最小日成交量（严格，流动性第一）
+        'lookback_period': 90,                 # 基本面指标回溯天数
+        'recent_period': 20,                   # 最近期间（天数）
+        'liquidity_weight': 0.35,              # 流动性因子权重（优先级最高）
+        'fundamental_weight': 0.20,            # 基本面因子权重（降低）
+        'sentiment_weight': 0.10,              # 情绪因子权重（最小化）
+        'momentum_weight': 0.35,               # 动量因子权重（优先级最高）
+        'buy_threshold': 0.68,                 # 买入复合得分阈值（严格）
+        'sell_threshold': 0.55,                # 卖出复合得分阈值（严格）
+        'exit_threshold': 0.25,                # 平仓复合得分阈值（更低，快速止损）
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+        'trading_start_time': '09:45',
+        'trading_end_time': '15:30',
+        'avoid_open_hour': True,
+        'avoid_close_hour': True,
     }
 }
 
@@ -128,6 +153,7 @@ STRATEGY_CONFIG_MAP = {
     'a2': 'strategy_a2',
     'a3': 'strategy_a3',
     'a4': 'strategy_a4',
+    'a5': 'strategy_a5',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a1/a2/a3
@@ -135,7 +161,7 @@ STRATEGY_CONFIG_MAP = {
 # 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
 # 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
 default_symbols = CONFIG.get('trading', {}).get('symbols', [])
-default_symbol_map = {s: 'a2' for s in default_symbols}
+default_symbol_map = {s: 'a5' for s in default_symbols}
 
 # 允许事先存在的自定义映射覆盖默认值
 existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
@@ -162,6 +188,7 @@ a1_symbols = [s for s, strat in merged_map.items() if strat == 'a1']
 a2_symbols = [s for s, strat in merged_map.items() if strat == 'a2']
 a3_symbols = [s for s, strat in merged_map.items() if strat == 'a3']
 a4_symbols = [s for s, strat in merged_map.items() if strat == 'a4']
+a5_symbols = [s for s, strat in merged_map.items() if strat == 'a5']
 print(f"✅ 策略映射加载完成，共 {len(merged_map)} 个标的")
 if a1_symbols:
     print(f"   A1 策略 ({len(a1_symbols)} 个): {', '.join(sorted(a1_symbols[:5]))} {'...' if len(a1_symbols) > 5 else ''}")
@@ -171,3 +198,5 @@ if a3_symbols:
     print(f"   A3 策略 ({len(a3_symbols)} 个): {', '.join(sorted(a3_symbols[:5]))} {'...' if len(a3_symbols) > 5 else ''}")
 if a4_symbols:
     print(f"   A4 策略 ({len(a4_symbols)} 个): {', '.join(sorted(a4_symbols[:5]))} {'...' if len(a4_symbols) > 5 else ''}")
+if a5_symbols:
+    print(f"   A5 策略 ({len(a5_symbols)} 个): {', '.join(sorted(a5_symbols[:5]))} {'...' if len(a5_symbols) > 5 else ''}")
