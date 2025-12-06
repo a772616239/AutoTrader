@@ -115,7 +115,7 @@ class DataProvider:
                 data = response.json()
                 
                 if 'error' in data:
-                    print(f"接口错误: {data['error']}")
+                    print(f"接口错误: {data['error']},symbol: {symbol}")
                     return pd.DataFrame()
                 
                 # 处理原始数据
@@ -351,7 +351,7 @@ class MomentumReversalEngine:
             'max_drawdown': -0.15,             # 最大回撤
             
             # 交易参数
-            'min_volume': 80000,             # 最小成交量
+            'min_volume': 10000,             # 最小成交量
             'min_data_points': 30,             # 最小数据点
             'commission_rate': 0.0005,         # 佣金率
         }
@@ -414,15 +414,16 @@ class MomentumReversalEngine:
             return None
         print(f"{symbol} 最新价: {latest['Close']}, MA20: {indicators[ma_key]}")
         price_deviation = (latest['Close'] - indicators[ma_key]) / indicators[ma_key] * 100
-        if abs(price_deviation) < 0.6:  # 温和偏离
+        if abs(price_deviation) < 0.34:  # 温和偏离
             print(f"{symbol} 价格偏离不足，非早盘动量: {price_deviation:.2f}%")
             return None
+        
         
         # 3. 成交量确认
         if 'Volume' in data.columns and len(data) >= 5:
             recent_volume = data['Volume'].iloc[-5:].mean()
-            if latest['Volume'] < recent_volume * 1.2:
-                print(f"{symbol} 成交量未放大，非早盘动量")
+            if latest['Volume'] < recent_volume * 1.05:
+                print(f"{symbol} 成交量未放大，非早盘动量{latest['Volume']} < {recent_volume *  1.05}----data['Volume']:{data['Volume'].tolist()}")
                 return None  # 成交量未放大
         
         # 计算信号强度
@@ -734,7 +735,10 @@ class MomentumReversalSystem:
                 'retry_attempts': 3
             },
             'trading': {
-                'symbols': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META'],
+                'symbols': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META','MU','INTC','AMD',
+                            'NFLX','BIDU','JD','BABA','TCEHY','PYPL','SHOP','CRM','ORCL','IBM',
+                            'CSCO','QCOM','TXN','AVGO','ADBE','INTU','ZM','DOCU','SNOW','UBER',
+                            'LYFT'],
                 'scan_interval_minutes': 1,
                 'trading_hours': {
                     'start': '00:00',  # 开盘后5分钟
