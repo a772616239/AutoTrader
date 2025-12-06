@@ -86,7 +86,7 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
     
     def _send_html_response(self):
         self.send_response(200)
-        self.send_header('Content-type', 'text/html')
+        self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
         html = """
         <html>
