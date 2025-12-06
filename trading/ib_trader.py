@@ -288,3 +288,47 @@ class IBTrader:
                 logger.info(f"检测到未完成订单重复: {symbol} {action} 数量{quantity} 订单ID {o.get('order_id')}")
                 return True
         return False
+
+    def cancel_open_orders(self, symbol: Optional[str] = None) -> int:
+        """取消当前未完成订单，支持按标的过滤"""
+        if not self.connected and not self.connect():
+            logger.error("IB未连接，无法取消订单")
+            return 0
+        try:
+            trades = self.ib.openTrades()
+            count = 0
+            for t in trades:
+                c = t.contract
+                if hasattr(c, 'secType') and c.secType == 'STK':
+                    if symbol and getattr(c, 'symbol', None) != symbol:
+                        continue
+                    s = t.orderStatus
+                    if getattr(s, 'status', '') in ['Filled', 'Cancelled']:  # 已完成或已取消跳过
+                        continue
+                    self.ib.cancelOrder(t.order)
+                    count += 1
+            if count > 0:
+                logger.info(f"已取消 {count} 个未完成订单{(' (仅 '+symbol+')' if symbol else '')}")
+            else:
+                logger.info("当前无需取消的未完成订单")
+            return count
+        except Exception as e:
+            logger.error(f"取消未完成订单时发生错误: {e}")
+            return 0
+
+    def cancel_all_orders_global(self) -> None:
+        """向 TWS 发送全局取消请求（若可用）"""
+        if not self.connected and not self.connect():
+            logger.error("IB未连接，无法全局取消订单")
+            return
+        try:
+            # 某些配置下可能不支持全局取消，故尝试并忽略异常
+            if hasattr(self.ib, 'reqGlobalCancel'):
+                self.ib.reqGlobalCancel()
+                logger.info("已发送全局取消请求")
+            else:
+                # 退化为逐个取消
+                self.cancel_open_orders()
+        except Exception as e:
+            logger.warning(f"全局取消失败，退化为逐个取消: {e}")
+            self.cancel_open_orders()

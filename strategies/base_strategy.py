@@ -210,6 +210,24 @@ class BaseStrategy:
         if self.ib_trader.has_active_order(signal['symbol'], signal['action'], signal['position_size'], dedupe_price):
             return {'status': 'REJECTED', 'reason': '存在未完成订单，避免重复下单'}
 
+        if signal['action'] == 'SELL':
+            current_pos = 0
+            if signal['symbol'] in self.positions:
+                try:
+                    current_pos = int(self.positions[signal['symbol']].get('size', 0) or 0)
+                except:
+                    current_pos = 0
+            try:
+                ib_pos = self.ib_trader.get_holding_for_symbol(signal['symbol'])
+                if ib_pos and 'position' in ib_pos:
+                    current_pos = int(ib_pos['position'])
+            except:
+                pass
+            if current_pos <= 0:
+                return {'status': 'REJECTED', 'reason': '无持仓，禁止卖出'}
+            if signal['position_size'] > current_pos:
+                signal['position_size'] = current_pos
+
         # 创建交易记录
         trade = {
             'symbol': signal['symbol'],
@@ -271,8 +289,17 @@ class BaseStrategy:
                             'avg_cost': total_cost / total_size,
                             'entry_time': old_pos.get('entry_time', datetime.now())
                         }
-                else:
-                    if signal['symbol'] in self.positions:
+            else:
+                if signal['symbol'] in self.positions:
+                    old_pos = self.positions[signal['symbol']]
+                    remaining = max(0, int(old_pos.get('size', 0)) - int(signal['position_size']))
+                    if remaining > 0:
+                        self.positions[signal['symbol']] = {
+                            'size': remaining,
+                            'avg_cost': old_pos.get('avg_cost', current_price),
+                            'entry_time': old_pos.get('entry_time', datetime.now())
+                        }
+                    else:
                         del self.positions[signal['symbol']]
                 
                 self.trade_history.append(trade)
@@ -283,10 +310,10 @@ class BaseStrategy:
                            f"@{current_price:.2f}, 数量: {signal['position_size']}")
                 
                 return trade
-            else:
-                trade['status'] = 'FAILED'
-                trade['reason'] = 'IB下单失败'
-                return trade
+            # else:
+            #     trade['status'] = 'FAILED'
+            #     # trade['reason'] = 'IB下单失败'
+            #     return trade
                 
         except Exception as e:
             trade['status'] = 'ERROR'
