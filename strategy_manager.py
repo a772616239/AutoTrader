@@ -3,6 +3,7 @@
 策略管理器：按股票分配策略并并行执行每个策略的分析周期
 """
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import queue as _queue
 from typing import Dict, List
 import logging
 
@@ -113,6 +114,63 @@ class StrategyManager:
                     logger.error(f"策略线程 {name} 失败: {e}")
 
         return results
+
+    def stream_run(self, symbols: List[str], signal_queue: _queue.Queue):
+        """以流式方式运行策略分析：
+
+        - 启动工作线程并在发现信号时将信号逐条放入 `signal_queue`（线程安全）以便主线程即时消费并下单。
+        - 返回 (executor, futures) 以便调用方监控完成状态；调用方负责关闭 executor（或等待 futures 完成）。
+        """
+        symbol_map = self.config.get('symbol_strategy_map', {})
+        grouped = _group_symbols_by_strategy(symbol_map, symbols)
+
+        def _run_for_strategy_stream(strategy_name: str, syms: List[str]):
+            cls = STRATEGY_CLASSES.get(strategy_name)
+            if not cls:
+                logger.error(f"未知策略名称: {strategy_name}")
+                return {}
+
+            cfg_key = global_config.STRATEGY_CONFIG_MAP.get(strategy_name)
+            strat_cfg = {}
+            if cfg_key:
+                strat_cfg = self.config.get(cfg_key, {})
+
+            strategy = cls(config=strat_cfg, ib_trader=None)
+
+            for sym in syms:
+                try:
+                    df = self.data_provider.get_intraday_data(sym, interval='5m', lookback=80)
+                    if df is None or df.empty:
+                        continue
+                    try:
+                        indicators = self.data_provider.get_technical_indicators(sym, '1d', '5m')
+                    except Exception:
+                        indicators = {}
+
+                    sigs = strategy.generate_signals(sym, df, indicators)
+                    if sigs:
+                        for s in sigs:
+                            try:
+                                s['origin_strategy'] = strategy_name
+                            except Exception:
+                                pass
+                            # 立即推送到主线程队列，供主线程即时处理
+                            try:
+                                signal_queue.put_nowait((sym, s))
+                            except Exception:
+                                # 若队列阻塞/失败，仍继续处理其它符号
+                                logger.exception('将信号放入队列失败')
+                except Exception as e:
+                    logger.error(f"策略 {strategy_name} 处理 {sym} 时出错: {e}")
+                    continue
+
+        ex = ThreadPoolExecutor(max_workers=min(8, max(1, len(grouped))))
+        futures = []
+        for name, syms in grouped.items():
+            fut = ex.submit(_run_for_strategy_stream, name, syms)
+            futures.append(fut)
+
+        return ex, futures
 
 
 if __name__ == '__main__':

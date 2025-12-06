@@ -301,31 +301,36 @@ class TradingSystem:
             symbol_map = None
 
         if symbol_map:
+            from queue import Queue, Empty
             mgr = StrategyManager(self.data_provider, self.ib_trader, config=global_config.CONFIG)
-            signals = mgr.run_once(symbols)
+            signal_queue = Queue()
+            # 启动流式运行，工作线程会把信号放入 signal_queue，主线程可即时消费
+            executor, futures = mgr.stream_run(symbols, signal_queue)
+            signals = {}
         else:
             signals = self.strategy.run_analysis_cycle(self.data_provider, symbols)
         
-        # 处理信号
-        if signals:
-            logger.info(f"\n📊 生成 {len(signals)} 个标的的信号:")
-            for symbol, sig_list in signals.items():
-                for sig in sig_list:
-                    action_icon = "🟢" if sig['action'] == 'BUY' else "🔴"
-                    logger.info(f"  {action_icon} {symbol}: {sig['action']} @ ${sig['price']:.2f}, "
-                              f"数量: {sig.get('position_size', 0):,}, "
-                              f"类型: {sig['signal_type']}, "
-                              f"原因: {sig.get('reason', 'N/A')}")
-        else:
-            logger.info("📭 未生成交易信号")
-        
-        # 如果是通过 StrategyManager 并行生成的信号，主线程负责执行下单，避免在工作线程中调用 IB
-        if signals and symbol_map and self.ib_trader:
-            logger.info("开始在主线程执行下单 (按信号来源策略创建执行实例)")
-            for symbol, sig_list in signals.items():
-                for sig in sig_list:
-                    origin = sig.get('origin_strategy') or symbol_map.get(symbol) or self.current_strategy_name
-                    # 获取策略配置节
+        # 处理信号：流式模式下主线程即时消费 signal_queue 并执行下单
+        if symbol_map and self.ib_trader:
+            from queue import Empty
+            logger.info("开始在主线程即时消费信号队列并下单")
+            # 在工作线程运行期间，持续消费队列
+            try:
+                # 只要还有未完成的 future，就尝试获取队列中的信号并执行
+                import concurrent.futures
+                while True:
+                    # 处理队列中所有可用的信号
+                    try:
+                        sym, sig = signal_queue.get(timeout=0.8)
+                    except Empty:
+                        # 若队列空，检查是否所有 futures 已完成
+                        if all(f.done() for f in futures):
+                            break
+                        else:
+                            continue
+
+                    # 立刻为该信号创建带 IB 的策略执行实例并下单
+                    origin = sig.get('origin_strategy') or symbol_map.get(sym) or self.current_strategy_name
                     try:
                         cfg_key = global_config.STRATEGY_CONFIG_MAP.get(origin)
                         strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
@@ -335,10 +340,8 @@ class TradingSystem:
                     try:
                         exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_trader)
                     except Exception:
-                        # 回退到当前系统策略实例（已连接 IB）
                         exec_strategy = self.strategy if self.strategy else StrategyFactory.create_strategy(self.current_strategy_name, config=strat_cfg, ib_trader=self.ib_trader)
 
-                    # 同步持仓以保证卖出/重复下单检查正确
                     try:
                         exec_strategy.sync_positions_from_ib()
                     except Exception:
@@ -347,22 +350,19 @@ class TradingSystem:
                     current_price = sig.get('price')
                     if current_price is None:
                         try:
-                            df = self.data_provider.get_intraday_data(symbol, interval='5m', lookback=1)
+                            df = self.data_provider.get_intraday_data(sym, interval='5m', lookback=1)
                             if df is not None and not df.empty:
                                 current_price = df['Close'].iloc[-1]
                         except Exception:
                             current_price = sig.get('price', 0)
 
-                    # 在主线程使用带 IB 的策略实例重新计算仓位，使用实时资金/持仓
                     try:
-                        # 优先使用信号中的 ATR 指标
                         atr = None
                         if isinstance(sig.get('indicators'), dict) and sig['indicators'].get('ATR'):
                             atr = sig['indicators'].get('ATR')
-                        # 否则尝试从历史数据计算近似ATR
                         if atr is None:
                             try:
-                                df = self.data_provider.get_intraday_data(symbol, interval='5m', lookback=30)
+                                df = self.data_provider.get_intraday_data(sym, interval='5m', lookback=30)
                                 if df is not None and not df.empty:
                                     atr = (df['High'].rolling(20).max().iloc[-1] - df['Low'].rolling(20).min().iloc[-1]) / 20
                             except Exception:
@@ -370,15 +370,46 @@ class TradingSystem:
 
                         new_size = exec_strategy.calculate_position_size(sig, atr)
                         sig['position_size'] = new_size
-
                     except Exception as e:
-                        logger.warning(f"重新计算仓位失败 ({symbol}): {e}")
+                        logger.warning(f"重新计算仓位失败 ({sym}): {e}")
 
                     try:
                         result = exec_strategy.execute_signal(sig, current_price)
-                        logger.info(f"执行信号结果: {symbol} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
+                        logger.info(f"执行信号结果: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
                     except Exception as e:
-                        logger.error(f"执行信号出错 {symbol}: {e}")
+                        logger.error(f"执行信号出错 {sym}: {e}")
+
+                # 所有 futures 完成后，drain队列以处理残留
+                while True:
+                    try:
+                        sym, sig = signal_queue.get_nowait()
+                    except Empty:
+                        break
+                    try:
+                        origin = sig.get('origin_strategy') or symbol_map.get(sym) or self.current_strategy_name
+                        cfg_key = global_config.STRATEGY_CONFIG_MAP.get(origin)
+                        strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
+                        exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_trader)
+                        exec_strategy.sync_positions_from_ib()
+                        current_price = sig.get('price') or 0
+                        atr = None
+                        new_size = exec_strategy.calculate_position_size(sig, atr)
+                        sig['position_size'] = new_size
+                        result = exec_strategy.execute_signal(sig, current_price)
+                        logger.info(f"执行信号结果: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
+                    except Exception as e:
+                        logger.error(f"处理残留信号出错 {sym}: {e}")
+            finally:
+                try:
+                    # 等待 futures 完成并关闭 executor
+                    for f in futures:
+                        f.result(timeout=1)
+                except Exception:
+                    pass
+                try:
+                    executor.shutdown(wait=False)
+                except Exception:
+                    pass
 
         self.last_signals = signals
         
