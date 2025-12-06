@@ -9,10 +9,36 @@ import schedule
 import pandas as pd
 import numpy as np
 import requests
+import logging
 from datetime import datetime, time as dt_time, timedelta
 from typing import Dict, List, Optional, Any
 import warnings
+import os
+
 warnings.filterwarnings('ignore')
+
+# ==================== 全局日志配置 ====================
+# 创建日志目录（如果不存在）
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+
+# 设置日志文件路径
+log_file = os.path.join(log_dir, "trading_system.log")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# 记录日志文件位置
+logger.info(f"日志文件保存在: {os.path.abspath(log_file)}")
 
 # ==================== 数据提供器 (纯接口版本) ====================
 class DataProvider:
@@ -32,8 +58,8 @@ class DataProvider:
         self.data_cache = {}
         self.cache_duration = 300  # 5分钟缓存
         
-        print(f"数据提供器初始化 - 仅使用真实接口")
-        print(f"服务器地址: {base_url}")
+        logger.info(f"数据提供器初始化 - 仅使用真实接口")
+        logger.info(f"服务器地址: {base_url}")
         
         # 测试连接
         self._test_connection()
@@ -47,21 +73,21 @@ class DataProvider:
             if response.status_code == 200:
                 data = response.json()
                 if 'error' not in data:
-                    print("✅ 数据服务器连接成功")
+                    logger.info("✅ 数据服务器连接成功")
                     return True
                 else:
-                    print(f"⚠️  服务器返回错误: {data.get('error', '未知错误')}")
+                    logger.warning(f"⚠️  服务器返回错误: {data.get('error', '未知错误')}")
                     return False
             else:
-                print(f"❌ 服务器响应异常: HTTP {response.status_code}")
+                logger.error(f"❌ 服务器响应异常: HTTP {response.status_code}")
                 return False
                 
         except requests.exceptions.ConnectionError:
-            print("❌ 无法连接到数据服务器")
-            print("请确保已运行: python enhanced_http_server.py")
+            logger.error("❌ 无法连接到数据服务器")
+            logger.error("请确保已运行: python enhanced_http_server.py")
             return False
         except Exception as e:
-            print(f"❌ 连接测试失败: {e}")
+            logger.error(f"❌ 连接测试失败: {e}")
             return False
     
     def get_intraday_data(self, symbol: str, interval: str = '5m', 
@@ -103,26 +129,26 @@ class DataProvider:
         # 带重试的请求
         for attempt in range(self.max_retries):
             try:
-                print(f"请求数据: {symbol} ({interval}, {period}) [尝试 {attempt+1}/{self.max_retries}]")
+                logger.info(f"请求数据: {symbol} ({interval}, {period}) [尝试 {attempt+1}/{self.max_retries}]")
                 
                 response = self.session.get(url, params=params, timeout=10)
                 
                 if response.status_code != 200:
-                    print(f"HTTP错误 {response.status_code}, 重试中...")
+                    logger.warning(f"HTTP错误 {response.status_code}, 重试中...")
                     time.sleep(1 * (attempt + 1))  # 指数退避
                     continue
                 
                 data = response.json()
                 
                 if 'error' in data:
-                    print(f"接口错误: {data['error']},symbol: {symbol}")
+                    logger.error(f"接口错误: {data['error']}, symbol: {symbol}")
                     return pd.DataFrame()
                 
                 # 处理原始数据
                 df = self._process_raw_data(data, symbol)
                 
                 if df.empty:
-                    print(f"处理后的数据为空: {symbol}")
+                    logger.warning(f"处理后的数据为空: {symbol}")
                     return df
                 
                 # 限制数据点数量
@@ -135,20 +161,20 @@ class DataProvider:
                     'data': df.copy()
                 }
                 
-                print(f"✅ 成功获取 {symbol}: {len(df)} 条数据")
+                logger.info(f"✅ 成功获取 {symbol}: {len(df)} 条数据")
                 return df
                 
             except requests.exceptions.Timeout:
-                print(f"请求超时 {symbol}, 重试中...")
+                logger.warning(f"请求超时 {symbol}, 重试中...")
                 time.sleep(2 * (attempt + 1))
             except requests.exceptions.ConnectionError:
-                print(f"连接错误 {symbol}, 重试中...")
+                logger.error(f"连接错误 {symbol}, 重试中...")
                 time.sleep(3 * (attempt + 1))
             except Exception as e:
-                print(f"获取 {symbol} 数据时出错: {e}")
+                logger.error(f"获取 {symbol} 数据时出错: {e}")
                 break
         
-        print(f"❌ 所有重试失败: {symbol}")
+        logger.error(f"❌ 所有重试失败: {symbol}")
         return pd.DataFrame()
     
     def _calculate_period(self, interval: str, lookback: int) -> str:
@@ -184,7 +210,7 @@ class DataProvider:
             # 获取原始数据列表
             raw_data = api_data.get('raw_data', [])
             if not raw_data:
-                print(f"无原始数据: {symbol}")
+                logger.warning(f"无原始数据: {symbol}")
                 return pd.DataFrame()
             
             # 转换为DataFrame
@@ -224,7 +250,7 @@ class DataProvider:
             missing_cols = [col for col in required_cols if col not in df.columns]
             
             if missing_cols:
-                print(f"缺失必需列 {missing_cols}: {symbol}")
+                logger.warning(f"缺失必需列 {missing_cols}: {symbol}")
                 return pd.DataFrame()
             
             # 确保Volume列存在
@@ -243,7 +269,7 @@ class DataProvider:
             return df
             
         except Exception as e:
-            print(f"处理 {symbol} 数据时出错: {e}")
+            logger.error(f"处理 {symbol} 数据时出错: {e}")
             return pd.DataFrame()
     
     def get_technical_indicators(self, symbol: str, 
@@ -262,10 +288,10 @@ class DataProvider:
             
             if response.status_code == 200:
                 data = response.json()
-                # print(f"✅ 获取技术指标成功: {response.text}")
+                logger.info(f"✅ 获取技术指标成功: {symbol}")
                 return data.get('technical_indicators', {})
         except Exception as e:
-            print(f"获取技术指标失败 {symbol}: {e}")
+            logger.error(f"获取技术指标失败 {symbol}: {e}")
         
         return {}
     
@@ -323,7 +349,7 @@ class MomentumReversalEngine:
         self.trades_executed = 0
         self.start_time = datetime.now()
         
-        print(f"策略引擎初始化 - 初始资金: ${self.equity:,.2f}")
+        logger.info(f"策略引擎初始化 - 初始资金: ${self.equity:,.2f}")
     
     def _default_config(self) -> Dict:
         """默认配置[citation:3]"""
@@ -386,7 +412,7 @@ class MomentumReversalEngine:
         3. 成交量配合
         """
         if len(data) < 10:
-            print(f"{symbol} 数据不足，无法检测早盘动量信号")
+            logger.info(f"{symbol} 数据不足，无法检测早盘动量信号")
             return None
         
         # 获取当前时间和价格
@@ -396,7 +422,7 @@ class MomentumReversalEngine:
         
         # 只在早盘时段检测
         # if not (morning_start <= current_time <= morning_end):
-        #     print(f"{symbol} 非早盘时段，跳过早盘动量检测")
+        #     logger.info(f"{symbol} 非早盘时段，跳过早盘动量检测")
         #     return None
         
         latest = data.iloc[-1]
@@ -404,26 +430,25 @@ class MomentumReversalEngine:
         # 1. RSI条件 (温和上涨，非超买)
         rsi = indicators.get('RSI', 50)
         if not (50 <= rsi <= 67):
-            print(f"{symbol} RSI不符合早盘动量条件: {rsi}")
+            logger.info(f"{symbol} RSI不符合早盘动量条件: {rsi}")
             return None
         
         # 2. 价格偏离均线 (温和偏离)
         ma_key = 'MA_20'
         if ma_key not in indicators or indicators[ma_key] is None:
-            print(f"{symbol} 缺少MA20指标，无法检测早盘动量")
-            return None
-        print(f"{symbol} 最新价: {latest['Close']}, MA20: {indicators[ma_key]}")
-        price_deviation = (latest['Close'] - indicators[ma_key]) / indicators[ma_key] * 100
-        if abs(price_deviation) < 0.34:  # 温和偏离
-            print(f"{symbol} 价格偏离不足，非早盘动量: {price_deviation:.2f}%")
+            logger.info(f"{symbol} 缺少MA20指标，无法检测早盘动量")
             return None
         
+        price_deviation = (latest['Close'] - indicators[ma_key]) / indicators[ma_key] * 100
+        if abs(price_deviation) < 0.34:  # 温和偏离
+            logger.info(f"{symbol} 价格偏离不足，非早盘动量: {price_deviation:.2f}%")
+            return None
         
         # 3. 成交量确认
         if 'Volume' in data.columns and len(data) >= 5:
             recent_volume = data['Volume'].iloc[-5:].mean()
             if latest['Volume'] < recent_volume * 1.05:
-                print(f"{symbol} 成交量未放大，非早盘动量{latest['Volume']} < {recent_volume *  1.05}----data['Volume']:{data['Volume'].tolist()}")
+                logger.info(f"{symbol} 成交量未放大，非早盘动量{latest['Volume']} < {recent_volume *  1.05}")
                 return None  # 成交量未放大
         
         # 计算信号强度
@@ -432,7 +457,9 @@ class MomentumReversalEngine:
             confidence += min(price_deviation / 5.0, 0.3)  # 正向偏离加分
         if rsi > 55:
             confidence += 0.1
-        print(f"✅--------------------------------------{symbol} 早盘动量信号检测通过，置信度: {confidence:.2f}")
+        
+        logger.info(f"✅ {symbol} 早盘动量信号检测通过，置信度: {confidence:.2f}")
+        
         signal = {
             'symbol': symbol,
             'signal_type': 'MORNING_MOMENTUM',
@@ -510,6 +537,8 @@ class MomentumReversalEngine:
             reason = f"午盘反转: RSI超卖 {rsi:.1f}, 接近近期低点"
             confidence = min(0.4 + (30 - rsi) / 30, 0.8)
         
+        logger.info(f"✅ {symbol} 午盘反转信号检测通过，置信度: {confidence:.2f}")
+        
         signal = {
             'symbol': symbol,
             'signal_type': 'AFTERNOON_REVERSAL',
@@ -539,7 +568,7 @@ class MomentumReversalEngine:
         # 基于波动率的仓位计算
         risk_per_share = atr * self.config['stop_loss_atr_multiple']
         if risk_per_share <= 0:
-            print("风险每股计算错误，无法计算仓位")
+            logger.warning("风险每股计算错误，无法计算仓位")
             return 0
         
         shares = int(risk_amount / risk_per_share)
@@ -557,19 +586,19 @@ class MomentumReversalEngine:
         
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
-            print(f"{symbol} 数据不足，跳过信号生成")
+            logger.info(f"{symbol} 数据不足，跳过信号生成")
             return signals
         
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if avg_volume < self.config['min_volume']:
-                print(f"{symbol} 成交量不足，跳过信号生成 avg_volume{avg_volume}--min_volume:{self.config['min_volume']}")
+                logger.info(f"{symbol} 成交量不足，跳过信号生成 avg_volume{avg_volume}--min_volume:{self.config['min_volume']}")
                 return signals
         
         # 获取ATR用于风险管理
         atr = indicators.get('ATR', data['Close'].std() * 0.01)
-        # print(f"{symbol} ATR: {atr:.2f}")
+        
         # 1. 早盘动量信号
         morning_signal = self.detect_morning_momentum(symbol, data, indicators)
         if morning_signal:
@@ -587,12 +616,14 @@ class MomentumReversalEngine:
         # 记录信号统计
         if signals:
             self.signals_generated += len(signals)
+            logger.info(f"📊 {symbol} 生成 {len(signals)} 个交易信号")
         
         return signals
     
     def execute_signal(self, signal: Dict, current_price: float) -> Dict:
         """执行交易信号 (模拟)"""
         if signal['position_size'] <= 0:
+            logger.warning(f"{signal['symbol']} 无效仓位，跳过执行")
             return {'status': 'REJECTED', 'reason': '无效仓位'}
         
         # 计算交易成本
@@ -631,17 +662,21 @@ class MomentumReversalEngine:
         # 简化资金更新 (实际需要更复杂的持仓管理)
         if signal['action'] == 'BUY':
             self.equity -= trade_value + commission
-        else:  # SELL (卖空，简化处理)
-            pass
+        
+        logger.info(f"📈 执行交易: {signal['symbol']} {signal['action']} "
+                   f"@{current_price:.2f}, "
+                   f"数量: {signal['position_size']}, "
+                   f"价值: ${trade_value:,.2f}")
         
         return trade
     
     def run_analysis_cycle(self, data_provider, symbols: List[str]) -> Dict[str, List[Dict]]:
         """运行分析周期"""
         all_signals = {}
+        logger.info(f"开始分析周期，共 {len(symbols)} 个标的")
         
         for symbol in symbols:
-            # print(f"\n分析标的: {symbol}")
+            logger.info(f"分析标的: {symbol}")
             try:
                 # 获取日内数据
                 df = data_provider.get_intraday_data(
@@ -649,7 +684,7 @@ class MomentumReversalEngine:
                 )
                 
                 if df.empty or len(df) < 30:
-                    print(f"分析 {symbol} 数据不足，跳过")
+                    logger.warning(f"分析 {symbol} 数据不足，跳过")
                     continue
                 
                 # 获取技术指标
@@ -666,9 +701,10 @@ class MomentumReversalEngine:
                         self.execute_signal(signal, signal['price'])
                         
             except Exception as e:
-                print(f"分析 {symbol} 时出错: {e}")
+                logger.error(f"分析 {symbol} 时出错: {e}")
                 continue
         
+        logger.info(f"分析周期完成，生成 {len(all_signals)} 个标的的信号")
         return all_signals
     
     def generate_report(self) -> Dict:
@@ -688,7 +724,7 @@ class MomentumReversalEngine:
         
         win_rate = winning_trades / total_trades if total_trades > 0 else 0
         
-        return {
+        report = {
             'timestamp': datetime.now().isoformat(),
             'equity': self.equity,
             'total_trades': total_trades,
@@ -705,6 +741,11 @@ class MomentumReversalEngine:
                 f"交易执行: {self.trades_executed}"
             ]
         }
+        
+        logger.info(f"📋 交易报告 - 资金: ${self.equity:,.2f}, "
+                   f"总交易: {total_trades}, 胜率: {win_rate:.1%}")
+        
+        return report
 
 # ==================== 主交易系统 ====================
 class MomentumReversalSystem:
@@ -723,9 +764,10 @@ class MomentumReversalSystem:
         self.cycle_count = 0
         self.last_signals = {}
         
-        print("=" * 70)
-        print("动量反转日内交易系统 (增强接口版)")
-        print("=" * 70)
+        logger.info("=" * 70)
+        logger.info("动量反转日内交易系统 (增强接口版)")
+        logger.info("=" * 70)
+        logger.info(f"日志文件: {log_file}")
     
     def _load_config(self, config_file: str) -> Dict:
         """加载配置"""
@@ -756,7 +798,7 @@ class MomentumReversalSystem:
     
     def initialize(self) -> bool:
         """初始化系统"""
-        print("\n初始化交易系统...")
+        logger.info("\n初始化交易系统...")
         
         # 1. 初始化数据提供器
         data_config = self.config['data_server']
@@ -769,11 +811,11 @@ class MomentumReversalSystem:
         strategy_config = self.config['strategy']
         self.strategy_engine = MomentumReversalEngine(strategy_config)
         
-        print("\n✅ 系统初始化完成")
-        print(f"交易标的: {', '.join(self.config['trading']['symbols'][:5])}...")
-        print(f"扫描间隔: {self.config['trading']['scan_interval_minutes']} 分钟")
-        print(f"交易时间: {self.config['trading']['trading_hours']['start']} - "
-              f"{self.config['trading']['trading_hours']['end']}")
+        logger.info("\n✅ 系统初始化完成")
+        logger.info(f"交易标的: {', '.join(self.config['trading']['symbols'][:5])}...")
+        logger.info(f"扫描间隔: {self.config['trading']['scan_interval_minutes']} 分钟")
+        logger.info(f"交易时间: {self.config['trading']['trading_hours']['start']} - "
+                   f"{self.config['trading']['trading_hours']['end']}")
         
         return True
     
@@ -789,26 +831,29 @@ class MomentumReversalSystem:
     def trading_cycle(self):
         """交易循环"""
         if not self.is_running:
-            print("📭 未is_running")
+            logger.warning("📭 系统未运行")
             return
         
         self.cycle_count += 1
         current_time = datetime.now()
         
-        print(f"\n{'='*60}")
-        print(f"交易周期 #{self.cycle_count} - {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print('='*60)
+        logger.info(f"\n{'='*60}")
+        logger.info(f"交易周期 #{self.cycle_count} - {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info('='*60)
         
         # 检查交易时间
         if not self._within_trading_hours():
-            print("⏸️  非交易时间，跳过...")
+            logger.info("⏸️  非交易时间，跳过...")
             return
         
         # 获取市场状态
         market_status = self.data_provider.get_market_status()
         if not market_status['server_available']:
-            print("❌ 数据服务器不可用")
+            logger.error("❌ 数据服务器不可用")
             return
+        
+        logger.info(f"市场状态: 服务器可用 - {market_status['server_available']}, "
+                   f"可用标的: {len(market_status['symbols_available'])}")
         
         # 运行策略分析
         symbols = self.config['trading']['symbols']
@@ -816,20 +861,23 @@ class MomentumReversalSystem:
         
         # 处理信号
         if signals:
-            print(f"\n📊 生成 {len(signals)} 个标的的信号:")
+            logger.info(f"\n📊 生成 {len(signals)} 个标的的信号:")
             for symbol, sig_list in signals.items():
                 for sig in sig_list:
-                    print(f"  {symbol}: {sig['action']} @ ${sig['price']:.2f}, "
-                          f"数量: {sig.get('position_size', 0):,}, "
-                          f"置信度: {sig['confidence']:.2f}, "
-                          f"类型: {sig['signal_type']}")
+                    logger.info(f"  {symbol}: {sig['action']} @ ${sig['price']:.2f}, "
+                              f"数量: {sig.get('position_size', 0):,}, "
+                              f"置信度: {sig['confidence']:.2f}, "
+                              f"类型: {sig['signal_type']}")
         else:
-            print("📭 未生成交易信号")
+            logger.info("📭 未生成交易信号")
         
         self.last_signals = signals
         
         # 生成状态报告
         self._status_report()
+        
+        logger.info(f"交易周期 #{self.cycle_count} 完成")
+        logger.info('='*60)
     
     def _status_report(self):
         """状态报告"""
@@ -838,23 +886,23 @@ class MomentumReversalSystem:
         
         report = self.strategy_engine.generate_report()
         
-        print(f"\n📈 系统状态:")
-        print(f"  资金: ${report['equity']:,.2f}")
-        print(f"  总交易: {report['total_trades']}")
-        print(f"  胜率: {report['win_rate']:.1%}")
-        print(f"  总PNL: ${report['total_pnl']:,.2f}")
+        logger.info(f"\n📈 系统状态:")
+        logger.info(f"  资金: ${report['equity']:,.2f}")
+        logger.info(f"  总交易: {report['total_trades']}")
+        logger.info(f"  胜率: {report['win_rate']:.1%}")
+        logger.info(f"  总PNL: ${report['total_pnl']:,.2f}")
         
         # 信号统计
         total_signals = sum(len(sigs) for sigs in self.last_signals.values())
         if total_signals > 0:
-            print(f"  本期信号: {total_signals}")
+            logger.info(f"  本期信号: {total_signals}")
     
     def start(self):
         """启动系统"""
-        print("\n启动交易系统...")
+        logger.info("\n启动交易系统...")
         
         if not self.initialize():
-            print("初始化失败，系统退出")
+            logger.error("初始化失败，系统退出")
             return
         
         self.is_running = True
@@ -863,8 +911,8 @@ class MomentumReversalSystem:
         interval = self.config['trading']['scan_interval_minutes']
         schedule.every(interval).minutes.at(":00").do(self.trading_cycle)
         
-        print(f"\n✅ 系统已启动，每 {interval} 分钟扫描一次")
-        print("按 Ctrl+C 停止系统\n")
+        logger.info(f"\n✅ 系统已启动，每 {interval} 分钟扫描一次")
+        logger.info("按 Ctrl+C 停止系统\n")
         
         # 立即运行一次
         self.trading_cycle()
@@ -875,27 +923,29 @@ class MomentumReversalSystem:
                 schedule.run_pending()
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("\n\n🛑 收到停止信号...")
+            logger.info("\n\n🛑 收到停止信号...")
             self.stop()
     
     def stop(self):
         """停止系统"""
-        print("停止交易系统...")
+        logger.info("停止交易系统...")
         self.is_running = False
         schedule.clear()
         
         runtime = datetime.now() - self.start_time
-        print(f"\n⏱️  运行时间: {runtime}")
-        print("系统已安全停止")
+        logger.info(f"\n⏱️  运行时间: {runtime}")
+        logger.info(f"总交易周期: {self.cycle_count}")
+        logger.info("系统已安全停止")
 
 # ==================== 主程序入口 ====================
 def main():
     """主函数"""
     import sys
     
-    print("🚀 动量反转日内交易系统启动")
-    print("版本: 增强接口版 (纯真实数据)")
-    print("=" * 70)
+    logger.info("🚀 动量反转日内交易系统启动")
+    logger.info("版本: 增强接口版 (纯真实数据)")
+    logger.info(f"日志文件: {log_file}")
+    logger.info("=" * 70)
     
     # 创建并启动系统
     system = MomentumReversalSystem()
@@ -903,7 +953,7 @@ def main():
     try:
         system.start()
     except Exception as e:
-        print(f"\n❌ 系统运行出错: {e}")
+        logger.error(f"\n❌ 系统运行出错: {e}")
         import traceback
         traceback.print_exc()
 
