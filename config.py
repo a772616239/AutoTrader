@@ -144,6 +144,29 @@ CONFIG = {
         'trading_end_time': '15:30',
         'avoid_open_hour': True,
         'avoid_close_hour': True,
+    },
+    'strategy_a6': {  # 新闻交易策略配置
+        'initial_capital': 100000.0,
+        'risk_per_trade': 0.015,              # 新闻交易风险控制更严格
+        'max_position_size': 0.04,             # 小仓位，快速进出
+        'per_trade_notional_cap': 5000.0,     # 单笔交易美元上限（更严格）
+        'max_position_notional': 20000.0,     # 单股总仓位上限（美元，更严格）
+        'polygon_api_key': 'O0AZUrxYoLsKpLiIgj68QPkARXAf3JRc',  # 🔴 需要替换为您的Polygon API密钥
+        # 获取API密钥: https://polygon.io/
+        'news_lookback_hours': 48,             # 新闻回顾小时数
+        'sentiment_threshold_positive': 0.6,   # 正面新闻情感阈值
+        'sentiment_threshold_negative': -0.6,  # 负面新闻情感阈值
+        'volatility_threshold': 0.02,          # 价格波动阈值（2%）
+        'news_reaction_window': 30,            # 新闻发布后反应窗口（分钟）
+        'min_news_relevance': 0.7,             # 最小新闻相关性评分
+        'max_news_age_hours': 4,               # 最大新闻年龄（小时）
+        'cooldown_after_news_trade': 60,       # 新闻交易后冷却期（分钟）
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.005,
+        'trading_start_time': '09:45',
+        'trading_end_time': '15:30',
+        'avoid_open_hour': True,
+        'avoid_close_hour': True,
     }
 }
 
@@ -154,6 +177,7 @@ STRATEGY_CONFIG_MAP = {
     'a3': 'strategy_a3',
     'a4': 'strategy_a4',
     'a5': 'strategy_a5',
+    'a6': 'strategy_a6',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a1/a2/a3
@@ -161,7 +185,7 @@ STRATEGY_CONFIG_MAP = {
 # 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
 # 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
 default_symbols = CONFIG.get('trading', {}).get('symbols', [])
-default_symbol_map = {s: 'a5' for s in default_symbols}
+default_symbol_map = {s: 'a6' for s in default_symbols}
 
 # 允许事先存在的自定义映射覆盖默认值
 existing_map = CONFIG.get('symbol_strategy_map', {}) or {}

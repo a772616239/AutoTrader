@@ -17,6 +17,7 @@ from strategies.a2_zscore import A2ZScoreStrategy
 from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
 from strategies.a4_pullback import A4PullbackStrategy
 from strategies.a5_multifactor_ai import A5MultiFactorAI
+from strategies.a6_news_trading import A6NewsTrading
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ STRATEGY_CLASSES = {
     'a3': A3DualMAVolumeStrategy,
     'a4': A4PullbackStrategy,
     'a5': A5MultiFactorAI,
+    'a6': A6NewsTrading,
 }
 
 
@@ -73,6 +75,10 @@ class StrategyManager:
 
             # 创建策略实例，但不传入 ib_trader，避免在工作线程中调用 IB
             strategy = cls(config=strat_cfg, ib_trader=None)
+
+            # 特殊处理：为A6新闻策略设置数据提供器
+            if strategy_name == 'a6' and hasattr(strategy, 'data_provider'):
+                strategy.data_provider = self.data_provider
 
             # 对分配给该策略的每个 symbol 单独拉取数据并调用 generate_signals（不下单）
             out: Dict[str, List[Dict]] = {}
@@ -138,6 +144,10 @@ class StrategyManager:
                 strat_cfg = self.config.get(cfg_key, {})
 
             strategy = cls(config=strat_cfg, ib_trader=None)
+
+            # 特殊处理：为A6新闻策略设置数据提供器
+            if strategy_name == 'a6' and hasattr(strategy, 'data_provider'):
+                strategy.data_provider = self.data_provider
 
             for sym in syms:
                 try:

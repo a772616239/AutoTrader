@@ -22,6 +22,7 @@ from strategies.a2_zscore import A2ZScoreStrategy
 from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
 from strategies.a4_pullback import A4PullbackStrategy
 from strategies.a5_multifactor_ai import A5MultiFactorAI
+from strategies.a6_news_trading import A6NewsTrading
 from strategy_manager import StrategyManager
 
 warnings.filterwarnings('ignore')
@@ -54,6 +55,7 @@ class StrategyFactory:
         'a3': A3DualMAVolumeStrategy,
         'a4': A4PullbackStrategy,
         'a5': A5MultiFactorAI,
+        'a6': A6NewsTrading,
     }
     
     @classmethod
@@ -89,6 +91,7 @@ class StrategyFactory:
             'a3': '双均线成交量突破策略 - 基于趋势突破',
             'a4': '回调交易策略 - 基于斐波那契回撤',
             'a5': '多因子AI融合策略 - 整合流动性、基本面、情绪、动量',
+            'a6': '新闻交易策略 - 基于实时新闻情绪分析',
         }
         return descriptions.get(strategy_name, '未知策略')
 
@@ -532,6 +535,8 @@ def command_line_interface(system: TradingSystem):
                     system.switch_strategy('a4')
                 elif cmd == 'switch a5':
                     system.switch_strategy('a5')
+                elif cmd == 'switch a6':
+                    system.switch_strategy('a6')
                 elif cmd == 'list':
                     system.list_strategies()
                 elif cmd == 'status':
@@ -569,7 +574,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='多策略交易系统')
-    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5'], default='a1',
+    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6'], default='a1',
                        help='初始策略 (a1: 动量反转, a2: Z-Score, a3: 双均线成交量突破, a4: 回调交易, a5: 多因子AI融合)')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='启用命令行交互模式')
