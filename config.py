@@ -91,3 +91,17 @@ STRATEGY_CONFIG_MAP = {
     'a2': 'strategy_a2',
     'a3': 'strategy_a3',
 }
+
+# 每个标的分配策略示例: 将特定股票映射到 a1/a2/a3
+# 如果未在此映射中列出，则系统可选择默认策略或轮询分配
+CONFIG.setdefault('symbol_strategy_map', {
+    'AAPL': 'a1',
+    'MSFT': 'a1',
+    'GOOGL': 'a2',
+    'AMZN': 'a2',
+    'TSLA': 'a3',
+    'NVDA': 'a3',
+    'META': 'a1',
+    'INTC': 'a2',
+    'AMD': 'a3',
+})
