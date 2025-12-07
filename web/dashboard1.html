@@ -364,6 +364,12 @@
                     <button id="btn-sub-macd" class="tool-btn active" onclick="setSubChart('MACD')">MACD</button>
                     <button id="btn-sub-rsi" class="tool-btn" onclick="setSubChart('RSI')">RSI</button>
                 </div>
+
+                <div class="toolbar-group">
+                    <button id="btn-trades" class="tool-btn active" onclick="toggleTradeMarkers()">交易点</button>
+                </div>
+                <div class="toolbar-divider"></div>
+                
             </div>
 
             <div id="chart-container">
@@ -759,9 +765,28 @@
             updateIndicators();
         }
 
+        function toggleTradeMarkers() {
+            document.getElementById('btn-trades').classList.toggle('active');
+            fetchTrades(); // Refresh markers based on toggle state
+        }
+
         // --- Trades & Markers ---
         async function fetchTrades() {
             try {
+                // Check if trade markers toggle is active
+                const showTrades = document.getElementById('btn-trades').classList.contains('active');
+
+                // Get existing day separators
+                const existingMarkers = candleSeries.markers ? candleSeries.markers() : [];
+                const daySeparators = existingMarkers.filter(m => m.shape === 'arrowDown');
+
+                if (!showTrades) {
+                    // Only show day separators, hide trade markers
+                    candleSeries.setMarkers(daySeparators);
+                    console.log('Trade markers hidden');
+                    return;
+                }
+
                 const response = await fetch(`/api/trades?symbol=${currentSymbol}`);
                 const trades = await response.json();
 
@@ -769,6 +794,7 @@
 
                 if (!Array.isArray(trades) || trades.length === 0) {
                     console.log('No trades to display');
+                    candleSeries.setMarkers(daySeparators);
                     return;
                 }
 
@@ -807,8 +833,6 @@
 
                 console.log(`Created ${tradeMarkers.length} markers:`, tradeMarkers);
 
-                const existingMarkers = candleSeries.markers ? candleSeries.markers() : [];
-                const daySeparators = existingMarkers.filter(m => m.shape === 'arrowDown');
                 candleSeries.setMarkers([...daySeparators, ...tradeMarkers]);
 
                 console.log('Markers set successfully');
