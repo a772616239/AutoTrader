@@ -158,7 +158,15 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
                     record[k] = v
             formatted_data.append(record)
             
-        self._send_json_response(formatted_data)
+        # Construct rich response
+        response_data = {
+            'candles': formatted_data,
+            'info': data.get('company_info', {}),
+            'signals': data.get('trading_signals', []),
+            'risk': data.get('risk_metrics', {})
+        }
+        
+        self._send_json_response(response_data)
 
     def _handle_indicators_api(self, parsed):
         # 复用 get_enhanced_data 中的指标计算

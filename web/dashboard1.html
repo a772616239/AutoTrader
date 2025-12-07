@@ -318,6 +318,29 @@
         </div>
     </header>
 
+    <!-- Info Bar -->
+    <div id="info-bar"
+        style="background: var(--card-bg); border-bottom: 1px solid var(--border-color); padding: 8px 20px; display: flex; align-items: center; gap: 20px; font-size: 12px; height: 30px;">
+        <div style="display: flex; gap: 15px; color: #8b949e;">
+            <span><span style="color: #58a6ff;">板块:</span> <span id="info-sector"
+                    style="color: #c9d1d9;">--</span></span>
+            <span><span style="color: #58a6ff;">行业:</span> <span id="info-industry"
+                    style="color: #c9d1d9;">--</span></span>
+            <span><span style="color: #58a6ff;">市值:</span> <span id="info-mktcap"
+                    style="color: #c9d1d9;">--</span></span>
+            <span><span style="color: #58a6ff;">市盈率:</span> <span id="info-pe" style="color: #c9d1d9;">--</span></span>
+        </div>
+        <div style="width: 1px; height: 16px; background: #30363d;"></div>
+        <div id="signal-container" style="display: flex; gap: 8px;">
+            <!-- Signals will be injected here -->
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="color: #8b949e;">
+            <span>夏普: <span id="info-sharpe" style="color: #c9d1d9;">--</span></span>
+            <span style="margin-left: 10px;">波动率: <span id="info-vol" style="color: #c9d1d9;">--</span></span>
+        </div>
+    </div>
+
     <div class="main-container">
         <aside>
             <div style="padding: 15px; font-weight: bold; border-bottom: 1px solid var(--border-color);">
@@ -337,8 +360,8 @@
                 </div>
                 <div class="toolbar-divider"></div>
                 <div class="toolbar-group">
-                    <button id="btn-sub-none" class="tool-btn active" onclick="setSubChart('NONE')">NONE</button>
-                    <button id="btn-sub-macd" class="tool-btn" onclick="setSubChart('MACD')">MACD</button>
+                    <button id="btn-sub-none" class="tool-btn" onclick="setSubChart('NONE')">NONE</button>
+                    <button id="btn-sub-macd" class="tool-btn active" onclick="setSubChart('MACD')">MACD</button>
                     <button id="btn-sub-rsi" class="tool-btn" onclick="setSubChart('RSI')">RSI</button>
                 </div>
             </div>
@@ -454,13 +477,19 @@
                 let period = '1y';
                 if (currentInterval === '1wk') period = '5y';
                 if (currentInterval === '1mo') period = 'max';
-                if (currentInterval === '1m') period = '7d';
+                if (currentInterval === '1m') period = '1d';
 
                 const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${period}`);
-                const data = await response.json();
+                const resData = await response.json();
 
-                if (data.error || !Array.isArray(data)) {
-                    console.error('Data load error', data);
+                let data = [];
+                if (Array.isArray(resData)) {
+                    data = resData; // Fallback
+                } else if (resData.candles) {
+                    data = resData.candles;
+                    updateInfoPanel(resData.info, resData.signals, resData.risk);
+                } else if (resData.error) {
+                    console.error('Data load error', resData);
                     return;
                 }
 
@@ -532,6 +561,80 @@
                 console.error(e);
             } finally {
                 loading.classList.remove('visible');
+            }
+        }
+
+        function formatNumber(num) {
+            if (num === undefined || num === null || isNaN(num)) return 'N/A';
+            if (num >= 1e12) return (num / 1e12).toFixed(2) + '万亿'; // Trillion
+            if (num >= 1e8) return (num / 1e8).toFixed(2) + '亿';    // 100 Million
+            if (num >= 1e4) return (num / 1e4).toFixed(2) + '万';    // 10 Thousand
+            return num.toFixed(2);
+        }
+
+        const SIGNAL_MAP = {
+            'bullish_crossover': '金叉看涨',
+            'bearish_crossover': '死叉看跌',
+            'oversold': '超卖反弹',
+            'overbought': '超买回调',
+            'near_support': '接近支撑',
+            'near_resistance': '接近阻力',
+            'bullish': '看涨',
+            'bearish': '看跌'
+        };
+
+        function updateInfoPanel(info, signals, risk) {
+            if (!info) return;
+            // Attempt to translate common sectors if possible, otherwise keep English or use simple mapping
+            // For now keep Sector/Industry as is from backend or mapped if simple
+            document.getElementById('info-sector').innerText = info.sector || 'N/A';
+            document.getElementById('info-industry').innerText = info.industry || 'N/A';
+
+            document.getElementById('info-mktcap').innerText = formatNumber(info.marketCap);
+            document.getElementById('info-pe').innerText = info.peRatio ? info.peRatio.toFixed(2) : 'N/A';
+
+            if (risk) {
+                document.getElementById('info-sharpe').innerText = risk.sharpe_ratio ? risk.sharpe_ratio.toFixed(2) : 'N/A';
+                document.getElementById('info-vol').innerText = risk.var_95 ? Math.abs(risk.var_95).toFixed(2) + '%' : 'N/A';
+            }
+
+            const sigContainer = document.getElementById('signal-container');
+            sigContainer.innerHTML = '';
+            if (signals && Array.isArray(signals)) {
+                signals.forEach(s => {
+                    const span = document.createElement('span');
+                    span.style.padding = '2px 6px';
+                    span.style.borderRadius = '4px';
+                    span.style.fontWeight = 'bold';
+                    span.style.fontSize = '10px';
+
+                    // Map type to Chinese
+                    let text = s.type;
+                    // Handle raw types like 'bullish_crossover' or already translated ones? 
+                    // Backend sends 'bullish_crossover'.
+                    if (SIGNAL_MAP[text]) {
+                        text = SIGNAL_MAP[text];
+                    } else {
+                        text = text.replace('_', ' ').toUpperCase();
+                    }
+
+                    // Append strength if needed? 'strength' field available
+                    // span.innerText = `${text} (${s.strength})`;
+                    span.innerText = text;
+
+
+                    // Color coding
+                    if (s.type.includes('bullish') || s.type.includes('oversold') || s.type.includes('support')) {
+                        span.style.backgroundColor = 'rgba(35, 134, 54, 0.2)';
+                        span.style.color = '#3fb950';
+                        span.style.border = '1px solid rgba(35, 134, 54, 0.4)';
+                    } else {
+                        span.style.backgroundColor = 'rgba(218, 54, 51, 0.2)';
+                        span.style.color = '#f85149';
+                        span.style.border = '1px solid rgba(218, 54, 51, 0.4)';
+                    }
+                    sigContainer.appendChild(span);
+                });
             }
         }
 
