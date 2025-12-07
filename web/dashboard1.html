@@ -518,7 +518,12 @@
                 volumeSeries.setData(volData);
 
                 updateIndicators();
-                chart.timeScale().fitContent();
+                if (currentInterval === '1d' && data.length > 110) {
+                    // 5 months * ~22 days/month = ~110 days
+                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 110, to: data.length });
+                } else {
+                    chart.timeScale().fitContent();
+                }
 
                 if (currentInterval === '1m') addDailySeparators();
                 setupInfiniteScroll();
