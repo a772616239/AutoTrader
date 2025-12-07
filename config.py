@@ -212,7 +212,7 @@ STRATEGY_CONFIG_MAP = {
 # 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
 # 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
 default_symbols = CONFIG.get('trading', {}).get('symbols', [])
-default_symbol_map = {s: 'a7' for s in default_symbols}
+default_symbol_map = {s: 'a4' for s in default_symbols}
 
 # 允许事先存在的自定义映射覆盖默认值
 existing_map = CONFIG.get('symbol_strategy_map', {}) or {}

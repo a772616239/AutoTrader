@@ -45,8 +45,11 @@ class EnhancedStockData:
                 'avgVolume': info.get('averageVolume', 0)
             }
             
-            # 3. 技术指标计算
+            # 3. 技术指标计算 (单点，用于摘要)
             indicators = self._calculate_indicators(hist)
+            
+            # 3.1 添加技术指标序列 (用于绘图)
+            hist = self._add_technical_indicators(hist)
             
             # 4. 价量特征工程
             price_features = self._extract_price_features(hist)
@@ -90,7 +93,40 @@ class EnhancedStockData:
             
         except Exception as e:
             return {"error": f"Data fetching failed: {str(e)}"}
-    
+
+    # ... (Keep existing methods) ...
+
+    def _format_raw_data(self, df):
+        """格式化原始数据"""
+        formatted = []
+        
+        # 将 NaN 替换为 None 以便 JSON 序列化
+        df_clean = df.where(pd.notnull(df), None)
+        
+        for idx, row in df_clean.iterrows():
+            record = {
+                'timestamp': idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
+                'open': float(row['Open']) if row['Open'] is not None else None,
+                'high': float(row['High']) if row['High'] is not None else None,
+                'low': float(row['Low']) if row['Low'] is not None else None,
+                'close': float(row['Close']) if row['Close'] is not None else None,
+                'volume': int(row['Volume']) if 'Volume' in row and row['Volume'] is not None else 0,
+            }
+            
+            # 添加指标字段 (如果存在)
+            optional_fields = ['MA20', 'MA50', 'MA200', 'BB_upper', 'BB_middle', 'BB_lower', 
+                               'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist']
+            for field in optional_fields:
+                if field in row:
+                    val = row[field]
+                    if val is not None:
+                        record[field] = float(val)
+                    else:
+                        record[field] = None
+                        
+            formatted.append(record)
+        return formatted
+
     def _calculate_indicators(self, df):
         """计算技术指标"""
         closes = df['Close'].values.astype(np.float64)
@@ -151,6 +187,32 @@ class EnhancedStockData:
             indicators['Volume_Ratio'] = volumes[-1] / indicators['Volume_SMA'] if indicators['Volume_SMA'] > 0 else 1
         
         return indicators
+
+    def _add_technical_indicators(self, df):
+        """向DataFrame添加技术指标列 (用于绘图)"""
+        closes = df['Close'].values.astype(np.float64)
+        
+        # MA
+        df['MA20'] = talib.SMA(closes, timeperiod=20)
+        df['MA50'] = talib.SMA(closes, timeperiod=50)
+        df['MA200'] = talib.SMA(closes, timeperiod=200)
+        
+        # Bollinger Bands
+        upper, middle, lower = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+        df['BB_upper'] = upper
+        df['BB_middle'] = middle
+        df['BB_lower'] = lower
+        
+        # RSI
+        df['RSI'] = talib.RSI(closes, timeperiod=14)
+        
+        # MACD
+        macd, signal, hist = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
+        df['MACD'] = macd
+        df['MACD_Signal'] = signal
+        df['MACD_Hist'] = hist
+        
+        return df
     
     def _extract_price_features(self, df):
         """提取价量特征"""
@@ -307,20 +369,4 @@ class EnhancedStockData:
         
         return metrics
     
-    def _format_raw_data(self, df):
-        """格式化原始数据"""
-        formatted = []
-        
-        for idx, row in df.iterrows():
-            record = {
-                'timestamp': idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
-                'open': float(row['Open']),
-                'high': float(row['High']),
-                'low': float(row['Low']),
-                'close': float(row['Close']),
-                'volume': int(row['Volume']) if 'Volume' in row else 0,
-                'adj_close': float(row['Close'])  # yfinance已自动调整
-            }
-            formatted.append(record)
-        
-        return formatted
+        return metrics

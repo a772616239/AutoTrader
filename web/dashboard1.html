@@ -146,6 +146,84 @@
             opacity: 1;
             pointer-events: initial;
         }
+
+        /* Toolbar */
+        .toolbar-container {
+            padding: 8px 15px;
+            border-bottom: 1px solid var(--border-color);
+            background: #0d1117;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .toolbar-group {
+            display: flex;
+            background: #161b22;
+            padding: 2px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 20px;
+            background: #30363d;
+        }
+
+        .tool-btn {
+            background: transparent;
+            border: none;
+            color: #8b949e;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tool-btn:hover {
+            color: #c9d1d9;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tool-btn.active {
+            background: #238636;
+            color: white;
+            box-shadow: 0 0 8px rgba(35, 134, 54, 0.4);
+        }
+
+        /* Specific colors */
+        #btn-ma.active {
+            background: #1f6feb;
+            box-shadow: 0 0 8px rgba(31, 111, 235, 0.4);
+        }
+
+        #btn-bb.active {
+            background: #8e24aa;
+            box-shadow: 0 0 8px rgba(142, 36, 170, 0.4);
+        }
+
+        #btn-vol.active {
+            background: #238636;
+        }
+
+        #btn-sub-macd.active {
+            background: #db6d00;
+            box-shadow: 0 0 8px rgba(219, 109, 0, 0.4);
+        }
+
+        #btn-sub-rsi.active {
+            background: #9c27b0;
+            box-shadow: 0 0 8px rgba(156, 39, 176, 0.4);
+        }
+
+        #btn-sub-none.active {
+            background: #30363d;
+            box-shadow: none;
+            color: #c9d1d9;
+        }
     </style>
 </head>
 
@@ -173,23 +251,27 @@
     <div class="main-container">
         <aside>
             <div style="padding: 10px; font-weight: bold; border-bottom: 1px solid var(--border-color);">Watchlist</div>
-            <div id="watchlist">
-                <div class="watchlist-item" onclick="loadSymbol('AAPL')">
-                    <span>AAPL</span>
-                    <span class="price-up">+1.2%</span>
-                </div>
-                <div class="watchlist-item" onclick="loadSymbol('TSLA')">
-                    <span>TSLA</span>
-                    <span class="price-down">-0.5%</span>
-                </div>
-                <div class="watchlist-item" onclick="loadSymbol('NVDA')">
-                    <span>NVDA</span>
-                    <span class="price-up">+2.4%</span>
-                </div>
-            </div>
+            <div id="watchlist"></div>
         </aside>
         <main>
-            <div id="chart-container"></div>
+            <!-- Indicators Toolbar -->
+            <div class="toolbar-container">
+                <div class="toolbar-group">
+                    <button id="btn-ma" class="tool-btn active" onclick="toggleIndicator('ma')">MA</button>
+                    <button id="btn-bb" class="tool-btn" onclick="toggleIndicator('bb')">BOLL</button>
+                    <button id="btn-vol" class="tool-btn active" onclick="toggleIndicator('vol')">VOL</button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group">
+                    <button id="btn-sub-none" class="tool-btn" onclick="toggleSubChart('none')">OFF</button>
+                    <button id="btn-sub-macd" class="tool-btn" onclick="toggleSubChart('macd')">MACD</button>
+                    <button id="btn-sub-rsi" class="tool-btn" onclick="toggleSubChart('rsi')">RSI</button>
+                </div>
+            </div>
+
+            <div id="chart-container" style="flex: 2;"></div>
+            <div id="sub-chart-container" style="flex: 1; border-top: 1px solid var(--border-color); display: none;">
+            </div>
         </main>
     </div>
 
@@ -207,14 +289,14 @@
             },
             timeScale: {
                 borderColor: '#30363d',
-                timeVisible: true, // 显示具体时间
+                timeVisible: true,
                 secondsVisible: false,
             },
             rightPriceScale: {
                 borderColor: '#30363d',
                 scaleMargins: {
                     top: 0.1,
-                    bottom: 0.25, // K线图底部留白 25% (给成交量腾地方)
+                    bottom: 0.25,
                 },
             },
         });
@@ -230,25 +312,70 @@
 
         const volumeSeries = chart.addHistogramSeries({
             color: '#26a69a',
-            priceFormat: {
-                type: 'volume',
-            },
+            priceFormat: { type: 'volume' },
             priceScaleId: '', // Overlay
             scaleMargins: {
-                top: 0.76, // 成交量从 76% 处开始 (底部 24%)
+                top: 0.76,
                 bottom: 0,
             },
         });
 
-        // --- Data Fetching ---
+        // --- Sub Chart Setup ---
+        const subChartContainer = document.getElementById('sub-chart-container');
+        const subChart = LightweightCharts.createChart(subChartContainer, {
+            layout: {
+                background: { type: 'solid', color: '#0d1117' },
+                textColor: '#c9d1d9',
+            },
+            grid: {
+                vertLines: { color: '#30363d' },
+                horzLines: { color: '#30363d' },
+            },
+            timeScale: {
+                borderColor: '#30363d',
+                timeVisible: true,
+            },
+            rightPriceScale: {
+                borderColor: '#30363d',
+            },
+        });
+
+        // --- Series Definitions ---
+        const ma20Series = chart.addLineSeries({ color: '#2962FF', lineWidth: 1, title: 'MA20', visible: false });
+        const ma50Series = chart.addLineSeries({ color: '#FF6D00', lineWidth: 1, title: 'MA50', visible: false });
+
+        const bbUpperSeries = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.5)', lineWidth: 1, title: 'BB Upper', visible: false });
+        const bbLowerSeries = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.5)', lineWidth: 1, title: 'BB Lower', visible: false });
+
+        let rsiSeries = null;
+        let macdHistSeries = null;
+        let macdLineSeries = null;
+        let macdSignalSeries = null;
+
+        // Sync Charts
+        chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            if (range) {
+                subChart.timeScale().setVisibleLogicalRange(range);
+            }
+        });
+        subChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            if (range) {
+                chart.timeScale().setVisibleLogicalRange(range);
+            }
+        });
+
+        // --- Data Variables ---
         let currentSymbol = 'AAPL';
         let currentInterval = '1d';
+        let currentData = [];
 
+        // --- Functions ---
         async function loadSymbol(symbol) {
             currentSymbol = symbol;
-            document.getElementById('symbol-input').value = symbol;
-            fetchData();
-            fetchTrades(); // 切换股票时加载对应的交易记录
+            const input = document.getElementById('symbol-input');
+            if (input) input.value = symbol;
+            await fetchData();
+            fetchTrades();
         }
 
         function searchSymbol() {
@@ -258,10 +385,8 @@
 
         function setPeriod(interval) {
             currentInterval = interval;
-            // Update active button state
             document.querySelectorAll('.btn').forEach(b => {
                 b.classList.remove('active');
-                // 模糊匹配: 1day vs 1d, 1mon vs 1mo
                 const txt = b.innerText.toLowerCase();
                 const intv = interval.toLowerCase();
                 if (txt === intv ||
@@ -284,7 +409,7 @@
                 let period = '1y';
                 if (currentInterval === '1wk') period = '2y';
                 if (currentInterval === '1mo') period = '5y';
-                if (currentInterval === '1m') period = '2d'; // 1分钟线取最近2天
+                if (currentInterval === '1m') period = '2d';
 
                 const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${period}`);
                 const data = await response.json();
@@ -294,6 +419,7 @@
                     return;
                 }
 
+                currentData = data;
                 candleSeries.setData(data);
 
                 const volData = data.map(d => ({
@@ -303,10 +429,8 @@
                 }));
                 volumeSeries.setData(volData);
 
-                // Auto-fit
+                updateIndicators();
                 chart.timeScale().fitContent();
-
-                // 加载交易数据
                 fetchTrades();
 
             } catch (e) {
@@ -324,7 +448,7 @@
                 const watchlistEl = document.getElementById('watchlist');
 
                 if (Array.isArray(symbols) && symbols.length > 0) {
-                    watchlistEl.innerHTML = ''; // Clear existing
+                    watchlistEl.innerHTML = '';
                     symbols.forEach(sym => {
                         const div = document.createElement('div');
                         div.className = 'watchlist-item';
@@ -338,6 +462,98 @@
             }
         }
 
+        function updateIndicators() {
+            if (!currentData.length) return;
+
+            const showMa = document.getElementById('btn-ma').classList.contains('active');
+            if (showMa) {
+                ma20Series.applyOptions({ visible: true });
+                ma50Series.applyOptions({ visible: true });
+                ma20Series.setData(currentData.map(d => ({ time: d.time, value: d.MA20 })).filter(d => d.value));
+                ma50Series.setData(currentData.map(d => ({ time: d.time, value: d.MA50 })).filter(d => d.value));
+            } else {
+                ma20Series.applyOptions({ visible: false });
+                ma50Series.applyOptions({ visible: false });
+            }
+
+            const showBb = document.getElementById('btn-bb').classList.contains('active');
+            if (showBb) {
+                bbUpperSeries.applyOptions({ visible: true });
+                bbLowerSeries.applyOptions({ visible: true });
+                bbUpperSeries.setData(currentData.map(d => ({ time: d.time, value: d.BB_upper })).filter(d => d.value));
+                bbLowerSeries.setData(currentData.map(d => ({ time: d.time, value: d.BB_lower })).filter(d => d.value));
+            } else {
+                bbUpperSeries.applyOptions({ visible: false });
+                bbLowerSeries.applyOptions({ visible: false });
+            }
+
+            const showVol = document.getElementById('btn-vol').classList.contains('active');
+            volumeSeries.applyOptions({ visible: showVol });
+
+            let subType = 'none';
+            if (document.getElementById('btn-sub-macd').classList.contains('active')) subType = 'macd';
+            if (document.getElementById('btn-sub-rsi').classList.contains('active')) subType = 'rsi';
+
+            const subContainer = document.getElementById('sub-chart-container');
+
+            if (rsiSeries) { subChart.removeSeries(rsiSeries); rsiSeries = null; }
+            if (macdHistSeries) { subChart.removeSeries(macdHistSeries); macdHistSeries = null; }
+            if (macdLineSeries) { subChart.removeSeries(macdLineSeries); macdLineSeries = null; }
+            if (macdSignalSeries) { subChart.removeSeries(macdSignalSeries); macdSignalSeries = null; }
+
+            if (subType === 'none') {
+                subContainer.style.display = 'none';
+                const main = document.querySelector('main');
+                if (chart) chart.resize(chartContainer.clientWidth, main.clientHeight - 45);
+                return;
+            }
+
+            subContainer.style.display = 'block';
+            const main = document.querySelector('main');
+            const h = main.clientHeight;
+            const mainH = h * 0.65;
+            const subH = h * 0.35 - 45;
+
+            chart.resize(chartContainer.clientWidth, mainH);
+            subChart.resize(subContainer.clientWidth, subH);
+
+            if (subType === 'rsi') {
+                rsiSeries = subChart.addLineSeries({ color: '#9C27B0', lineWidth: 1, title: 'RSI(14)' });
+                rsiSeries.setData(currentData.map(d => ({ time: d.time, value: d.RSI })).filter(d => d.value));
+                rsiSeries.createPriceLine({ price: 70, color: '#FF9800', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+                rsiSeries.createPriceLine({ price: 30, color: '#FF9800', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+            } else if (subType === 'macd') {
+                macdHistSeries = subChart.addHistogramSeries({ color: '#26a69a', title: 'MACD Hist' });
+                macdLineSeries = subChart.addLineSeries({ color: '#2962FF', lineWidth: 1, title: 'MACD' });
+                macdSignalSeries = subChart.addLineSeries({ color: '#FF6D00', lineWidth: 1, title: 'Signal' });
+
+                macdHistSeries.setData(currentData.map(d => ({
+                    time: d.time,
+                    value: d.MACD_Hist,
+                    color: d.MACD_Hist >= 0 ? '#26a69a' : '#ef5350'
+                })).filter(d => d.value !== null));
+
+                macdLineSeries.setData(currentData.map(d => ({ time: d.time, value: d.MACD })).filter(d => d.value !== null));
+                macdSignalSeries.setData(currentData.map(d => ({ time: d.time, value: d.MACD_Signal })).filter(d => d.value !== null));
+            }
+
+            subChart.timeScale().fitContent();
+        }
+
+        function toggleIndicator(type) {
+            const btn = document.getElementById('btn-' + type);
+            btn.classList.toggle('active');
+            updateIndicators();
+        }
+
+        function toggleSubChart(type) {
+            ['none', 'macd', 'rsi'].forEach(t => {
+                document.getElementById('btn-sub-' + t).classList.remove('active');
+            });
+            document.getElementById('btn-sub-' + type).classList.add('active');
+            updateIndicators();
+        }
+
         async function fetchTrades() {
             try {
                 const response = await fetch(`/api/trades?symbol=${currentSymbol}`);
@@ -346,46 +562,43 @@
                 if (!Array.isArray(trades)) return;
 
                 const markers = trades.map(t => {
-                    // 解析时间 (后端存的是 isoformat string)
-                    // Lightweight Charts markers time 需要和 K 线的 time 一致 (timestamp or YYYY-MM-DD)
-                    // 后端 API /api/history 处理了 time 格式。
-                    // 这里的 trades timestamp 是完整的 datetimestring。
-                    // 简单起见，我们将 trade time 转换为 timestamp
                     const time = new Date(t.timestamp).getTime() / 1000;
-
-                    // 修复 UNDEFINED 问题：兼容 entry_price
                     const priceVal = t.price || t.entry_price || 'N/A';
-                    // 如果 priceVal 是数字，保留两位小数
                     const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
-
                     return {
                         time: time,
                         position: t.action === 'BUY' ? 'belowBar' : 'aboveBar',
-                        color: t.action === 'BUY' ? '#2196F3' : '#FF9800', // 买入蓝色，卖出橙色
+                        color: t.action === 'BUY' ? '#2196F3' : '#FF9800',
                         shape: 'circle',
                         text: `${t.action} @ ${priceDisp}`,
                     };
                 });
-
-                // 必须按时间排序
                 markers.sort((a, b) => a.time - b.time);
-
                 candleSeries.setMarkers(markers);
-
             } catch (e) {
                 console.error("Failed to load trades", e);
             }
         }
 
-        // --- Init ---
+        // Init
         window.addEventListener('resize', () => {
-            chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+            const main = document.querySelector('main');
+            const h = main.clientHeight;
+            const sub = document.getElementById('sub-chart-container');
+
+            if (sub && sub.style.display !== 'none') {
+                const mainH = h * 0.65;
+                const subH = h * 0.35 - 45;
+                if (chart) chart.resize(chartContainer.clientWidth, mainH);
+                if (subChart) subChart.resize(chartContainer.clientWidth, subH);
+            } else {
+                if (chart) chart.resize(chartContainer.clientWidth, h - 45);
+            }
         });
 
-        // Initial Load
         loadWatchlist();
         fetchData();
-        setInterval(fetchTrades, 5000); // 轮询交易记录
+        setInterval(fetchTrades, 5000);
 
     </script>
 </body>

@@ -127,14 +127,19 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             if has_invalid:
                 continue
 
-            formatted_data.append({
+            record = {
                 'time': time_val,
                 'open': o,
                 'high': h,
                 'low': l,
                 'close': c,
                 'volume': v
-            })
+            }
+            # Add all other fields (indicators)
+            for k, v in item.items():
+                if k not in record and k != 'timestamp':
+                    record[k] = v
+            formatted_data.append(record)
             
         self._send_json_response(formatted_data)
 
