@@ -57,6 +57,9 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         elif path == '/api/trades':
             self._handle_trades_api(parsed)
             return
+        elif path == '/api/update-strategy':
+            self._handle_update_strategy_api(parsed)
+            return
             
         # 404
         self.send_error(404, "File not found")
@@ -306,6 +309,77 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             self._send_json_response(trades)
         except Exception as e:
             self._send_json_response([])
+
+    def _handle_update_strategy_api(self, parsed):
+        """更新股票策略映射"""
+        try:
+            params = parse_qs(parsed.query)
+            symbol = params.get('symbol', [None])[0]
+            strategy = params.get('strategy', [None])[0]
+            
+            if not symbol or not strategy:
+                self._send_json_response({'success': False, 'error': 'Missing symbol or strategy'})
+                return
+            
+            # Read config.py
+            config_path = 'config.py'
+            if not os.path.exists(config_path):
+                self._send_json_response({'success': False, 'error': 'config.py not found'})
+                return
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_content = f.read()
+            
+            # Update or add the strategy mapping
+            # Look for SYMBOL_STRATEGY_MAP section
+            import re
+            
+            # Find the merged_map.update section or create it
+            pattern = r"(merged_map\.update\(\{[^}]*\}\))"
+            
+            # Create the new mapping entry
+            new_entry = f"    '{symbol}': '{strategy.lower()}',\n"
+            
+            # Check if symbol already exists in the update block
+            if re.search(rf"'{symbol}':\s*'[^']*'", config_content):
+                # Replace existing entry
+                config_content = re.sub(
+                    rf"('{symbol}':\s*)'[^']*'",
+                    rf"\1'{strategy.lower()}'",
+                    config_content
+                )
+            else:
+                # Add new entry to merged_map.update block
+                # Find the update block and add before the closing })
+                if 'merged_map.update({' in config_content:
+                    config_content = re.sub(
+                        r'(merged_map\.update\(\{\n)',
+                        rf'\1{new_entry}',
+                        config_content
+                    )
+                else:
+                    # Create new update block before the print statements
+                    insert_pos = config_content.find('# 显示策略分配情况')
+                    if insert_pos > 0:
+                        config_content = (
+                            config_content[:insert_pos] +
+                            f"merged_map.update({{\n{new_entry}}})\n\n" +
+                            config_content[insert_pos:]
+                        )
+            
+            # Write back to config.py
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config_content)
+            
+            # Reload config module
+            import sys
+            if 'config' in sys.modules:
+                del sys.modules['config']
+            
+            self._send_json_response({'success': True, 'symbol': symbol, 'strategy': strategy})
+            
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
 
 def run_enhanced_server(port=8001):
     server_address = ('', port)

@@ -1084,16 +1084,79 @@
                         const color = strategyColors[strategy] || '#8b949e';
 
                         d.innerHTML = `
-                            <span style="flex: 1;">${symbol}</span>
-                            <span style="font-size: 10px; padding: 2px 6px; border-radius: 3px; background: ${color}20; color: ${color}; border: 1px solid ${color}40; white-space: nowrap;">${strategyName}</span>
+                            <span style="flex: 1;" onclick="loadSymbol('${symbol}')">${symbol}</span>
+                            <span class="strategy-badge" data-symbol="${symbol}" data-strategy="${strategy}" style="font-size: 10px; padding: 2px 6px; border-radius: 3px; background: ${color}20; color: ${color}; border: 1px solid ${color}40; white-space: nowrap; cursor: pointer;">${strategyName}</span>
                         `;
-                        d.onclick = () => loadSymbol(symbol);
+
+                        // Add click handler for strategy badge
+                        const badge = d.querySelector('.strategy-badge');
+                        badge.onclick = (e) => {
+                            e.stopPropagation();
+                            showStrategySelector(symbol, strategy, badge);
+                        };
+
                         div.appendChild(d);
                     });
                 }
             } catch (e) {
                 console.error('Failed to load watchlist:', e);
             }
+        }
+
+        // Strategy selector function
+        function showStrategySelector(symbol, currentStrategy, badgeElement) {
+            const strategies = ['A1', 'A2', 'A3', 'A4', 'A5', 'A7'];
+            const strategyNames = {
+                'A1': '动量反转',
+                'A2': 'Z-Score',
+                'A3': '双均线量能',
+                'A4': '回调买入',
+                'A5': '多因子AI',
+                'A7': 'CTA趋势'
+            };
+
+            // Create dropdown
+            const dropdown = document.createElement('select');
+            dropdown.style.cssText = 'font-size: 10px; padding: 2px; border-radius: 3px; background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);';
+
+            strategies.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s;
+                option.textContent = strategyNames[s];
+                option.selected = s === currentStrategy;
+                dropdown.appendChild(option);
+            });
+
+            // Replace badge with dropdown
+            badgeElement.replaceWith(dropdown);
+            dropdown.focus();
+
+            // Handle selection
+            dropdown.onchange = async () => {
+                const newStrategy = dropdown.value;
+                try {
+                    const response = await fetch(`/api/update-strategy?symbol=${symbol}&strategy=${newStrategy}`);
+                    const result = await response.json();
+
+                    if (result.success) {
+                        console.log(`Updated ${symbol} strategy to ${newStrategy}`);
+                        // Reload watchlist to show updated strategy
+                        loadWatchlist();
+                    } else {
+                        alert('Failed to update strategy: ' + (result.error || 'Unknown error'));
+                        loadWatchlist();
+                    }
+                } catch (e) {
+                    console.error('Error updating strategy:', e);
+                    alert('Failed to update strategy');
+                    loadWatchlist();
+                }
+            };
+
+            // Handle blur (clicking outside)
+            dropdown.onblur = () => {
+                loadWatchlist();
+            };
         }
 
         // --- Legend Logic ---
