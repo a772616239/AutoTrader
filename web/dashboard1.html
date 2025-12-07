@@ -333,7 +333,7 @@
             },
             timeScale: {
                 borderColor: '#30363d',
-                timeVisible: true,
+                visible: false,  // Hide time axis for cleaner look
             },
             rightPriceScale: {
                 borderColor: '#30363d',
@@ -416,7 +416,7 @@
                 let period = '3y';  // Daily: 3 years ensures good coverage even after warmup
                 if (currentInterval === '1wk') period = '5y';  // Weekly: 5 years to cover 33-week MACD warmup
                 if (currentInterval === '1mo') period = 'max';  // Monthly: load maximum available data
-                if (currentInterval === '1m') period = '14d';  // Intraday: 2 weeks for sufficient minute data
+                if (currentInterval === '1m') period = '7d';  // Intraday: Yahoo限制最多7-8天的分钟数据
 
                 const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${period}`);
                 const data = await response.json();
