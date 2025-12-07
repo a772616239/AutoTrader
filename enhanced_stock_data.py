@@ -108,7 +108,7 @@ class EnhancedStockData:
         
         for idx, row in df_clean.iterrows():
             record = {
-                'timestamp': idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
+                'time': idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
                 'open': float(row['Open']) if row['Open'] is not None else None,
                 'high': float(row['High']) if row['High'] is not None else None,
                 'low': float(row['Low']) if row['Low'] is not None else None,
@@ -400,4 +400,3 @@ class EnhancedStockData:
         
         return metrics
     
-        return metrics

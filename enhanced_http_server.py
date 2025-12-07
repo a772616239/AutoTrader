@@ -101,7 +101,7 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         for item in raw_data:
             # 格式化为 Lightweight Charts 格式
             # time: '2019-04-11' or timestamp
-            ts_str = item['timestamp']
+            ts_str = item['time']
             try:
                 # 解析时间戳 - 确保一致性
                 if 'T' in ts_str:

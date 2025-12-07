@@ -292,8 +292,20 @@
     <header>
         <div class="controls">
             <h3 style="margin:0; margin-right: 20px;">AutoTrader Pro</h3>
-            <input type="text" id="symbol-input" value="AAPL" placeholder="Symbol">
-            <button class="btn" onclick="searchSymbol()">GO</button>
+            <div class="symbol-search">
+                <input type="text" id="symbol-input" value="AAPL" placeholder="Symbol">
+                <button class="btn" onclick="searchSymbol()">GO</button>
+            </div>
+
+            <!-- Header Ticker -->
+            <div id="price-ticker"
+                style="display:flex; align-items:baseline; margin-left: 20px; font-family: 'Roboto Mono', monospace;">
+                <span id="ticker-price" style="font-size: 24px; font-weight: bold; color: #d1d4dc;">--.--</span>
+                <span id="ticker-change" style="font-size: 16px; margin-left: 10px; font-weight: 500;">--%</span>
+                <span id="ticker-time" style="font-size: 12px; margin-left: 15px; color: #8b949e;">--:--:--
+                    ET</span>
+            </div>
+            <div style="flex:1"></div>
         </div>
         <div class="controls">
             <button class="btn" onclick="setPeriod('1m')">1m</button>
@@ -460,6 +472,43 @@
                 });
 
                 candleSeries.setData(data);
+
+                // Update Ticker
+                if (data.length > 0) {
+                    const last = data[data.length - 1];
+                    const prev = data.length > 1 ? data[data.length - 2] : last;
+                    const price = last.close;
+                    const change = price - prev.close;
+                    const changePct = (change / prev.close) * 100;
+
+                    const tickerPrice = document.getElementById('ticker-price');
+                    const tickerChange = document.getElementById('ticker-change');
+                    const tickerTime = document.getElementById('ticker-time');
+
+                    if (tickerPrice && tickerChange && tickerTime) {
+                        tickerPrice.innerText = price.toFixed(2);
+                        tickerChange.innerText = `${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePct.toFixed(2)}%)`;
+
+                        const color = change >= 0 ? '#238636' : '#da3633';
+                        tickerPrice.style.color = color;
+                        tickerChange.style.color = color;
+
+                        // Time Format (US Eastern)
+                        let timeVal = last.time;
+                        if (typeof timeVal === 'number') {
+                            // Unix timestamp in seconds
+                            const date = new Date(timeVal * 1000);
+                            const etTime = new Intl.DateTimeFormat('en-US', {
+                                timeZone: 'America/New_York',
+                                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                                year: 'numeric', month: 'short', day: 'numeric'
+                            }).format(date);
+                            tickerTime.innerText = `${etTime} ET`;
+                        } else {
+                            tickerTime.innerText = `${timeVal} (End of Day)`;
+                        }
+                    }
+                }
 
                 const volData = data.map(d => ({
                     time: d.time,
