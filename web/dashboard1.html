@@ -564,6 +564,9 @@
 
             const subContainer = document.getElementById('sub-chart-container');
             const main = document.querySelector('main');
+            const toolbar = document.querySelector('.toolbar-container');
+            const toolbarH = toolbar ? toolbar.offsetHeight : 40;
+            const availableH = main.clientHeight - toolbarH;
 
             // Cleanup old series
             if (rsiSeries) { subChart.removeSeries(rsiSeries); rsiSeries = null; }
@@ -573,22 +576,14 @@
 
             if (subType === 'none') {
                 subContainer.style.display = 'none';
-                chart.resize(chartContainer.clientWidth, main.clientHeight); // Full height (minus toolbar height automatically handled by flex)
+                chart.resize(chartContainer.clientWidth, availableH);
                 return;
             }
 
             subContainer.style.display = 'block';
-            // Calculate heights
-            // Main container flex layout handles this, but resize needs pixels
-            // Let's assume 70% / 30% split
-            const totalH = chartContainer.clientHeight + subContainer.clientHeight;
-            // Wait, flex layout makes them fill available space. 
-            // chart-container style="flex: 2" (added below via JS resize or CSS?)
-            // We need to verify layout.
-            // Let's force explicit resize
-            const h = main.clientHeight - 40; // minus toolbar approx
-            const mainH = Math.floor(h * 0.7);
-            const subH = Math.floor(h * 0.3);
+
+            const mainH = Math.floor(availableH * 0.7);
+            const subH = Math.floor(availableH * 0.3);
 
             chart.resize(chartContainer.clientWidth, mainH);
             subChart.resize(chartContainer.clientWidth, subH);
