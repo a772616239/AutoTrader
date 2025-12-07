@@ -89,12 +89,16 @@ class BaseStrategy:
         for key in expired_keys:
             del self.signal_cache[key]
     
-    def sync_positions_from_ib(self):
+    def sync_positions_from_ib(self) -> bool:
         """从IB同步持仓信息"""
         if not self.ib_trader:
-            return
+            return False
         
         try:
+            if not self.ib_trader.connected:
+                logger.warning("IB未连接，跳过持仓同步")
+                return False
+
             holdings = self.ib_trader.get_holdings()
             self.positions.clear()
             
@@ -103,14 +107,18 @@ class BaseStrategy:
                 self.positions[symbol] = {
                     'size': pos.position,
                     'avg_cost': pos.avgCost,
-                    'contract': pos.contract
+                    'contract': pos.contract,
+                    'entry_time': datetime.now()  # 如果无法获取真实开仓时间，使用当前时间
                 }
             
             # 同步净资产
             self.equity = self.ib_trader.get_net_liquidation()
+            logger.info(f"✅ 持仓同步完成: {len(self.positions)} 个持仓, 净资产: ${self.equity:,.2f}")
+            return True
             
         except Exception as e:
             logger.error(f"从IB同步持仓失败: {e}")
+            return False
     
     def check_exit_conditions(self, symbol: str, current_price: float, 
                              current_time: datetime = None) -> Optional[Dict]:

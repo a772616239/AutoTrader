@@ -151,7 +151,7 @@ CONFIG = {
         'max_position_size': 0.04,             # 小仓位，快速进出
         'per_trade_notional_cap': 5000.0,     # 单笔交易美元上限（更严格）
         'max_position_notional': 20000.0,     # 单股总仓位上限（美元，更严格）
-        'polygon_api_key': 'O0AZUrxYoLsKpLiIgj68QPkARXAf3JRc',  # 🔴 需要替换为您的Polygon API密钥
+        'polygon_api_key': '0SgE61bAeLNqkcDks0y0FDtP2t7l_8an',  # 🔴 需要替换为您的Polygon API密钥
         # 获取API密钥: https://polygon.io/
         'news_lookback_hours': 48,             # 新闻回顾小时数
         'sentiment_threshold_positive': 0.6,   # 正面新闻情感阈值

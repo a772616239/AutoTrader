@@ -8,6 +8,7 @@ from datetime import datetime, time as dt_time, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import logging
 from strategies.base_strategy import BaseStrategy
+from strategies import indicators as tech_indicators
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +59,6 @@ class A2ZScoreStrategy(BaseStrategy):
             'ib_limit_offset': 0.005,  # 限价单偏移量
         }
     
-    def calculate_zscore(self, prices: pd.Series, window: int = 20) -> pd.Series:
-        """计算价格Z-Score"""
-        rolling_mean = prices.rolling(window=window).mean()
-        rolling_std = prices.rolling(window=window).std()
-        zscore = (prices - rolling_mean) / rolling_std
-        return zscore
-    
     def detect_oversold_entry(self, symbol: str, data: pd.DataFrame, 
                              indicators: Dict) -> Optional[Dict]:
         """
@@ -80,7 +74,7 @@ class A2ZScoreStrategy(BaseStrategy):
         
         # 计算Z-Score
         prices = data['Close']
-        zscore = self.calculate_zscore(prices, window=self.config['zscore_lookback'])
+        zscore = tech_indicators.calculate_zscore(prices, window=self.config['zscore_lookback'])
         current_zscore = zscore.iloc[-1]
         
         # Z-Score入场条件
@@ -153,7 +147,7 @@ class A2ZScoreStrategy(BaseStrategy):
         
         # 计算Z-Score
         prices = data['Close']
-        zscore = self.calculate_zscore(prices, window=self.config['zscore_lookback'])
+        zscore = tech_indicators.calculate_zscore(prices, window=self.config['zscore_lookback'])
         current_zscore = zscore.iloc[-1]
         
         # Z-Score入场条件
@@ -220,7 +214,8 @@ class A2ZScoreStrategy(BaseStrategy):
             return None
         
         prices = data['Close']
-        zscore = self.calculate_zscore(prices, window=self.config['zscore_lookback'])
+        prices = data['Close']
+        zscore = tech_indicators.calculate_zscore(prices, window=self.config['zscore_lookback'])
         current_zscore = zscore.iloc[-1]
         
         avg_cost = position['avg_cost']

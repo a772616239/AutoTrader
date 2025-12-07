@@ -68,19 +68,20 @@ class DataProvider:
             logger.error(f"❌ 连接测试失败: {e}")
             return False
     
-    def get_intraday_data(self, symbol: str, interval: str = '5m', 
-                         lookback: int = 60) -> pd.DataFrame:
+    def get_intraday_data(self, symbol: str, interval: str = '5m',
+                          lookback: int = 60, use_cache: bool = True) -> pd.DataFrame:
         """
         从 enhanced-data 接口获取日内数据
         """
         cache_key = f"{symbol}_{interval}"
         current_time = time.time()
         
-        if cache_key in self.data_cache:
+        if use_cache and cache_key in self.data_cache:
             cache_age = current_time - self.data_cache[cache_key]['timestamp']
             if cache_age < self.cache_duration:
                 cached_data = self.data_cache[cache_key]['data']
                 if len(cached_data) >= min(lookback, 10):
+                    logger.info(f"使用缓存数据: {symbol} ({len(cached_data)} 条)")
                     return cached_data.copy()
         
         period = self._calculate_period(interval, lookback)
@@ -640,17 +641,20 @@ class DataProvider:
             news_items = self.get_news_sentiment(symbol, api_key, self.news_lookback_hours)
 
             if not news_items:
+                logger.info("not news_items")
                 return {'impact_score': 0.0, 'significant_news': [], 'news_count': 0}
 
             # 获取价格数据
-            price_data = self.get_intraday_data(symbol, interval='5m', lookback=60)  # 5小时数据
+            price_data = self.get_intraday_data(symbol, interval='5m', lookback=240, use_cache=False)  # 20小时数据，强制刷新
 
-            if price_data.empty:
-                return {'impact_score': 0.0, 'significant_news': []}
+            # if price_data.empty:
+            #     logger.info("price_data.empty")
+            #     return {'impact_score': 0.0, 'significant_news': []}
 
-            # 移除价格数据的时区信息，确保为naive datetime
+            # 确保索引为DatetimeIndex并移除时区信息
+            price_data.index = pd.to_datetime(price_data.index)
             if hasattr(price_data.index, 'tz') and price_data.index.tz is not None:
-                price_data.index = price_data.index.tz_localize(None)
+                price_data.index = price_data.index.tz_convert(None)
 
             significant_news = []
             total_impact = 0.0
@@ -665,13 +669,17 @@ class DataProvider:
                     news_window_start = news_time
                     news_window_end = news_time + timedelta(minutes=window_minutes)
 
+                    logger.info(f"新闻时间: {news_time}, 价格数据范围: {price_data.index.min()} 到 {price_data.index.max()}")
+
                     # 过滤窗口内的价格数据
+                    # 确保比较的datetime都是timezone-naive
                     window_data = price_data[
                         (price_data.index >= news_window_start) &
                         (price_data.index <= news_window_end)
                     ]
 
                     if len(window_data) < 2:
+                        logger.info(f"window_data为空，跳过: {symbol} - 新闻时间: {news_time}, window_data长度: {len(window_data)}")
                         continue
 
                     # 计算价格波动
@@ -686,9 +694,9 @@ class DataProvider:
                     )
 
                     # 结合情感和波动计算影响分数
-                    sentiment_abs = abs(news['sentiment_score'])
+                    sentiment_abs = abs(float(news['overall_sentiment_score']))
                     relevance = news['relevance_score']
-
+                    logger.info(f"情感分析 - sentiment_abs: {sentiment_abs}, relevance: {relevance}")
                     impact_score = sentiment_abs * relevance * volatility * 100  # 百分比形式
 
                     if impact_score > 0.5:  # 显著影响阈值（降低阈值）

@@ -9,6 +9,7 @@ from datetime import datetime, time as dt_time, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import logging
 from strategies.base_strategy import BaseStrategy
+from strategies import indicators
 
 logger = logging.getLogger(__name__)
 
@@ -72,18 +73,16 @@ class A3DualMAVolumeStrategy(BaseStrategy):
     
     def calculate_moving_averages(self, data: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
         """计算快速和慢速均线"""
-        fast_ma_type = self.config['ema_or_sma']
-        slow_ma_type = self.config['ema_or_sma']
-        
-        if fast_ma_type == 'EMA':
-            fast_ma = data['Close'].ewm(span=self.config['fast_ma_period'], adjust=False).mean()
-        else:
-            fast_ma = data['Close'].rolling(window=self.config['fast_ma_period']).mean()
-        
-        if slow_ma_type == 'EMA':
-            slow_ma = data['Close'].ewm(span=self.config['slow_ma_period'], adjust=False).mean()
-        else:
-            slow_ma = data['Close'].rolling(window=self.config['slow_ma_period']).mean()
+        fast_ma = indicators.calculate_moving_average(
+            data['Close'], 
+            self.config['fast_ma_period'], 
+            self.config['ema_or_sma']
+        )
+        slow_ma = indicators.calculate_moving_average(
+            data['Close'], 
+            self.config['slow_ma_period'], 
+            self.config['ema_or_sma']
+        )
         
         logger.info(
             f"    📊 均线计算完成: 快速MA={fast_ma.iloc[-1]:.2f} 慢速MA={slow_ma.iloc[-1]:.2f}"

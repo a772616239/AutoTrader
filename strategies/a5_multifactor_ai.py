@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from strategies.base_strategy import BaseStrategy
+from strategies import indicators
 
 logger = logging.getLogger(__name__)
 
@@ -235,11 +236,11 @@ class A5MultiFactorAI(BaseStrategy):
             close_col = 'Close' if 'Close' in data.columns else 'close'
             
             # 相对强度指数 (RSI)
-            rsi = self._calculate_rsi(data[close_col], period=14)
+            rsi = indicators.calculate_rsi(data[close_col], period=14)
             rsi_score = rsi.iloc[-1] / 100.0 if len(rsi) > 0 else 0.5
             
             # MACD 指标
-            macd, signal, histogram = self._calculate_macd(data[close_col])
+            macd, signal, histogram = indicators.calculate_macd(data[close_col])
             if len(histogram) > 0:
                 macd_score = max(0.0, min(histogram.iloc[-1] / abs(histogram.mean() + 0.01), 1.0))
             else:
@@ -281,33 +282,7 @@ class A5MultiFactorAI(BaseStrategy):
             logger.warning(f"A5动量计算出错: {e}")
             return 0.5
 
-    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
-        """计算相对强度指数 (RSI)"""
-        try:
-            delta = prices.diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-            rs = gain / (loss + 1e-10)
-            rsi = 100 - (100 / (1 + rs))
-            return rsi
-        except Exception as e:
-            logger.warning(f"RSI计算出错: {e}")
-            return pd.Series([0.5] * len(prices))
 
-    def _calculate_macd(self, prices: pd.Series, fast: int = 12, slow: int = 26, 
-                       signal_period: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """计算 MACD 指标"""
-        try:
-            ema_fast = prices.ewm(span=fast).mean()
-            ema_slow = prices.ewm(span=slow).mean()
-            macd = ema_fast - ema_slow
-            signal = macd.ewm(span=signal_period).mean()
-            histogram = macd - signal
-            return macd, signal, histogram
-        except Exception as e:
-            logger.warning(f"MACD计算出错: {e}")
-            empty_series = pd.Series([0.0] * len(prices))
-            return empty_series, empty_series, empty_series
 
     def _calculate_composite_ai_score(self, liquidity_score: float, 
                                      fundamental_score: float,
