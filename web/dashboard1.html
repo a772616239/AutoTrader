@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoTrader Pro Terminal</title>
+    <script src="https://unpkg.com/lightweight-charts@4.0.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-color: #c9d1d9;
+            --accent-color: #58a6ff;
+            --border-color: #30363d;
+            --up-color: #238636;
+            --down-color: #da3633;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Layout */
+        header {
+            height: 50px;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        aside {
+            width: 250px;
+            background-color: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #chart-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Components */
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="text"] {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            background-color: var(--btn-bg, #21262d);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #30363d;
+        }
+
+        .btn.active {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .watchlist-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .watchlist-item:hover {
+            background-color: #21262d;
+        }
+
+        .price-up {
+            color: var(--up-color);
+        }
+
+        .price-down {
+            color: var(--down-color);
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(13, 17, 23, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            font-size: 20px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .loading-overlay.visible {
+            opacity: 1;
+            pointer-events: initial;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="loading-overlay" id="loading">Loading Data...</div>
+
+    <header>
+        <div class="controls">
+            <h3 style="margin:0; margin-right: 20px;">AutoTrader Pro</h3>
+            <input type="text" id="symbol-input" value="AAPL" placeholder="Symbol">
+            <button class="btn" onclick="searchSymbol()">GO</button>
+        </div>
+        <div class="controls">
+            <button class="btn active" onclick="setPeriod('1d')">1D</button>
+            <button class="btn" onclick="setPeriod('1wk')">1W</button>
+            <button class="btn" onclick="setPeriod('1mo')">1M</button>
+        </div>
+        <div class="controls">
+            <button class="btn" onclick="toggleTheme()">🌗</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside>
+            <div style="padding: 10px; font-weight: bold; border-bottom: 1px solid var(--border-color);">Watchlist</div>
+            <div id="watchlist">
+                <div class="watchlist-item" onclick="loadSymbol('AAPL')">
+                    <span>AAPL</span>
+                    <span class="price-up">+1.2%</span>
+                </div>
+                <div class="watchlist-item" onclick="loadSymbol('TSLA')">
+                    <span>TSLA</span>
+                    <span class="price-down">-0.5%</span>
+                </div>
+                <div class="watchlist-item" onclick="loadSymbol('NVDA')">
+                    <span>NVDA</span>
+                    <span class="price-up">+2.4%</span>
+                </div>
+            </div>
+        </aside>
+        <main>
+            <div id="chart-container"></div>
+        </main>
+    </div>
+
+    <script>
+        // --- Chart Setup ---
+        const chartContainer = document.getElementById('chart-container');
+        const chart = LightweightCharts.createChart(chartContainer, {
+            layout: {
+                background: { type: 'solid', color: '#0d1117' },
+                textColor: '#c9d1d9',
+            },
+            grid: {
+                vertLines: { color: '#30363d' },
+                horzLines: { color: '#30363d' },
+            },
+            timeScale: {
+                borderColor: '#30363d',
+            },
+            rightPriceScale: {
+                borderColor: '#30363d',
+                scaleMargins: {
+                    top: 0.1,
+                    bottom: 0.25, // 留出底部 25% 跟成交量分开
+                },
+            },
+        });
+
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#238636',
+            downColor: '#da3633',
+            borderDownColor: '#da3633',
+            borderUpColor: '#238636',
+            wickDownColor: '#da3633',
+            wickUpColor: '#238636',
+        });
+
+        const volumeSeries = chart.addHistogramSeries({
+            color: '#26a69a',
+            priceFormat: {
+                type: 'volume',
+            },
+            priceScaleId: '', // Overlay on main chart or simplify
+            scaleMargins: {
+                top: 0.8,
+                bottom: 0,
+            },
+        });
+
+        // --- Data Fetching ---
+        let currentSymbol = 'AAPL';
+        let currentInterval = '1d';
+
+        async function loadSymbol(symbol) {
+            currentSymbol = symbol;
+            document.getElementById('symbol-input').value = symbol;
+            fetchData();
+        }
+
+        function searchSymbol() {
+            const sym = document.getElementById('symbol-input').value;
+            if (sym) loadSymbol(sym.toUpperCase());
+        }
+
+        function setPeriod(interval) {
+            currentInterval = interval;
+            // Update active button state
+            document.querySelectorAll('.btn').forEach(b => {
+                if (['1D', '1W', '1M'].includes(b.innerText)) {
+                    b.classList.remove('active');
+                    if (b.innerText === interval.toUpperCase()) b.classList.add('active');
+                }
+            });
+            fetchData();
+        }
+
+        async function fetchData() {
+            const loading = document.getElementById('loading');
+            loading.classList.add('visible');
+
+            try {
+                let period = '1y';
+                if (currentInterval === '1wk') period = '2y';
+                if (currentInterval === '1mo') period = '5y';
+
+                const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${period}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Convert data for Lightweight Charts
+                // API returns { time, open, high, low, close, volume }
+                // Lightweight charts expects time as string 'YYYY-MM-DD' for daily, or unix timestamp for intraday.
+                // Our backend already formats it appropriately.
+
+                candleSeries.setData(data);
+
+                const volData = data.map(d => ({
+                    time: d.time,
+                    value: d.volume,
+                    color: d.close > d.open ? '#238636' : '#da3633'
+                }));
+                volumeSeries.setData(volData);
+
+                // Auto-fit
+                chart.timeScale().fitContent();
+
+            } catch (e) {
+                console.error(e);
+                alert('Failed to load data');
+            } finally {
+                loading.classList.remove('visible');
+            }
+        }
+
+        // --- Init ---
+        window.addEventListener('resize', () => {
+            chart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+        });
+
+        // Initial Load
+        fetchData();
+
+    </script>
+</body>
+
+</html>
