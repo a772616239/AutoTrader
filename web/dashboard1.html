@@ -152,7 +152,7 @@
         .toolbar-container {
             padding: 8px 15px;
             border-bottom: 1px solid var(--border-color);
-            background: #0d1117;
+            background: var(--bg-color);
             display: flex;
             gap: 15px;
             align-items: center;
@@ -160,7 +160,7 @@
 
         .toolbar-group {
             display: flex;
-            background: #161b22;
+            background: var(--card-bg);
             padding: 2px;
             border-radius: 6px;
             border: 1px solid #30363d;
@@ -1037,6 +1037,76 @@
             }
             legend.innerHTML = html;
         });
+
+
+        // --- Theme Toggle ---
+        function toggleTheme() {
+            const root = document.documentElement;
+            const currentTheme = localStorage.getItem('theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            if (newTheme === 'light') {
+                // Light theme colors
+                root.style.setProperty('--bg-color', '#ffffff');
+                root.style.setProperty('--card-bg', '#f6f8fa');
+                root.style.setProperty('--text-color', '#24292f');
+                root.style.setProperty('--accent-color', '#0969da');
+                root.style.setProperty('--border-color', '#d0d7de');
+                root.style.setProperty('--up-color', '#1a7f37');
+                root.style.setProperty('--down-color', '#cf222e');
+                root.style.setProperty('--btn-bg', '#ffffff');
+
+                // Update chart background
+                chart.applyOptions({
+                    layout: { background: { type: 'solid', color: '#ffffff' }, textColor: '#24292f' },
+                    grid: { vertLines: { color: '#e1e4e8' }, horzLines: { color: '#e1e4e8' } },
+                    timeScale: { borderColor: '#d0d7de' },
+                    rightPriceScale: { borderColor: '#d0d7de' }
+                });
+
+                subChart.applyOptions({
+                    layout: { background: { type: 'solid', color: '#ffffff' }, textColor: '#24292f' },
+                    grid: { vertLines: { color: '#e1e4e8' }, horzLines: { color: '#e1e4e8' } },
+                    timeScale: { borderColor: '#d0d7de' },
+                    rightPriceScale: { borderColor: '#d0d7de' }
+                });
+            } else {
+                // Dark theme colors (default)
+                root.style.setProperty('--bg-color', '#0d1117');
+                root.style.setProperty('--card-bg', '#161b22');
+                root.style.setProperty('--text-color', '#c9d1d9');
+                root.style.setProperty('--accent-color', '#58a6ff');
+                root.style.setProperty('--border-color', '#30363d');
+                root.style.setProperty('--up-color', '#238636');
+                root.style.setProperty('--down-color', '#da3633');
+                root.style.setProperty('--btn-bg', '#21262d');
+
+                // Update chart background
+                chart.applyOptions({
+                    layout: { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
+                    grid: { vertLines: { color: '#30363d' }, horzLines: { color: '#30363d' } },
+                    timeScale: { borderColor: '#30363d' },
+                    rightPriceScale: { borderColor: '#30363d' }
+                });
+
+                subChart.applyOptions({
+                    layout: { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
+                    grid: { vertLines: { color: '#30363d' }, horzLines: { color: '#30363d' } },
+                    timeScale: { borderColor: '#30363d' },
+                    rightPriceScale: { borderColor: '#30363d' }
+                });
+            }
+
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Load saved theme on startup
+        (function () {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                toggleTheme();
+            }
+        })();
 
         // Init
         window.addEventListener('resize', () => {
