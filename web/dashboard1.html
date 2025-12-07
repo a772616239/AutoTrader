@@ -443,7 +443,7 @@
 
         // --- Data Variables ---
         let currentSymbol = localStorage.getItem('lastSymbol') || 'AAPL';
-        let currentInterval = '1d';
+        let currentInterval = localStorage.getItem('lastInterval') || '1d';
         let currentData = [];
         let dataMap = new Map();
 
@@ -463,6 +463,7 @@
 
         function setPeriod(interval) {
             currentInterval = interval;
+            localStorage.setItem('lastInterval', interval); // Save interval choice
             document.querySelectorAll('.btn').forEach(b => {
                 b.classList.remove('active');
 
@@ -1100,11 +1101,36 @@
             localStorage.setItem('theme', newTheme);
         }
 
+
         // Load saved theme on startup
         (function () {
-            const savedTheme = localStorage.getItem('theme');
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            const root = document.documentElement;
+
             if (savedTheme === 'light') {
-                toggleTheme();
+                // Apply light theme directly
+                root.style.setProperty('--bg-color', '#ffffff');
+                root.style.setProperty('--card-bg', '#f6f8fa');
+                root.style.setProperty('--text-color', '#24292f');
+                root.style.setProperty('--accent-color', '#0969da');
+                root.style.setProperty('--border-color', '#d0d7de');
+                root.style.setProperty('--up-color', '#1a7f37');
+                root.style.setProperty('--down-color', '#cf222e');
+                root.style.setProperty('--btn-bg', '#ffffff');
+
+                chart.applyOptions({
+                    layout: { background: { type: 'solid', color: '#ffffff' }, textColor: '#24292f' },
+                    grid: { vertLines: { color: '#e1e4e8' }, horzLines: { color: '#e1e4e8' } },
+                    timeScale: { borderColor: '#d0d7de' },
+                    rightPriceScale: { borderColor: '#d0d7de' }
+                });
+
+                subChart.applyOptions({
+                    layout: { background: { type: 'solid', color: '#ffffff' }, textColor: '#24292f' },
+                    grid: { vertLines: { color: '#e1e4e8' }, horzLines: { color: '#e1e4e8' } },
+                    timeScale: { borderColor: '#d0d7de' },
+                    rightPriceScale: { borderColor: '#d0d7de' }
+                });
             }
         })();
 
@@ -1121,6 +1147,10 @@
         });
 
         loadWatchlist();
+
+        // Restore saved interval button state
+        setPeriod(currentInterval);
+
         loadSymbol(currentSymbol); // Use saved symbol from localStorage
         setInterval(fetchTrades, 5000);
     </script>
