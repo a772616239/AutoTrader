@@ -342,6 +342,14 @@ class A5MultiFactorAI(BaseStrategy):
                 logger.info(f"[{symbol}] A5 过滤: 价格 {current_price:.2f} < 最小值 {self.min_price}")
                 return signals
             
+            # 1. 检查持仓止损止盈 (优先处理)
+            if symbol in self.positions:
+                exit_signal = self.check_exit_conditions(symbol, current_price)
+                if exit_signal:
+                    signals.append(exit_signal)
+                    # 如果触发硬止损，直接返回信号，不再计算复杂的AI逻辑
+                    return signals
+            
             if current_volume < self.min_volume:
                 logger.info(f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 最小值 {self.min_volume:.0f}")
                 return signals

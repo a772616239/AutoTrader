@@ -143,9 +143,9 @@ class BaseStrategy:
         else:
             price_change_pct = (avg_cost - current_price) / avg_cost
         
-        # 简单的退出条件
-        stop_loss_pct = -0.02
-        take_profit_pct = 0.03
+        # 简单的退出条件 - 使用配置或默认值
+        stop_loss_pct = -self.config.get('stop_loss_pct', 0.02)
+        take_profit_pct = self.config.get('take_profit_pct', 0.03)
         
         if price_change_pct <= stop_loss_pct:
             return {

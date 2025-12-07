@@ -124,9 +124,14 @@ class A6NewsTrading(BaseStrategy):
             trading_start = datetime.strptime(self.config.get('trading_start_time', '09:45'), '%H:%M').time()
             trading_end = datetime.strptime(self.config.get('trading_end_time', '15:30'), '%H:%M').time()
 
-            # if current_time.time() < trading_start or current_time.time() > trading_end:
             #     logger.info(f"[{symbol}] A6 不在交易时间范围内")
             #     return signals
+
+            # 1. 检查持仓止损止盈 (CRITICAL: 即使没有新闻也要检查止损)
+            if symbol in self.positions:
+                exit_signal = self.check_exit_conditions(symbol, current_price)
+                if exit_signal:
+                    signals.append(exit_signal)
 
             # 检查最近是否进行过新闻交易
             if symbol in self.last_news_trade_time:

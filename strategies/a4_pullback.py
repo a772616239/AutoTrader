@@ -420,4 +420,48 @@ class A4PullbackStrategy(BaseStrategy):
                 'profit_pct': price_change_pct * 100
             }
         
+        # 追踪止损
+        trailing_stop_pct = self.config.get('trailing_stop_pct', 0.02)
+        
+        if position_size > 0:
+            # 多头追踪止损
+            # 更新最高价
+            highest_price = position.get('highest_price', current_price)
+            if current_price > highest_price:
+                self.positions[symbol]['highest_price'] = current_price
+                highest_price = current_price
+            
+            # 检查回撤
+            drawdown = (highest_price - current_price) / highest_price
+            if drawdown >= trailing_stop_pct and price_change_pct > 0:
+                return {
+                    'symbol': symbol,
+                    'signal_type': 'TRAILING_STOP',
+                    'action': 'SELL',
+                    'price': current_price,
+                    'reason': f"追踪止损:以此前最高价{highest_price:.2f}回撤{drawdown*100:.1f}%",
+                    'position_size': abs(position_size),
+                    'profit_pct': price_change_pct * 100
+                }
+        else:
+            # 空头追踪止损
+            # 更新最低价
+            lowest_price = position.get('lowest_price', current_price)
+            if current_price < lowest_price:
+                self.positions[symbol]['lowest_price'] = current_price
+                lowest_price = current_price
+            
+            # 检查反弹
+            rebound = (current_price - lowest_price) / lowest_price
+            if rebound >= trailing_stop_pct and price_change_pct > 0:
+                return {
+                    'symbol': symbol,
+                    'signal_type': 'TRAILING_STOP',
+                    'action': 'BUY',
+                    'price': current_price,
+                    'reason': f"追踪止损:以此前最低价{lowest_price:.2f}反弹{rebound*100:.1f}%",
+                    'position_size': abs(position_size),
+                    'profit_pct': price_change_pct * 100
+                }
+        
         return None

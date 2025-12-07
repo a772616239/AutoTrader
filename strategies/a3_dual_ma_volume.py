@@ -297,6 +297,13 @@ class A3DualMAVolumeStrategy(BaseStrategy):
         if data.empty or len(data) < self.config['fast_ma_period'] + 5:
             return signals
         
+        # 检查是否持有仓位，如果有，检查止损止盈
+        if symbol in self.positions:
+            current_price = data['Close'].iloc[-1]
+            exit_signal = self.check_exit_conditions(symbol, current_price)
+            if exit_signal:
+                signals.append(exit_signal)
+
         # 检查买入信号
         buy_signal = self.detect_buy_signal(symbol, data, {})
         if buy_signal:
