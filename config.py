@@ -219,15 +219,15 @@ existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
 
 # 预设一些需要使用 a2 策略的标的（可按需修改）。仅在用户未显式设置时应用。
 preselect_a2 = {
-    # 'AAPL': 'a2',
-    # 'MSFT': 'a2',
-    # 'GOOGL':'a2',
-    # 'AMZN': 'a2',
-    # 'TSLA': 'a2',
-    # 'NVDA': 'a2',
-    # 'META': 'a2',
-    # 'INTC': 'a2',
-    # 'AMD':  'a2',
+    'AAPL': 'a2',
+    'MSFT': 'a2',
+    'GOOGL':'a2',
+    'AMZN': 'a2',
+    'TSLA': 'a2',
+    'NVDA': 'a2',
+    'META': 'a2',
+    'INTC': 'a2',
+    'AMD':  'a2',
 }
 
 merged_map = default_symbol_map.copy()
