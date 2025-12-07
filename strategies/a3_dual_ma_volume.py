@@ -145,9 +145,9 @@ class A3DualMAVolumeStrategy(BaseStrategy):
         confidence = min(ma_distance * 10, 1.0)  # 归一化到0-1之间
         
         if bullish_cross:
-            return '看涨', confidence
+            return 'BULLISH', confidence
         elif bearish_cross:
-            return '看跌', confidence
+            return 'BEARISH', confidence
         else:
             return 'NONE', 0.0
     

@@ -434,7 +434,7 @@
         });
 
         // --- Data Variables ---
-        let currentSymbol = 'AAPL';
+        let currentSymbol = localStorage.getItem('lastSymbol') || 'AAPL';
         let currentInterval = '1d';
         let currentData = [];
         let dataMap = new Map();
@@ -442,6 +442,7 @@
         // --- Functions ---
         async function loadSymbol(symbol) {
             currentSymbol = symbol;
+            localStorage.setItem('lastSymbol', symbol); // Save to localStorage
             document.getElementById('symbol-input').value = symbol;
             await fetchData();
             fetchTrades();
@@ -580,7 +581,14 @@
             'near_support': '接近支撑',
             'near_resistance': '接近阻力',
             'bullish': '看涨',
-            'bearish': '看跌'
+            'bearish': '看跌',
+            'volume_surge': '异常放量',
+            'bollinger_breakout_up': '布林上轨突破',
+            'bollinger_breakout_down': '布林下轨突破',
+            'strong_uptrend': '强势多头',
+            'strong_downtrend': '强势空头',
+            'golden_cross': '均线金叉',
+            'death_cross': '均线死叉'
         };
 
         function updateInfoPanel(info, signals, risk) {
@@ -750,7 +758,8 @@
                     const priceVal = t.price || t.entry_price || 'N/A';
                     const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
 
-                    let text = `${t.action} @ ${priceDisp}`;
+                    <!-- let text = `${t.action}@ ${priceDisp}`; -->
+                    let text = `${priceDisp}`;
                     if (t.size) text += ` * ${t.size}`;
                     if (t.strategy) text += ` | ${t.strategy}`;
 
@@ -758,8 +767,8 @@
                         time: time,
                         position: t.action === 'BUY' ? 'belowBar' : 'aboveBar',
                         color: t.action === 'BUY' ? '#2196F3' : '#FFC107',
-                        shape: 'circle',
-                        text: text,
+                        shape: 'text',
+                        text: t.action === 'BUY' ? '🚀' + text : '💰' + text,
                     };
                 });
                 tradeMarkers.sort((a, b) => a.time - b.time);
@@ -942,7 +951,7 @@
         });
 
         loadWatchlist();
-        loadSymbol('AAPL');
+        loadSymbol(currentSymbol); // Use saved symbol from localStorage
         setInterval(fetchTrades, 5000);
     </script>
 </body>

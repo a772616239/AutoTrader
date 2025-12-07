@@ -370,6 +370,47 @@ class EnhancedStockData:
             elif current_price > resistance * 0.98:
                 signals.append({"type": "near_resistance", "indicator": "price", "strength": "medium"})
         
+        # 成交量异常信号
+        if 'Volume_Ratio' in indicators and indicators['Volume_Ratio']:
+            if indicators['Volume_Ratio'] > 2.0:  # 放量超过平均2倍
+                signals.append({"type": "volume_surge", "indicator": "Volume", "strength": "medium"})
+        
+        # 布林带突破信号
+        if 'BB_upper' in indicators and 'BB_lower' in indicators and len(df) >= 1:
+            current_price = df['Close'].iloc[-1]
+            if indicators['BB_upper'] and current_price > indicators['BB_upper']:
+                signals.append({"type": "bollinger_breakout_up", "indicator": "BOLL", "strength": "high"})
+            elif indicators['BB_lower'] and current_price < indicators['BB_lower']:
+                signals.append({"type": "bollinger_breakout_down", "indicator": "BOLL", "strength": "high"})
+        
+        # 均线多头/空头排列
+        if all(k in indicators for k in ['MA_5', 'MA_10', 'MA_20']) and len(df) >= 1:
+            current_price = df['Close'].iloc[-1]
+            ma5, ma10, ma20 = indicators['MA_5'], indicators['MA_10'], indicators['MA_20']
+            
+            if all([ma5, ma10, ma20]):
+                # 多头排列：价格 > MA5 > MA10 > MA20
+                if current_price > ma5 > ma10 > ma20:
+                    signals.append({"type": "strong_uptrend", "indicator": "MA", "strength": "high"})
+                # 空头排列：价格 < MA5 < MA10 < MA20
+                elif current_price < ma5 < ma10 < ma20:
+                    signals.append({"type": "strong_downtrend", "indicator": "MA", "strength": "high"})
+        
+        # 均线金叉/死叉 (MA5 与 MA10)
+        if len(df) >= 2 and 'MA5' in df.columns and 'MA10' in df.columns:
+            ma5_curr = df['MA5'].iloc[-1]
+            ma10_curr = df['MA10'].iloc[-1]
+            ma5_prev = df['MA5'].iloc[-2]
+            ma10_prev = df['MA10'].iloc[-2]
+            
+            if all([ma5_curr, ma10_curr, ma5_prev, ma10_prev]):
+                # 金叉：MA5 上穿 MA10
+                if ma5_prev <= ma10_prev and ma5_curr > ma10_curr:
+                    signals.append({"type": "golden_cross", "indicator": "MA", "strength": "high"})
+                # 死叉：MA5 下穿 MA10
+                elif ma5_prev >= ma10_prev and ma5_curr < ma10_curr:
+                    signals.append({"type": "death_cross", "indicator": "MA", "strength": "high"})
+        
         return signals
     
     def _calculate_risk_metrics(self, df):
