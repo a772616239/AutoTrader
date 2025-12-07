@@ -549,22 +549,24 @@
 
                 updateIndicators();
 
-                // Set visible range based on interval
-                if (currentInterval === '1d' && data.length > 110) {
-                    // 5 months * ~22 days/month = ~110 days
-                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 110, to: data.length });
-                } else if (currentInterval === '1m' && data.length > 780) {
-                    // 2 days * 6.5 hours * 60 minutes = ~780 bars
-                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 780, to: data.length });
-                } else if (currentInterval === '1wk' && data.length > 113) {
-                    // 26 months * ~4.33 weeks/month = ~113 weeks
-                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 113, to: data.length });
-                } else if (currentInterval === '1mo' && data.length > 48) {
-                    // 4 years * 12 months = 48 months
-                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 48, to: data.length });
-                } else {
-                    chart.timeScale().fitContent();
-                }
+                // Set visible range based on interval (use requestAnimationFrame to ensure chart is ready)
+                requestAnimationFrame(() => {
+                    if (currentInterval === '1d' && data.length > 110) {
+                        // 5 months * ~22 days/month = ~110 days
+                        chart.timeScale().setVisibleLogicalRange({ from: data.length - 110, to: data.length });
+                    } else if (currentInterval === '1m' && data.length > 780) {
+                        // 2 days * 6.5 hours * 60 minutes = ~780 bars
+                        chart.timeScale().setVisibleLogicalRange({ from: data.length - 780, to: data.length });
+                    } else if (currentInterval === '1wk' && data.length > 113) {
+                        // 26 months * ~4.33 weeks/month = ~113 weeks
+                        chart.timeScale().setVisibleLogicalRange({ from: data.length - 113, to: data.length });
+                    } else if (currentInterval === '1mo' && data.length > 48) {
+                        // 4 years * 12 months = 48 months
+                        chart.timeScale().setVisibleLogicalRange({ from: data.length - 48, to: data.length });
+                    } else {
+                        chart.timeScale().fitContent();
+                    }
+                });
 
                 if (currentInterval === '1m') addDailySeparators();
                 setupInfiniteScroll();
