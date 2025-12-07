@@ -548,9 +548,20 @@
                 volumeSeries.setData(volData);
 
                 updateIndicators();
+
+                // Set visible range based on interval
                 if (currentInterval === '1d' && data.length > 110) {
                     // 5 months * ~22 days/month = ~110 days
                     chart.timeScale().setVisibleLogicalRange({ from: data.length - 110, to: data.length });
+                } else if (currentInterval === '1m' && data.length > 780) {
+                    // 2 days * 6.5 hours * 60 minutes = ~780 bars
+                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 780, to: data.length });
+                } else if (currentInterval === '1wk' && data.length > 39) {
+                    // 9 months * ~4.33 weeks/month = ~39 weeks
+                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 39, to: data.length });
+                } else if (currentInterval === '1mo' && data.length > 36) {
+                    // 3 years * 12 months = 36 months
+                    chart.timeScale().setVisibleLogicalRange({ from: data.length - 36, to: data.length });
                 } else {
                     chart.timeScale().fitContent();
                 }
