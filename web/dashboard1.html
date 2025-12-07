@@ -478,7 +478,7 @@
                 let period = '1y';
                 if (currentInterval === '1wk') period = '5y';
                 if (currentInterval === '1mo') period = 'max';
-                if (currentInterval === '1m') period = '1d';
+                if (currentInterval === '1m') period = '7d';
 
                 const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${period}`);
                 const resData = await response.json();
@@ -751,32 +751,57 @@
             try {
                 const response = await fetch(`/api/trades?symbol=${currentSymbol}`);
                 const trades = await response.json();
-                if (!Array.isArray(trades)) return;
+
+                console.log(`Fetched ${trades.length} trades for ${currentSymbol}`);
+
+                if (!Array.isArray(trades) || trades.length === 0) {
+                    console.log('No trades to display');
+                    return;
+                }
 
                 const tradeMarkers = trades.map(t => {
-                    const time = new Date(t.timestamp).getTime() / 1000;
+                    const tradeDate = new Date(t.timestamp);
                     const priceVal = t.price || t.entry_price || 'N/A';
                     const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
 
-                    <!-- let text = `${t.action}@ ${priceDisp}`; -->
-                    let text = `${priceDisp}`;
+                    let text = `${t.action}@ ${priceDisp}`;
                     if (t.size) text += ` * ${t.size}`;
                     if (t.strategy) text += ` | ${t.strategy}`;
 
+                    // Add order status emoji at the end
+                    const orderStatus = t.order_status || t.status || '';
+                    if (orderStatus === 'Filled') {
+                        text += ' ✅';
+                    } else if (orderStatus === 'Cancelled') {
+                        text += ' ❎';
+                    } else if (orderStatus === 'PreSubmitted') {
+                        text += ' ⌛️';
+                    }
+
+                    // Always use Unix timestamp for markers (Lightweight Charts handles conversion)
+                    const markerTime = Math.floor(tradeDate.getTime() / 1000);
+
                     return {
-                        time: time,
+                        time: markerTime,
                         position: t.action === 'BUY' ? 'belowBar' : 'aboveBar',
                         color: t.action === 'BUY' ? '#2196F3' : '#FFC107',
                         shape: 'text',
                         text: t.action === 'BUY' ? '🚀' + text : '💰' + text,
                     };
                 });
+
                 tradeMarkers.sort((a, b) => a.time - b.time);
+
+                console.log(`Created ${tradeMarkers.length} markers:`, tradeMarkers);
 
                 const existingMarkers = candleSeries.markers ? candleSeries.markers() : [];
                 const daySeparators = existingMarkers.filter(m => m.shape === 'arrowDown');
                 candleSeries.setMarkers([...daySeparators, ...tradeMarkers]);
-            } catch (e) { console.error("Trades error", e); }
+
+                console.log('Markers set successfully');
+            } catch (e) {
+                console.error("Trades error:", e);
+            }
         }
 
         // --- Helpers ---
