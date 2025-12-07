@@ -443,11 +443,98 @@
                 chart.timeScale().fitContent();
                 fetchTrades();
 
+                // Setup infinite scroll for historical data
+                setupInfiniteScroll();
+
             } catch (e) {
                 console.error(e);
                 alert('Failed to load data');
             } finally {
                 loading.classList.remove('visible');
+            }
+        }
+
+        // Infinite scroll: load more data when scrolling to edges
+        let isLoadingMore = false;
+        let scrollListenerAdded = false;
+
+        function setupInfiniteScroll() {
+            // Prevent duplicate listeners
+            if (scrollListenerAdded) return;
+            scrollListenerAdded = true;
+
+            console.log('🔄 Infinite scroll enabled');
+
+            chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+                if (!range) return;
+
+                console.log(`Visible range: from=${range.from.toFixed(1)}, to=${range.to.toFixed(1)}, total=${currentData.length}`);
+
+                // When user scrolls near the left edge (viewing old data)
+                if (range.from < 5 && !isLoadingMore && currentData.length > 0) {
+                    console.log('📜 Near left edge - loading more data...');
+                    loadMoreHistory();
+                }
+            });
+        }
+
+        async function loadMoreHistory() {
+            if (isLoadingMore) {
+                console.log('Already loading more data');
+                return;
+            }
+
+            isLoadingMore = true;
+            console.log('📜 Loading more historical data...');
+
+            try {
+                // Simply load a larger period to get more data
+                let newPeriod;
+                if (currentInterval === '1d') newPeriod = '5y';  // Increase from 3y
+                else if (currentInterval === '1wk') newPeriod = '10y';  // Increase from 5y
+                else if (currentInterval === '1mo') newPeriod = 'max';
+                else newPeriod = '14d';  // Increase from 7d
+
+                const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${newPeriod}`);
+                const allData = await response.json();
+
+                if (!allData || !Array.isArray(allData) || allData.length <= currentData.length) {
+                    console.log('📜 No additional data available');
+                    // Show user-friendly message
+                    const notification = document.createElement('div');
+                    notification.style.cssText = 'position:fixed;top:80px;right:20px;background:#2d2d2d;color:#4ade80;padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:1000;font-size:14px;';
+
+                    if (currentInterval === '1m') {
+                        notification.textContent = `⚠️ 1分钟数据仅支持7-8天历史 (Yahoo限制)`;
+                        notification.style.color = '#fbbf24';  // Yellow warning color
+                    } else {
+                        notification.textContent = `✓ 已加载所有可用历史数据 (${currentData.length}个数据点)`;
+                    }
+
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                    return;
+                }
+
+                console.log(`📜 Loaded ${allData.length} total points (was ${currentData.length})`);
+                currentData = allData;
+
+                // Update chart with new data
+                candleSeries.setData(currentData);
+                const volData = currentData.map(d => ({
+                    time: d.time,
+                    value: d.volume,
+                    color: d.close > d.open ? '#238636' : '#da3633'
+                }));
+                volumeSeries.setData(volData);
+                updateIndicators();
+
+            } catch (e) {
+                console.error('Failed to load more history:', e);
+            } finally {
+                setTimeout(() => {
+                    isLoadingMore = false;
+                }, 2000);  // Prevent rapid reloads
             }
         }
 
