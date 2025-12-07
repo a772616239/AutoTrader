@@ -402,6 +402,7 @@
         let currentSymbol = 'AAPL';
         let currentInterval = '1d';
         let currentData = [];
+        let dataMap = new Map();
 
         // --- Functions ---
         async function loadSymbol(symbol) {
@@ -439,7 +440,7 @@
 
             try {
                 let period = '1y';
-                if (currentInterval === '1wk') period = '5y'; // Restore optimal periods
+                if (currentInterval === '1wk') period = '5y';
                 if (currentInterval === '1mo') period = 'max';
                 if (currentInterval === '1m') period = '7d';
 
@@ -452,6 +453,12 @@
                 }
 
                 currentData = data;
+                // Rebuild Map for fast lookup
+                dataMap.clear();
+                data.forEach(d => {
+                    dataMap.set(d.time, d);
+                });
+
                 candleSeries.setData(data);
 
                 const volData = data.map(d => ({
@@ -647,6 +654,11 @@
                 const data = await response.json();
                 if (data && Array.isArray(data) && data.length > currentData.length) {
                     currentData = data;
+                    // Rebuild Map
+                    dataMap.clear();
+                    data.forEach(d => {
+                        dataMap.set(d.time, d);
+                    });
                     candleSeries.setData(data);
 
                     const volData = data.map(d => ({
@@ -684,6 +696,13 @@
         // --- Legend Logic ---
         const legend = document.getElementById('chart-legend');
         function formatVal(val) { return (val !== undefined && val !== null) ? val.toFixed(2) : 'N/A'; }
+        function formatNumber(num) {
+            if (num === undefined || num === null || isNaN(num)) return 'N/A';
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+            return num.toString();
+        }
 
         chart.subscribeCrosshairMove(param => {
             // Hide legend for 1 minute interval as requested
@@ -696,18 +715,37 @@
             let d = {};
             if (valid) {
                 const c = param.seriesData.get(candleSeries);
-                if (c) d = {
-                    ...c, volume: param.seriesData.get(volumeSeries)?.value,
-                    ma5: param.seriesData.get(ma5Series)?.value,
-                    ma10: param.seriesData.get(ma10Series)?.value,
-                    bbU: param.seriesData.get(bbUpperSeries)?.value,
-                    bbL: param.seriesData.get(bbLowerSeries)?.value
-                };
+                if (c) {
+                    d = {
+                        ...c, volume: param.seriesData.get(volumeSeries)?.value,
+                        ma5: param.seriesData.get(ma5Series)?.value,
+                        ma10: param.seriesData.get(ma10Series)?.value,
+                        bbU: param.seriesData.get(bbUpperSeries)?.value,
+                        bbL: param.seriesData.get(bbLowerSeries)?.value
+                    };
+
+                    // Lookup extra fields using Map
+                    let lookupKey = c.time;
+                    if (typeof c.time === 'object' && c.time.year) {
+                        // Convert LC object to YYYY-MM-DD
+                        lookupKey = `${c.time.year}-${String(c.time.month).padStart(2, '0')}-${String(c.time.day).padStart(2, '0')}`;
+                    }
+                    const originalData = dataMap.get(lookupKey);
+                    if (originalData) {
+                        d.Turnover = originalData.Turnover;
+                        d.TurnoverRate = originalData.TurnoverRate;
+                        d.PE = originalData.PE;
+                    } else {
+                        // Fallback debug
+                        // console.log('Lookup failed for', lookupKey);
+                    }
+                }
             } else if (currentData.length) {
                 const l = currentData[currentData.length - 1];
                 d = {
                     open: l.open, high: l.high, low: l.low, close: l.close, time: l.time, volume: l.volume,
-                    ma5: l.MA5, ma10: l.MA10, bbU: l.BB_upper, bbL: l.BB_lower
+                    ma5: l.MA5, ma10: l.MA10, bbU: l.BB_upper, bbL: l.BB_lower,
+                    Turnover: l.Turnover, TurnoverRate: l.TurnoverRate, PE: l.PE
                 };
             } else { legend.style.display = 'none'; return; }
 
@@ -715,14 +753,16 @@
             const chg = d.close - d.open;
             const pct = (chg / d.open) * 100;
             const color = chg >= 0 ? 'legend-up' : 'legend-down';
-            const dateStr = typeof d.time === 'number' ? new Date(d.time * 1000).toLocaleString() : d.time;
+            const dateStr = typeof d.time === 'number' ? new Date(d.time * 1000).toLocaleString() : (typeof d.time === 'object' ? `${d.time.year}-${d.time.month}-${d.time.day}` : d.time);
 
             let html = `
                 <div class="legend-section"><div style="font-weight:bold">${currentSymbol} · ${currentInterval}</div><div style="color:#8b949e;font-size:11px">${dateStr}</div></div>
                 <div class="legend-section">
-                    <div class="legend-row"><span>Open: <span class="${color}">${formatVal(d.open)}</span></span><span>High: <span class="${color}">${formatVal(d.high)}</span></span></div>
-                    <div class="legend-row"><span>Low: <span class="${color}">${formatVal(d.low)}</span></span><span>Close: <span class="${color}">${formatVal(d.close)}</span></span></div>
-                    <div class="legend-row"><span>Vol: <span class="legend-val">${formatVal(d.volume)}</span></span><span class="${color}">${chg >= 0 ? '+' : ''}${formatVal(chg)} (${formatVal(pct)}%)</span></div>
+                    <div class="legend-row"><span>开盘: <span class="${color}">${formatVal(d.open)}</span></span><span>最高: <span class="${color}">${formatVal(d.high)}</span></span></div>
+                    <div class="legend-row"><span>最低: <span class="${color}">${formatVal(d.low)}</span></span><span>收盘: <span class="${color}">${formatVal(d.close)}</span></span></div>
+                    <div class="legend-row"><span>涨跌: <span class="${color}">${chg >= 0 ? '+' : ''}${formatVal(chg)}</span></span><span>幅度: <span class="${color}">${formatVal(pct)}%</span></span></div>
+                    <div class="legend-row"><span>总手: <span class="legend-val">${formatNumber(d.volume)}</span></span><span>金额: <span class="legend-val">${formatNumber(d.Turnover)}</span></span></div>
+                    <div class="legend-row"><span>换手: <span class="legend-val">${formatVal(d.TurnoverRate)}%</span></span><span>市盈: <span class="legend-val">${formatVal(d.PE)}</span></span></div>
                 </div>`;
 
             if ((d.ma5 !== undefined && document.getElementById('btn-ma').classList.contains('active')) ||

@@ -51,6 +51,9 @@ class EnhancedStockData:
             # 3.1 添加技术指标序列 (用于绘图)
             hist = self._add_technical_indicators(hist)
             
+            # 3.2 添加基本面衍生数据
+            hist = self._add_fundamental_data(hist, info)
+            
             # 4. 价量特征工程
             price_features = self._extract_price_features(hist)
             
@@ -115,7 +118,7 @@ class EnhancedStockData:
             
             # 添加指标字段 (如果存在)
             optional_fields = ['MA5', 'MA10', 'MA20', 'MA50', 'MA200', 'BB_upper', 'BB_middle', 'BB_lower', 
-                               'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist']
+                               'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist', 'Turnover', 'TurnoverRate', 'PE']
             for field in optional_fields:
                 if field in row:
                     val = row[field]
@@ -217,6 +220,29 @@ class EnhancedStockData:
         df['MACD_Signal'] = signal
         df['MACD_Hist'] = hist
         
+        return df
+
+    def _add_fundamental_data(self, df, info):
+        """添加基本面衍生数据 (PE, 换手率等)"""
+        # 获取股本和EPS
+        shares_outstanding = info.get('sharesOutstanding', 0)
+        trailing_eps = info.get('trailingEps', 0)
+        
+        # 1. Turnover (成交额) - 近似值
+        df['Turnover'] = df['Close'] * df['Volume']
+        
+        # 2. TurnoverRate (换手率)
+        if shares_outstanding and shares_outstanding > 0:
+            df['TurnoverRate'] = (df['Volume'] / shares_outstanding) * 100 # 百分比
+        else:
+            df['TurnoverRate'] = 0
+            
+        # 3. PE (市盈率) - 动态估算:收盘价/最近EPS
+        if trailing_eps and trailing_eps > 0:
+            df['PE'] = df['Close'] / trailing_eps
+        else:
+            df['PE'] = 0
+            
         return df
     
     def _extract_price_features(self, df):
