@@ -225,6 +225,32 @@ class BaseStrategy:
         
         if not self.ib_trader:
             return {'status': 'REJECTED', 'reason': 'IB接口未初始化'}
+            
+        # 动态资金检查 (仅针对买入)
+        if signal['action'] == 'BUY':
+            try:
+                available_funds = self.ib_trader.get_available_funds()
+                # 1. 资金门槛检查 (< $500 则不交易)
+                if available_funds < 500:
+                    msg = f"可用资金不足 $500 (${available_funds:.2f})，跳过下单"
+                    logger.warning(f"⚠️ {msg}")
+                    return {'status': 'REJECTED', 'reason': msg}
+                
+                # 2. 资金充足性检查 (不够则用剩余全部)
+                estimated_cost = signal['position_size'] * current_price
+                if estimated_cost > available_funds:
+                    # 计算最大可买股数
+                    max_qty = int(available_funds // current_price)
+                    if max_qty > 0:
+                        logger.info(f"💰 资金不足全额买入 (${available_funds:.2f} < ${estimated_cost:.2f})，"
+                                   f"调整仓位: {signal['position_size']} -> {max_qty} 股")
+                        signal['position_size'] = max_qty
+                    else:
+                        msg = f"资金不足以买入 1 股 (${available_funds:.2f} < ${current_price:.2f})"
+                        logger.warning(f"⚠️ {msg}")
+                        return {'status': 'REJECTED', 'reason': msg}
+            except Exception as e:
+                logger.error(f"检查可用资金时出错: {e}")
         
         order_type_cfg = self.config.get('ib_order_type', 'MKT')
         dedupe_price = None
