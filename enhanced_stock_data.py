@@ -18,6 +18,11 @@ class EnhancedStockData:
         """
         try:
             # 1. 基础行情数据
+            # 检查是否有代理配置 (Yahoo Finance 在某些地区需要代理)
+            import os
+            if not os.environ.get('https_proxy') and not os.environ.get('HTTPS_PROXY'):
+                print("⚠️ Warning: No HTTPS_PROXY detected. Yahoo Finance might be blocked.")
+
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period=period, interval=interval)
             

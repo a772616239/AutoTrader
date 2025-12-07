@@ -1,0 +1,28 @@
+[
+  {
+    "symbol": "MSFT",
+    "action": "BUY",
+    "entry_price": 483.0299987792969,
+    "size": 8,
+    "timestamp": "2025-12-07T18:02:18.220139",
+    "signal_type": "CTA_BREAKOUT_LONG",
+    "confidence": 0.8,
+    "status": "PENDING",
+    "order_type": "LMT",
+    "order_id": 183,
+    "order_status": "Submitted"
+  },
+  {
+    "symbol": "MSFT",
+    "action": "BUY",
+    "entry_price": 483.0299987792969,
+    "size": 8,
+    "timestamp": "2025-12-07T18:03:01.067613",
+    "signal_type": "CTA_BREAKOUT_LONG",
+    "confidence": 0.8,
+    "status": "PENDING",
+    "order_type": "LMT",
+    "order_id": 185,
+    "order_status": "Submitted"
+  }
+]

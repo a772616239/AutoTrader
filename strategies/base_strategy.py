@@ -392,6 +392,7 @@ class BaseStrategy:
                            f"@{current_price:.2f}, 数量: {signal['position_size']}")
                 
                 return trade
+                return trade
             # else:
             #     trade['status'] = 'FAILED'
             #     # trade['reason'] = 'IB下单失败'
@@ -402,6 +403,40 @@ class BaseStrategy:
             trade['reason'] = str(e)
             logger.error(f"执行交易时出错 {signal['symbol']}: {e}")
             return trade
+        finally:
+            # 保存交易记录到文件 (供 Dashboard 使用)
+            try:
+                import json
+                import os
+                
+                # 确保 data 目录存在
+                data_dir = os.path.join(os.getcwd(), 'data')
+                if not os.path.exists(data_dir):
+                    os.makedirs(data_dir)
+                    
+                file_path = os.path.join(data_dir, 'trades.json')
+                
+                # 读取现有记录
+                existing_trades = []
+                if os.path.exists(file_path):
+                    with open(file_path, 'r') as f:
+                        try:
+                            existing_trades = json.load(f)
+                        except:
+                            pass
+                
+                # 转换 datetime 为字符串
+                trade_record = trade.copy()
+                if isinstance(trade_record.get('timestamp'), datetime):
+                    trade_record['timestamp'] = trade_record['timestamp'].isoformat()
+                
+                existing_trades.append(trade_record)
+                
+                # 写入文件
+                with open(file_path, 'w') as f:
+                    json.dump(existing_trades[-100:], f, indent=2) # 只保留最近100条
+            except Exception as e:
+                logger.error(f"保存交易记录失败: {e}")
     
     def generate_signals(self, symbol: str, data: pd.DataFrame, 
                         indicators: Dict) -> List[Dict]:

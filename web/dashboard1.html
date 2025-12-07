@@ -211,7 +211,7 @@
                 borderColor: '#30363d',
                 scaleMargins: {
                     top: 0.1,
-                    bottom: 0.5, // K线图底部留白 30%
+                    bottom: 0.25, // K线图底部留白 25% (给成交量腾地方)
                 },
             },
         });
@@ -232,7 +232,7 @@
             },
             priceScaleId: '', // Overlay
             scaleMargins: {
-                top: 1, // 成交量从 80% 处开始 (底部 20%)
+                top: 0.76, // 成交量从 76% 处开始 (底部 24%)
                 bottom: 0,
             },
         });
@@ -245,6 +245,7 @@
             currentSymbol = symbol;
             document.getElementById('symbol-input').value = symbol;
             fetchData();
+            fetchTrades(); // 切换股票时加载对应的交易记录
         }
 
         function searchSymbol() {
@@ -281,11 +282,6 @@
                     return;
                 }
 
-                // Convert data for Lightweight Charts
-                // API returns { time, open, high, low, close, volume }
-                // Lightweight charts expects time as string 'YYYY-MM-DD' for daily, or unix timestamp for intraday.
-                // Our backend already formats it appropriately.
-
                 candleSeries.setData(data);
 
                 const volData = data.map(d => ({
@@ -298,11 +294,68 @@
                 // Auto-fit
                 chart.timeScale().fitContent();
 
+                // 加载交易数据
+                fetchTrades();
+
             } catch (e) {
                 console.error(e);
                 alert('Failed to load data');
             } finally {
                 loading.classList.remove('visible');
+            }
+        }
+
+        async function loadWatchlist() {
+            try {
+                const response = await fetch('/api/symbols');
+                const symbols = await response.json();
+                const watchlistEl = document.getElementById('watchlist');
+
+                if (Array.isArray(symbols) && symbols.length > 0) {
+                    watchlistEl.innerHTML = ''; // Clear existing
+                    symbols.forEach(sym => {
+                        const div = document.createElement('div');
+                        div.className = 'watchlist-item';
+                        div.onclick = () => loadSymbol(sym);
+                        div.innerHTML = `<span>${sym}</span>`;
+                        watchlistEl.appendChild(div);
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to load watchlist", e);
+            }
+        }
+
+        async function fetchTrades() {
+            try {
+                const response = await fetch(`/api/trades?symbol=${currentSymbol}`);
+                const trades = await response.json();
+
+                if (!Array.isArray(trades)) return;
+
+                const markers = trades.map(t => {
+                    // 解析时间 (后端存的是 isoformat string)
+                    // Lightweight Charts markers time 需要和 K 线的 time 一致 (timestamp or YYYY-MM-DD)
+                    // 后端 API /api/history 处理了 time 格式。
+                    // 这里的 trades timestamp 是完整的 datetimestring。
+                    // 简单起见，我们将 trade time 转换为 timestamp
+                    const time = new Date(t.timestamp).getTime() / 1000;
+                    return {
+                        time: time,
+                        position: t.action === 'BUY' ? 'belowBar' : 'aboveBar',
+                        color: 'blue', // 蓝色点点
+                        shape: 'circle',
+                        text: `${t.action} @ ${t.price}`,
+                    };
+                });
+
+                // 必须按时间排序
+                markers.sort((a, b) => a.time - b.time);
+
+                candleSeries.setMarkers(markers);
+
+            } catch (e) {
+                console.error("Failed to load trades", e);
             }
         }
 
@@ -312,7 +365,9 @@
         });
 
         // Initial Load
+        loadWatchlist();
         fetchData();
+        setInterval(fetchTrades, 5000); // 轮询交易记录
 
     </script>
 </body>

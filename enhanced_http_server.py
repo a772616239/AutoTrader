@@ -50,6 +50,12 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         elif path == '/analysis-report':
             self._handle_analysis_report(parsed)
             return
+        elif path == '/api/symbols':
+            self._handle_symbols_api()
+            return
+        elif path == '/api/trades':
+            self._handle_trades_api(parsed)
+            return
             
         # 404
         self.send_error(404, "File not found")
@@ -220,6 +226,40 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             'summary': {'symbol': data.get('metadata', {}).get('symbol'), 'time': datetime.now().isoformat()},
             'details': 'Analysis logic simplified for brevity in this update'
         }
+
+    def _handle_symbols_api(self):
+        try:
+            # 动态导入配置
+            import sys
+            if os.getcwd() not in sys.path:
+                sys.path.append(os.getcwd())
+            from config import CONFIG
+            
+            symbols = CONFIG.get('trading', {}).get('symbols', [])
+            self._send_json_response(symbols)
+        except Exception as e:
+            self._send_json_response({'error': str(e), 'symbols': ['AAPL','NVDA','TSLA']})
+
+    def _handle_trades_api(self, parsed):
+        params = parse_qs(parsed.query)
+        symbol = params.get('symbol', [None])[0]
+        
+        try:
+            file_path = os.path.join(os.getcwd(), 'data', 'trades.json')
+            if not os.path.exists(file_path):
+                self._send_json_response([])
+                return
+                
+            with open(file_path, 'r') as f:
+                trades = json.load(f)
+            
+            # 过滤
+            if symbol:
+                trades = [t for t in trades if t.get('symbol') == symbol]
+                
+            self._send_json_response(trades)
+        except Exception as e:
+            self._send_json_response([])
 
 def run_enhanced_server(port=8001):
     server_address = ('', port)
