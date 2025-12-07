@@ -534,7 +534,11 @@
 
             if (subType === 'rsi') {
                 rsiSeries = subChart.addLineSeries({ color: '#9C27B0', lineWidth: 1, title: 'RSI(14)' });
-                rsiSeries.setData(currentData.map(d => ({ time: d.time, value: d.RSI })).filter(d => d.value != null && !isNaN(d.value)));
+                rsiSeries.setData(currentData.map(d => {
+                    const val = d.RSI;
+                    if (val == null || isNaN(val)) return { time: d.time }; // Whitespace for alignment
+                    return { time: d.time, value: val };
+                }));
                 rsiSeries.createPriceLine({ price: 70, color: '#FF9800', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
                 rsiSeries.createPriceLine({ price: 30, color: '#FF9800', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
             } else if (subType === 'macd') {
@@ -542,9 +546,21 @@
                 macdLineSeries = subChart.addLineSeries({ color: '#2962FF', lineWidth: 1, title: 'MACD' });
                 macdSignalSeries = subChart.addLineSeries({ color: '#FF6D00', lineWidth: 1, title: 'Signal' });
 
-                macdHistSeries.setData(currentData.map(d => ({ time: d.time, value: d.MACD_Hist, color: (d.MACD_Hist >= 0 ? '#26a69a' : '#ef5350') })).filter(d => d.value != null && !isNaN(d.value)));
-                macdLineSeries.setData(currentData.map(d => ({ time: d.time, value: d.MACD })).filter(d => d.value != null && !isNaN(d.value)));
-                macdSignalSeries.setData(currentData.map(d => ({ time: d.time, value: d.MACD_Signal })).filter(d => d.value != null && !isNaN(d.value)));
+                macdHistSeries.setData(currentData.map(d => {
+                    const val = d.MACD_Hist;
+                    if (val == null || isNaN(val)) return { time: d.time };
+                    return { time: d.time, value: val, color: (val >= 0 ? '#26a69a' : '#ef5350') };
+                }));
+                macdLineSeries.setData(currentData.map(d => {
+                    const val = d.MACD;
+                    if (val == null || isNaN(val)) return { time: d.time };
+                    return { time: d.time, value: val };
+                }));
+                macdSignalSeries.setData(currentData.map(d => {
+                    const val = d.MACD_Signal;
+                    if (val == null || isNaN(val)) return { time: d.time };
+                    return { time: d.time, value: val };
+                }));
             }
 
             // Sync
