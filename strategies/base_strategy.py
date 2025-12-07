@@ -289,6 +289,7 @@ class BaseStrategy:
             'size': signal['position_size'],
             'timestamp': datetime.now(),
             'signal_type': signal['signal_type'],
+            'strategy': signal.get('strategy', self.name),  # 记录策略名称
             'confidence': signal.get('confidence', 0.5),
             'status': 'PENDING',
             'order_type': self.config.get('ib_order_type', 'MKT')

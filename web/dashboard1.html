@@ -590,12 +590,19 @@
                     const time = new Date(t.timestamp).getTime() / 1000;
                     const priceVal = t.price || t.entry_price || 'N/A';
                     const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
+
+                    // Construct marker text with strategy info (single line)
+                    let text = `${t.action} @ ${priceDisp}`;
+                    if (t.strategy) {
+                        text += ` | ${t.strategy}`;
+                    }
+
                     return {
                         time: time,
                         position: t.action === 'BUY' ? 'belowBar' : 'aboveBar',
                         color: t.action === 'BUY' ? '#2196F3' : '#FFC107',  // Blue for BUY, Yellow for SELL
                         shape: 'circle',
-                        text: `${t.action} @ ${priceDisp}`,
+                        text: text,
                     };
                 });
                 markers.sort((a, b) => a.time - b.time);
