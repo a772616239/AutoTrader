@@ -50,11 +50,11 @@ class BaseStrategy:
     def _default_config(self) -> Dict:
         """默认配置 - 子类应该重写此方法"""
         return {
-            'initial_capital': 100000.0,
+            'initial_capital': 40000.0,
             'risk_per_trade': 0.01,
             'max_position_size': 0.05,
             'min_cash_buffer': 0.3,
-            'per_trade_notional_cap': 10000.0,
+            'per_trade_notional_cap': 4000.0,
             'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
             'max_active_positions': 5,
         }

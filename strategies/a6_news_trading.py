@@ -30,10 +30,10 @@ class A6NewsTrading(BaseStrategy):
     def _default_config(self) -> Dict:
         """A6 策略的默认配置"""
         return {
-            'initial_capital': 100000.0,
+            'initial_capital': 40000.0,
             'risk_per_trade': 0.015,
             'max_position_size': 0.04,
-            'per_trade_notional_cap': 5000.0,
+            'per_trade_notional_cap': 4000.0,
             'max_position_notional': 20000.0,
             'alpha_vantage_api_key': 'S4DJM04D0PS02401',
             'news_lookback_hours': 24,

@@ -20,10 +20,10 @@ class A3DualMAVolumeStrategy(BaseStrategy):
         """默认配置"""
         return {
             # 资金管理
-            'initial_capital': 100000.0,
+            'initial_capital': 40000.0,
             'risk_per_trade': 0.02,
             'max_position_size': 0.1,
-            'per_trade_notional_cap': 10000.0,  # 单笔交易美元上限
+            'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
             'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
             
             # 双均线参数

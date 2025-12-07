@@ -34,10 +34,10 @@ class A5MultiFactorAI(BaseStrategy):
     def _default_config(self) -> Dict:
         """A5 策略的默认配置"""
         return {
-            'initial_capital': 100000.0,
+            'initial_capital': 40000.0,
             'risk_per_trade': 0.02,
             'max_position_size': 0.06,
-            'per_trade_notional_cap': 6000.0,
+            'per_trade_notional_cap': 4000.0,
             'max_position_notional': 40000.0,
             'min_confidence': 0.65,
             'min_price': 10.0,

@@ -41,10 +41,10 @@ CONFIG = {
         'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     },
     'strategy_a1': {  # 动量反转策略配置
-        'initial_capital': 100000.0,
+        'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 10000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'rsi_overbought': 72,
         'rsi_oversold': 28,
@@ -58,10 +58,10 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a2': {  # Z-Score策略配置
-        'initial_capital': 100000.0,
+        'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 10000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'zscore_lookback': 20,
         'zscore_entry_threshold': 2.0,
@@ -75,10 +75,10 @@ CONFIG = {
         'trading_hours_only': True,
     },
     'strategy_a3': {  # 双均线成交量突破策略配置
-        'initial_capital': 100000.0,
+        'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 10000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'fast_ma_period': 9,
         'slow_ma_period': 21,
@@ -97,10 +97,10 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a4': {  # 回调交易策略配置（斐波那契回撤）
-        'initial_capital': 100000.0,
+        'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 10000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 104000000.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'trend_ma_period': 80,              # 长期趋势均线
         'trend_confirmation_bars': 3,      # 趋势确认K线数
@@ -121,10 +121,10 @@ CONFIG = {
         'ib_limit_offset': 0.01,
     },
     'strategy_a5': {  # 多因子AI融合策略配置
-        'initial_capital': 100000.0,
+        'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.06,
-        'per_trade_notional_cap': 6000.0,      # 单笔交易美元上限（严格）
+        'per_trade_notional_cap': 4000.0,      # 单笔交易美元上限（严格）
         'max_position_notional': 40000.0,      # 单股总仓位上限（美元，严格）
         'min_confidence': 0.65,                # 最小信心度阈值（严格）
         'min_price': 10.0,                     # 最小股价（严格，避免低价股）
@@ -146,10 +146,10 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a6': {  # 新闻交易策略配置
-        'initial_capital': 100000.0,
+        'initial_capital': 40000.0,
         'risk_per_trade': 0.015,              # 新闻交易风险控制更严格
         'max_position_size': 0.04,             # 小仓位，快速进出
-        'per_trade_notional_cap': 5000.0,     # 单笔交易美元上限（更严格）
+        'per_trade_notional_cap': 4000.0,     # 单笔交易美元上限（更严格）
         'max_position_notional': 20000.0,     # 单股总仓位上限（美元，更严格）
         'polygon_api_key': '0SgE61bAeLNqkcDks0y0FDtP2t7l_8an',  # 🔴 需要替换为您的Polygon API密钥
         # 获取API密钥: https://polygon.io/
