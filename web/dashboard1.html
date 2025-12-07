@@ -260,9 +260,16 @@
             currentInterval = interval;
             // Update active button state
             document.querySelectorAll('.btn').forEach(b => {
-                // 简单的 active 状态切换逻辑，包括 1m
                 b.classList.remove('active');
-                if (b.innerText.toLowerCase() === interval.toLowerCase()) {
+                // 模糊匹配: 1day vs 1d, 1mon vs 1mo
+                const txt = b.innerText.toLowerCase();
+                const intv = interval.toLowerCase();
+                if (txt === intv ||
+                    (intv === '1d' && txt.includes('1d')) ||
+                    (intv === '1mo' && txt.includes('1mon')) ||
+                    (intv === '1wk' && txt.includes('1w')) ||
+                    (intv === '1m' && txt === '1m')
+                ) {
                     b.classList.add('active');
                 }
             });
@@ -345,12 +352,18 @@
                     // 这里的 trades timestamp 是完整的 datetimestring。
                     // 简单起见，我们将 trade time 转换为 timestamp
                     const time = new Date(t.timestamp).getTime() / 1000;
+
+                    // 修复 UNDEFINED 问题：兼容 entry_price
+                    const priceVal = t.price || t.entry_price || 'N/A';
+                    // 如果 priceVal 是数字，保留两位小数
+                    const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
+
                     return {
                         time: time,
                         position: t.action === 'BUY' ? 'belowBar' : 'aboveBar',
-                        color: 'blue', // 蓝色点点
+                        color: t.action === 'BUY' ? '#2196F3' : '#FF9800', // 买入蓝色，卖出橙色
                         shape: 'circle',
-                        text: `${t.action} @ ${t.price}`,
+                        text: `${t.action} @ ${priceDisp}`,
                     };
                 });
 

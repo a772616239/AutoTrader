@@ -285,6 +285,7 @@ class BaseStrategy:
             'symbol': signal['symbol'],
             'action': signal['action'],
             'entry_price': current_price,
+            'price': current_price, # 兼容前端显示
             'size': signal['position_size'],
             'timestamp': datetime.now(),
             'signal_type': signal['signal_type'],
