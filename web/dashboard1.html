@@ -211,7 +211,7 @@
                 borderColor: '#30363d',
                 scaleMargins: {
                     top: 0.1,
-                    bottom: 0.25, // 留出底部 25% 跟成交量分开
+                    bottom: 0.5, // K线图底部留白 30%
                 },
             },
         });
@@ -230,9 +230,9 @@
             priceFormat: {
                 type: 'volume',
             },
-            priceScaleId: '', // Overlay on main chart or simplify
+            priceScaleId: '', // Overlay
             scaleMargins: {
-                top: 0.8,
+                top: 1, // 成交量从 80% 处开始 (底部 20%)
                 bottom: 0,
             },
         });
