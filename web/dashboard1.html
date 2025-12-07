@@ -160,9 +160,10 @@
             <button class="btn" onclick="searchSymbol()">GO</button>
         </div>
         <div class="controls">
+            <button class="btn" onclick="setPeriod('1m')">1m</button>
             <button class="btn active" onclick="setPeriod('1d')">1D</button>
             <button class="btn" onclick="setPeriod('1wk')">1W</button>
-            <button class="btn" onclick="setPeriod('1mo')">1M</button>
+            <button class="btn" onclick="setPeriod('1mo')">1Mon</button>
         </div>
         <div class="controls">
             <button class="btn" onclick="toggleTheme()">🌗</button>
@@ -206,6 +207,8 @@
             },
             timeScale: {
                 borderColor: '#30363d',
+                timeVisible: true, // 显示具体时间
+                secondsVisible: false,
             },
             rightPriceScale: {
                 borderColor: '#30363d',
@@ -257,9 +260,10 @@
             currentInterval = interval;
             // Update active button state
             document.querySelectorAll('.btn').forEach(b => {
-                if (['1D', '1W', '1M'].includes(b.innerText)) {
-                    b.classList.remove('active');
-                    if (b.innerText === interval.toUpperCase()) b.classList.add('active');
+                // 简单的 active 状态切换逻辑，包括 1m
+                b.classList.remove('active');
+                if (b.innerText.toLowerCase() === interval.toLowerCase()) {
+                    b.classList.add('active');
                 }
             });
             fetchData();
@@ -273,6 +277,7 @@
                 let period = '1y';
                 if (currentInterval === '1wk') period = '2y';
                 if (currentInterval === '1mo') period = '5y';
+                if (currentInterval === '1m') period = '2d'; // 1分钟线取最近2天
 
                 const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${period}`);
                 const data = await response.json();
