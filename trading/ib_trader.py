@@ -348,6 +348,74 @@ class IBTrader:
             logger.error(f"取消未完成订单时发生错误: {e}")
             return 0
 
+    def update_pending_trade_statuses(self, trades_file='data/trades.json') -> int:
+        """
+        查询所有未完成订单的状态并更新 trades.json
+        返回更新的订单数量
+        """
+        if not self.connected and not self.connect():
+            logger.error("IB未连接，无法查询订单状态")
+            return 0
+        
+        try:
+            import json
+            import os
+            
+            # 获取所有IB订单
+            ib_trades = self.ib.openTrades()
+            if not ib_trades:
+                logger.info("当前无未完成订单需要更新状态")
+                return 0
+            
+            # 构建订单ID到状态的映射
+            order_status_map = {}
+            for t in ib_trades:
+                order_id = t.order.orderId
+                status = t.orderStatus.status if hasattr(t.orderStatus, 'status') else 'Unknown'
+                filled = t.orderStatus.filled if hasattr(t.orderStatus, 'filled') else 0
+                order_status_map[order_id] = {
+                    'status': status,
+                    'filled': filled
+                }
+            
+            # 读取 trades.json
+            if not os.path.exists(trades_file):
+                logger.warning(f"交易记录文件不存在: {trades_file}")
+                return 0
+            
+            with open(trades_file, 'r', encoding='utf-8') as f:
+                trades = json.load(f)
+            
+            # 更新状态
+            updated_count = 0
+            for trade in trades:
+                order_id = trade.get('order_id')
+                if order_id and order_id in order_status_map:
+                    old_status = trade.get('order_status', 'Unknown')
+                    new_status = order_status_map[order_id]['status']
+                    
+                    if old_status != new_status:
+                        trade['order_status'] = new_status
+                        # 如果订单已成交，也更新 status 字段
+                        if new_status == 'Filled':
+                            trade['status'] = 'FILLED'
+                        updated_count += 1
+                        logger.info(f"更新订单状态: ID={order_id}, {old_status} -> {new_status}")
+            
+            # 保存回文件
+            if updated_count > 0:
+                with open(trades_file, 'w', encoding='utf-8') as f:
+                    json.dump(trades, f, indent=2, ensure_ascii=False)
+                logger.info(f"✅ 已更新 {updated_count} 个订单状态到 {trades_file}")
+            else:
+                logger.info("所有订单状态已是最新，无需更新")
+            
+            return updated_count
+            
+        except Exception as e:
+            logger.error(f"更新订单状态时发生错误: {e}")
+            return 0
+
     def cancel_all_orders_global(self) -> None:
         """向 TWS 发送全局取消请求（若可用）"""
         if not self.connected and not self.connect():

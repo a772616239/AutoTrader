@@ -280,6 +280,13 @@ class TradingSystem:
         if self.config['trading'].get('auto_cancel_orders', True):
             if self.ib_trader and self.ib_trader.connected:
                 try:
+                    # 先查询并更新订单状态到 trades.json
+                    logger.info("查询订单状态并更新交易记录...")
+                    updated = self.ib_trader.update_pending_trade_statuses()
+                    if updated > 0:
+                        logger.info(f"✅ 已更新 {updated} 个订单状态")
+                    
+                    # 然后取消所有未完成订单
                     self.ib_trader.cancel_all_orders_global()
                     cancelled = self.ib_trader.cancel_open_orders()
                     if cancelled:
