@@ -341,8 +341,8 @@
         });
 
         // --- Series Definitions ---
-        const ma20Series = chart.addLineSeries({ color: '#2962FF', lineWidth: 1, title: 'MA20', visible: false });
-        const ma50Series = chart.addLineSeries({ color: '#FF6D00', lineWidth: 1, title: 'MA50', visible: false });
+        const ma5Series = chart.addLineSeries({ color: '#2962FF', lineWidth: 1, title: 'MA5', visible: false });
+        const ma10Series = chart.addLineSeries({ color: '#FF6D00', lineWidth: 1, title: 'MA10', visible: false });
 
         const bbUpperSeries = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.5)', lineWidth: 1, title: 'BB Upper', visible: false });
         const bbLowerSeries = chart.addLineSeries({ color: 'rgba(0, 150, 136, 0.5)', lineWidth: 1, title: 'BB Lower', visible: false });
@@ -352,16 +352,21 @@
         let macdLineSeries = null;
         let macdSignalSeries = null;
 
-        // Sync Charts
+        // Sync Charts - prevent circular updates
+        let syncInProgress = false;
+
         chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-            if (range) {
-                subChart.timeScale().setVisibleLogicalRange(range);
-            }
+            if (syncInProgress || !range) return;
+            syncInProgress = true;
+            subChart.timeScale().setVisibleLogicalRange(range);
+            syncInProgress = false;
         });
+
         subChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-            if (range) {
-                chart.timeScale().setVisibleLogicalRange(range);
-            }
+            if (syncInProgress || !range) return;
+            syncInProgress = true;
+            chart.timeScale().setVisibleLogicalRange(range);
+            syncInProgress = false;
         });
 
         // --- Data Variables ---
@@ -406,10 +411,12 @@
             loading.classList.add('visible');
 
             try {
-                let period = '1y';
-                if (currentInterval === '1wk') period = '2y';
-                if (currentInterval === '1mo') period = '5y';
-                if (currentInterval === '1m') period = '2d';
+                // Load extra data to account for indicator calculation warmup period
+                // MACD needs ~35 periods before it starts calculating
+                let period = '3y';  // Daily: 3 years ensures good coverage even after warmup
+                if (currentInterval === '1wk') period = '5y';  // Weekly: 5 years to cover 33-week MACD warmup
+                if (currentInterval === '1mo') period = 'max';  // Monthly: load maximum available data
+                if (currentInterval === '1m') period = '14d';  // Intraday: 2 weeks for sufficient minute data
 
                 const response = await fetch(`/api/history?symbol=${currentSymbol}&interval=${currentInterval}&period=${period}`);
                 const data = await response.json();
@@ -420,6 +427,9 @@
                 }
 
                 currentData = data;
+                console.log(`📊 Loaded ${data.length} data points for ${currentSymbol} (${currentInterval})`);
+                console.log(`   Time range: ${data[0].time} to ${data[data.length - 1].time}`);
+
                 candleSeries.setData(data);
 
                 const volData = data.map(d => ({
@@ -467,21 +477,21 @@
 
             const showMa = document.getElementById('btn-ma').classList.contains('active');
             if (showMa) {
-                ma20Series.applyOptions({ visible: true });
-                ma50Series.applyOptions({ visible: true });
-                ma20Series.setData(currentData.map(d => ({ time: d.time, value: d.MA20 })).filter(d => d.value));
-                ma50Series.setData(currentData.map(d => ({ time: d.time, value: d.MA50 })).filter(d => d.value));
+                ma5Series.applyOptions({ visible: true });
+                ma10Series.applyOptions({ visible: true });
+                ma5Series.setData(currentData.map(d => ({ time: d.time, value: d.MA5 })).filter(d => d.value != null && !isNaN(d.value)));
+                ma10Series.setData(currentData.map(d => ({ time: d.time, value: d.MA10 })).filter(d => d.value != null && !isNaN(d.value)));
             } else {
-                ma20Series.applyOptions({ visible: false });
-                ma50Series.applyOptions({ visible: false });
+                ma5Series.applyOptions({ visible: false });
+                ma10Series.applyOptions({ visible: false });
             }
 
             const showBb = document.getElementById('btn-bb').classList.contains('active');
             if (showBb) {
                 bbUpperSeries.applyOptions({ visible: true });
                 bbLowerSeries.applyOptions({ visible: true });
-                bbUpperSeries.setData(currentData.map(d => ({ time: d.time, value: d.BB_upper })).filter(d => d.value));
-                bbLowerSeries.setData(currentData.map(d => ({ time: d.time, value: d.BB_lower })).filter(d => d.value));
+                bbUpperSeries.setData(currentData.map(d => ({ time: d.time, value: d.BB_upper })).filter(d => d.value != null && !isNaN(d.value)));
+                bbLowerSeries.setData(currentData.map(d => ({ time: d.time, value: d.BB_lower })).filter(d => d.value != null && !isNaN(d.value)));
             } else {
                 bbUpperSeries.applyOptions({ visible: false });
                 bbLowerSeries.applyOptions({ visible: false });
@@ -519,7 +529,10 @@
 
             if (subType === 'rsi') {
                 rsiSeries = subChart.addLineSeries({ color: '#9C27B0', lineWidth: 1, title: 'RSI(14)' });
-                rsiSeries.setData(currentData.map(d => ({ time: d.time, value: d.RSI })).filter(d => d.value));
+                // Don't filter - keep all time points for alignment
+                const rsiData = currentData.map(d => ({ time: d.time, value: d.RSI }));
+                console.log(`RSI: ${rsiData.filter(d => d.value != null).length}/${currentData.length} valid points (${(100 * rsiData.filter(d => d.value != null).length / currentData.length).toFixed(1)}%)`);
+                rsiSeries.setData(rsiData);
                 rsiSeries.createPriceLine({ price: 70, color: '#FF9800', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
                 rsiSeries.createPriceLine({ price: 30, color: '#FF9800', lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
             } else if (subType === 'macd') {
@@ -527,17 +540,29 @@
                 macdLineSeries = subChart.addLineSeries({ color: '#2962FF', lineWidth: 1, title: 'MACD' });
                 macdSignalSeries = subChart.addLineSeries({ color: '#FF6D00', lineWidth: 1, title: 'Signal' });
 
-                macdHistSeries.setData(currentData.map(d => ({
+                // Keep ALL time points - don't filter null values
+                // This ensures MACD aligns with K-line at the correct dates
+                const macdHistData = currentData.map(d => ({
                     time: d.time,
                     value: d.MACD_Hist,
-                    color: d.MACD_Hist >= 0 ? '#26a69a' : '#ef5350'
-                })).filter(d => d.value !== null));
+                    color: (d.MACD_Hist != null && d.MACD_Hist >= 0) ? '#26a69a' : '#ef5350'
+                }));
 
-                macdLineSeries.setData(currentData.map(d => ({ time: d.time, value: d.MACD })).filter(d => d.value !== null));
-                macdSignalSeries.setData(currentData.map(d => ({ time: d.time, value: d.MACD_Signal })).filter(d => d.value !== null));
+                const macdData = currentData.map(d => ({ time: d.time, value: d.MACD }));
+                const macdSignalData = currentData.map(d => ({ time: d.time, value: d.MACD_Signal }));
+
+                console.log(`MACD: ${macdData.filter(d => d.value != null).length}/${currentData.length} valid points (${(100 * macdData.filter(d => d.value != null).length / currentData.length).toFixed(1)}%)`);
+
+                macdHistSeries.setData(macdHistData);
+                macdLineSeries.setData(macdData);
+                macdSignalSeries.setData(macdSignalData);
             }
 
-            subChart.timeScale().fitContent();
+            // Sync time range with main chart instead of independent fitContent
+            const mainTimeRange = chart.timeScale().getVisibleLogicalRange();
+            if (mainTimeRange) {
+                subChart.timeScale().setVisibleLogicalRange(mainTimeRange);
+            }
         }
 
         function toggleIndicator(type) {

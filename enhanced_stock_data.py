@@ -114,7 +114,7 @@ class EnhancedStockData:
             }
             
             # 添加指标字段 (如果存在)
-            optional_fields = ['MA20', 'MA50', 'MA200', 'BB_upper', 'BB_middle', 'BB_lower', 
+            optional_fields = ['MA5', 'MA10', 'MA20', 'MA50', 'MA200', 'BB_upper', 'BB_middle', 'BB_lower', 
                                'RSI', 'MACD', 'MACD_Signal', 'MACD_Hist']
             for field in optional_fields:
                 if field in row:
@@ -190,23 +190,28 @@ class EnhancedStockData:
 
     def _add_technical_indicators(self, df):
         """向DataFrame添加技术指标列 (用于绘图)"""
+        if len(df) < 2:
+            return df
+            
         closes = df['Close'].values.astype(np.float64)
+        highs = df['High'].values.astype(np.float64)
+        lows = df['Low'].values.astype(np.float64)
         
-        # MA
+        # MA - 使用较短周期以提高覆盖率
+        df['MA5'] = talib.SMA(closes, timeperiod=5)
+        df['MA10'] = talib.SMA(closes, timeperiod=10)
         df['MA20'] = talib.SMA(closes, timeperiod=20)
-        df['MA50'] = talib.SMA(closes, timeperiod=50)
-        df['MA200'] = talib.SMA(closes, timeperiod=200)
         
-        # Bollinger Bands
+        # Bollinger Bands - 保持20周期
         upper, middle, lower = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
         df['BB_upper'] = upper
         df['BB_middle'] = middle
         df['BB_lower'] = lower
         
-        # RSI
+        # RSI - 保持14周期（标准）
         df['RSI'] = talib.RSI(closes, timeperiod=14)
         
-        # MACD
+        # MACD - 保持标准参数
         macd, signal, hist = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
         df['MACD'] = macd
         df['MACD_Signal'] = signal

@@ -13,6 +13,7 @@ import mimetypes
 import enhanced_stock_data as esd
 from datetime import datetime
 import math
+import numpy as np
 
 class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -102,14 +103,24 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             # time: '2019-04-11' or timestamp
             ts_str = item['timestamp']
             try:
-                dt = datetime.fromisoformat(ts_str)
-                # 如果是日线，使用 'YYYY-MM-DD'
+                # 解析时间戳 - 确保一致性
+                if 'T' in ts_str:
+                    # ISO format with time
+                    dt = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                else:
+                    # Just date
+                    dt = datetime.strptime(ts_str.split(' ')[0], '%Y-%m-%d')
+                
+                # 对于日线、周线、月线，统一使用 'YYYY-MM-DD' 格式
                 if interval in ['1d', '1wk', '1mo']:
                     time_val = dt.strftime('%Y-%m-%d')
                 else:
+                    # 分钟线使用 Unix 时间戳
                     time_val = int(dt.timestamp())
-            except:
-                time_val = ts_str
+            except Exception as e:
+                # 如果解析失败，尝试直接使用原始值
+                print(f"⚠️ Time parsing error for {ts_str}: {e}")
+                time_val = ts_str.split('T')[0] if 'T' in ts_str else ts_str
 
             # 验证数据的有效性 (Lightweight Charts 不接受 null/NaN 的价格)
             o, h, l, c, v = item['open'], item['high'], item['low'], item['close'], item['volume']
@@ -135,9 +146,15 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
                 'close': c,
                 'volume': v
             }
-            # Add all other fields (indicators)
+            # Add all other fields (indicators) - ensure they're properly formatted
             for k, v in item.items():
                 if k not in record and k != 'timestamp':
+                    # Convert numpy types and handle NaN
+                    if v is not None:
+                        if isinstance(v, (np.integer, np.floating)):
+                            v = float(v)
+                        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                            v = None
                     record[k] = v
             formatted_data.append(record)
             
