@@ -30,9 +30,10 @@ CONFIG = {
         ],
         'scan_interval_minutes': 1,
         'trading_hours': {
-            'start': '09:30',  # 美东时间 06:30（冬令时）或 05:30（夏令时），但 TWS 通常以本地时间计
-            'end': '16:00'     # 美东时间下午 4:00
+            'start': '00:00',
+            'end': '15:45'
         },
+        'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
     },
     'logging': {
@@ -181,12 +182,13 @@ CONFIG = {
         'max_position_size': 0.1,
         'per_trade_notional_cap': 4000.0,
         'max_position_notional': 60000.0,
-        'donchian_entry_period': 20,
-        'donchian_exit_period': 10,
-        'trend_filter_sma_period': 200,
+        'donchian_entry_period': 60,    # 入场通道周期 (调大到60)
+        'donchian_exit_period': 20,     # 出场通道周期
+        'trend_filter_sma_period': 200, # 慢速趋势线 (MA200)
+        'trend_filter_fast_sma_period': 50, # 快速趋势线 (MA50) - 新增：要求 MA50 > MA200
         'stop_loss_atr_multiple': 2.0,
-        'ib_order_type': 'MKT',
-        'ib_limit_offset': 0.01,
+        'ib_order_type': 'LMT', # 使用限价单 (无行情权限需用LMT)
+        'ib_limit_offset': -0.003, # 激进单 (Marketable Limit)
         'trading_start_time': '09:45',
         'trading_end_time': '16:00',
         'avoid_open_hour': True,
@@ -210,7 +212,7 @@ STRATEGY_CONFIG_MAP = {
 # 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
 # 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
 default_symbols = CONFIG.get('trading', {}).get('symbols', [])
-default_symbol_map = {s: 'a7' for s in default_symbols}
+default_symbol_map = {s: 'a2' for s in default_symbols}
 
 # 允许事先存在的自定义映射覆盖默认值
 existing_map = CONFIG.get('symbol_strategy_map', {}) or {}

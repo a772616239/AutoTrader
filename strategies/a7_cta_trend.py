@@ -71,6 +71,11 @@ class A7CTATrendStrategy(BaseStrategy):
         sma_trend = tech_indicators.calculate_moving_average(
             closes, self.config['trend_filter_sma_period'], type='SMA'
         )
+        # 快速趋势均线 (50) - 用于排列过滤
+        fast_period = self.config.get('trend_filter_fast_sma_period', 50)
+        sma_fast = tech_indicators.calculate_moving_average(
+            closes, fast_period, type='SMA'
+        )
         
         # ATR (用于风险计算)
         atr = tech_indicators.calculate_atr(highs, lows, closes, 14)
@@ -86,6 +91,7 @@ class A7CTATrendStrategy(BaseStrategy):
         prev_lower_exit = lower_exit.iloc[-2]
         
         current_trend_ma = sma_trend.iloc[-1]
+        current_fast_ma = sma_fast.iloc[-1]
 
         # 2. 获取当前持仓
         current_pos = 0
@@ -93,15 +99,15 @@ class A7CTATrendStrategy(BaseStrategy):
             current_pos = self.positions[symbol]['size']
             
         # 🟢 调试日志：打印关键数据
-        logger.info(f"🔍 [A7 Debug] {symbol}: Price={current_price:.2f}, Pos={current_pos}, "
-                   f"Entry20H={prev_upper_entry:.2f}, Entry20L={prev_lower_entry:.2f}, "
-                   f"TrendMA200={current_trend_ma:.2f}, ATR={current_atr:.2f}")
+        logger.info(f"🔍 [A7 Debug] {symbol}: Price={current_price:.2f}, "
+                   f"EntryH={prev_upper_entry:.2f}, EntryL={prev_lower_entry:.2f}, "
+                   f"MA{fast_period}={current_fast_ma:.2f}, MA{self.config['trend_filter_sma_period']}={current_trend_ma:.2f}")
 
         # 3. 交易逻辑
         
         # ---------------- 出场逻辑 ----------------
         if current_pos > 0: # 持多头
-            # 价格跌破短期(10日)低点 -> 平多
+            # 价格跌破短期(10/20日)低点 -> 平多
             if current_price < prev_lower_exit:
                 return [{
                     'symbol': symbol,
@@ -109,13 +115,13 @@ class A7CTATrendStrategy(BaseStrategy):
                     'action': 'SELL',
                     'price': current_price,
                     'position_size': abs(current_pos),
-                    'reason': f"触及10日低点退出 ({prev_lower_exit:.2f})"
+                    'reason': f"触及出场低点 ({prev_lower_exit:.2f})"
                 }]
             else:
                 logger.debug(f"  🛑 {symbol} 多头持有: 当前价 {current_price:.2f} >= 出场线 {prev_lower_exit:.2f}")
 
         elif current_pos < 0: # 持空头
-            # 价格突破短期(10日)高点 -> 平空
+            # 价格突破短期(10/20日)高点 -> 平空
             if current_price > prev_upper_exit:
                 return [{
                     'symbol': symbol,
@@ -123,7 +129,7 @@ class A7CTATrendStrategy(BaseStrategy):
                     'action': 'BUY',
                     'price': current_price,
                     'position_size': abs(current_pos),
-                    'reason': f"触及10日高点退出 ({prev_upper_exit:.2f})"
+                    'reason': f"触及出场高点 ({prev_upper_exit:.2f})"
                 }]
             else:
                 logger.debug(f"  🛑 {symbol} 空头持有: 当前价 {current_price:.2f} <= 出场线 {prev_upper_exit:.2f}")
@@ -131,46 +137,56 @@ class A7CTATrendStrategy(BaseStrategy):
         # ---------------- 入场逻辑 ----------------
         # 只有在没有反向持仓时才开仓（或者已平仓）
         if current_pos == 0:
-            # 突破20日新高 且 价格 > 200日均线 (多头)
+            # 多头严格条件：
+            # 1. 价格突破入场通道高点
+            # 2. 价格 > 慢速均线 (MA200)
+            # 3. 快速均线 > 慢速均线 (均线多头排列)
             long_cond_1 = current_price > prev_upper_entry
             long_cond_2 = current_price > current_trend_ma
+            long_cond_3 = current_fast_ma > current_trend_ma
             
-            if long_cond_1 and long_cond_2:
+            if long_cond_1 and long_cond_2 and long_cond_3:
                 return [{
                     'symbol': symbol,
                     'signal_type': 'CTA_BREAKOUT_LONG',
                     'action': 'BUY',
                     'price': current_price,
-                    'confidence': 0.7, # 趋势策略通常信心度固定
+                    'confidence': 0.8,
                     'indicators': {
                         'ATR': current_atr,
                         'UpperChannel': prev_upper_entry,
-                        'TrendMA': current_trend_ma
+                        'TrendMA': current_trend_ma,
+                        'FastMA': current_fast_ma
                     },
-                    'reason': f"突破20日新高 ({prev_upper_entry:.2f}) 且 > MA200"
+                    'reason': f"新高({prev_upper_entry:.2f}) + MA多头排列(MA{fast_period}>MA{self.config['trend_filter_sma_period']})"
                 }]
             else:
-                 logger.debug(f"  ⏸️ {symbol} 多头过滤: 突破20日高点?{long_cond_1} ({current_price:.2f}>{prev_upper_entry:.2f}), >MA200?{long_cond_2}")
+                 logger.debug(f"  ⏸️ {symbol} 多头过滤: 突破?{long_cond_1} (>MA200)?{long_cond_2} (MA50>MA200)?{long_cond_3}")
             
-            # 跌破20日新低 且 价格 < 200日均线 (空头)
+            # 空头严格条件：
+            # 1. 价格跌破入场通道低点
+            # 2. 价格 < 慢速均线 (MA200)
+            # 3. 快速均线 < 慢速均线 (均线空头排列)
             short_cond_1 = current_price < prev_lower_entry
             short_cond_2 = current_price < current_trend_ma
+            short_cond_3 = current_fast_ma < current_trend_ma
             
-            if short_cond_1 and short_cond_2:
+            if short_cond_1 and short_cond_2 and short_cond_3:
                 return [{
                     'symbol': symbol,
                     'signal_type': 'CTA_BREAKDOWN_SHORT',
                     'action': 'SELL',
                     'price': current_price,
-                    'confidence': 0.7,
+                    'confidence': 0.8,
                     'indicators': {
                         'ATR': current_atr,
                         'LowerChannel': prev_lower_entry,
-                        'TrendMA': current_trend_ma
+                        'TrendMA': current_trend_ma,
+                        'FastMA': current_fast_ma
                     },
-                    'reason': f"跌破20日新低 ({prev_lower_entry:.2f}) 且 < MA200"
+                    'reason': f"新低({prev_lower_entry:.2f}) + MA空头排列(MA{fast_period}<MA{self.config['trend_filter_sma_period']})"
                 }]
             else:
-                logger.debug(f"  ⏸️ {symbol} 空头过滤: 跌破20日低点?{short_cond_1} ({current_price:.2f}<{prev_lower_entry:.2f}), <MA200?{short_cond_2}")
+                logger.debug(f"  ⏸️ {symbol} 空头过滤: 跌破?{short_cond_1} (<MA200)?{short_cond_2} (MA50<MA200)?{short_cond_3}")
 
         return []

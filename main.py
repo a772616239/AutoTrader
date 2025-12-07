@@ -276,15 +276,16 @@ class TradingSystem:
         #     logger.info("⏸️  非交易时间，跳过...")
         #     return
         
-        # 周期开始前取消所有未完成委托
-        if self.ib_trader and self.ib_trader.connected:
-            try:
-                self.ib_trader.cancel_all_orders_global()
-                cancelled = self.ib_trader.cancel_open_orders()
-                if cancelled:
-                    logger.info(f"本周期开始已取消 {cancelled} 个未完成委托")
-            except Exception as e:
-                logger.warning(f"取消未完成委托失败: {e}")
+        # 周期开始前取消所有未完成委托 (如果配置启用)
+        if self.config['trading'].get('auto_cancel_orders', True):
+            if self.ib_trader and self.ib_trader.connected:
+                try:
+                    self.ib_trader.cancel_all_orders_global()
+                    cancelled = self.ib_trader.cancel_open_orders()
+                    if cancelled:
+                        logger.info(f"本周期开始已取消 {cancelled} 个未完成委托")
+                except Exception as e:
+                    logger.warning(f"取消未完成委托失败: {e}")
 
         
         
