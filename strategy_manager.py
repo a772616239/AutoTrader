@@ -18,6 +18,7 @@ from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
 from strategies.a4_pullback import A4PullbackStrategy
 from strategies.a5_multifactor_ai import A5MultiFactorAI
 from strategies.a6_news_trading import A6NewsTrading
+from strategies.a7_cta_trend import A7CTATrendStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ STRATEGY_CLASSES = {
     'a4': A4PullbackStrategy,
     'a5': A5MultiFactorAI,
     'a6': A6NewsTrading,
+    'a7': A7CTATrendStrategy,
 }
 
 
@@ -84,7 +86,8 @@ class StrategyManager:
             out: Dict[str, List[Dict]] = {}
             for sym in syms:
                 try:
-                    df = self.data_provider.get_intraday_data(sym, interval='5m', lookback=80)
+                    # A7等策略需要更长的数据窗口 (例如SMA200)
+                    df = self.data_provider.get_intraday_data(sym, interval='5m', lookback=300)
                     if df is None or df.empty:
                         continue
                     # technical indicators 可选获取，若不可用则传空
@@ -151,7 +154,8 @@ class StrategyManager:
 
             for sym in syms:
                 try:
-                    df = self.data_provider.get_intraday_data(sym, interval='5m', lookback=80)
+                    # A7等策略需要更长的数据窗口 (例如SMA200)
+                    df = self.data_provider.get_intraday_data(sym, interval='5m', lookback=300)
                     if df is None or df.empty:
                         continue
                     try:

@@ -75,11 +75,18 @@ CONFIG = {
         'trading_hours_only': True,
     },
     'strategy_a3': {  # 双均线成交量突破策略配置
-        'initial_capital': 40000.0,
-        'risk_per_trade': 0.02,
-        'max_position_size': 0.1,
-        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
-        'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+        'trading': {
+            'initial_capital': 40000.0,  # 初始资金
+            'risk_per_trade': 0.02,    # 单笔交易风险 (2% equity) (A6 uses 0.015)
+            'max_position_size': 0.1,  # 最大仓位 (10% equity)
+            'min_cash_buffer': 0.1,    # 最小现金缓冲
+            'per_trade_notional_cap': 4000.0, # 单笔名义价值上限 (USD)
+            'max_position_notional': 60000.0, # 单个标的持仓名义价值上限 (USD)
+            
+            # 交易时间
+            'trading_start_time': '09:45', # 避开开盘前15分钟波动
+            'trading_end_time': '15:45',   # 收盘前15分钟停止开新仓
+        },
         'fast_ma_period': 9,
         'slow_ma_period': 21,
         'ema_or_sma': 'EMA',
@@ -100,7 +107,7 @@ CONFIG = {
         'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 104000000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'trend_ma_period': 80,              # 长期趋势均线
         'trend_confirmation_bars': 3,      # 趋势确认K线数
@@ -167,6 +174,23 @@ CONFIG = {
         'trading_end_time': '15:30',
         'avoid_open_hour': True,
         'avoid_close_hour': True,
+    },
+    'strategy_a7': {  # A7 CTA 趋势跟踪策略
+        'initial_capital': 40000.0,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 4000.0,
+        'max_position_notional': 60000.0,
+        'donchian_entry_period': 20,
+        'donchian_exit_period': 10,
+        'trend_filter_sma_period': 200,
+        'stop_loss_atr_multiple': 2.0,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+        'trading_start_time': '09:45',
+        'trading_end_time': '16:00',
+        'avoid_open_hour': True,
+        'avoid_close_hour': True,
     }
 }
 
@@ -178,6 +202,7 @@ STRATEGY_CONFIG_MAP = {
     'a4': 'strategy_a4',
     'a5': 'strategy_a5',
     'a6': 'strategy_a6',
+    'a7': 'strategy_a7',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a1/a2/a3
@@ -185,7 +210,7 @@ STRATEGY_CONFIG_MAP = {
 # 自动生成 symbol->strategy 映射：默认将 `trading.symbols` 中的每个标的分配到 'a1'
 # 如果用户在外部（或在文件上方）已经设置了部分映射，会合并并以用户设置为准。
 default_symbols = CONFIG.get('trading', {}).get('symbols', [])
-default_symbol_map = {s: 'a6' for s in default_symbols}
+default_symbol_map = {s: 'a7' for s in default_symbols}
 
 # 允许事先存在的自定义映射覆盖默认值
 existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
@@ -224,3 +249,6 @@ if a4_symbols:
     print(f"   A4 策略 ({len(a4_symbols)} 个): {', '.join(sorted(a4_symbols[:5]))} {'...' if len(a4_symbols) > 5 else ''}")
 if a5_symbols:
     print(f"   A5 策略 ({len(a5_symbols)} 个): {', '.join(sorted(a5_symbols[:5]))} {'...' if len(a5_symbols) > 5 else ''}")
+a7_symbols = [s for s, strat in merged_map.items() if strat == 'a7']
+if a7_symbols:
+    print(f"   A7 策略 ({len(a7_symbols)} 个): {', '.join(sorted(a7_symbols[:5]))} {'...' if len(a7_symbols) > 5 else ''}")

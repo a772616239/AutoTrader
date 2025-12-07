@@ -15,6 +15,8 @@ from data.data_provider import DataProvider
 from strategies.a2_zscore import A2ZScoreStrategy
 from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
 from strategies.a5_multifactor_ai import A5MultiFactorAI
+from strategies.a6_news_trading import A6NewsTrading
+from strategies.a7_cta_trend import A7CTATrendStrategy
 import config
 
 # Configure logging
@@ -66,6 +68,19 @@ def verify_strategies():
             
         except Exception as e:
             logger.error(f"❌ {name} failed: {e}", exc_info=True)
+
+    # 验证 A7
+    try:
+        a7_config = config.CONFIG.get('strategy_a7')
+        a7 = A7CTATrendStrategy(config=a7_config)
+        logger.info("Testing A7 CTA Trend Strategy...")
+        signals = a7.generate_signals(symbol, df, {})
+        if signals:
+            logger.info(f"✅ A7CTATrendStrategy generated signal: {signals[0]['action']} {signals[0]['symbol']}")
+        else:
+            logger.info("✅ A7CTATrendStrategy executed successfully. Generated 0 signals.")
+    except Exception as e:
+        logger.error(f"❌ A7CTATrendStrategy verification failed: {e}")
 
 if __name__ == "__main__":
     verify_strategies()

@@ -124,3 +124,21 @@ def calculate_bollinger_bands(prices: pd.Series, window: int = 20,
     lower = middle - (std * num_std)
     
     return upper, middle, lower
+
+def calculate_donchian_channels(high: pd.Series, low: pd.Series, window: int = 20) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    Calculate Donchian Channels.
+    
+    Args:
+        high: High price series
+        low: Low price series
+        window: Lookback window size
+        
+    Returns:
+        Tuple[pd.Series, pd.Series, pd.Series]: (Upper Channel, Middle Channel, Lower Channel)
+    """
+    upper = high.rolling(window=window).max()
+    lower = low.rolling(window=window).min()
+    middle = (upper + lower) / 2
+    
+    return upper, middle, lower

@@ -396,7 +396,8 @@ class BaseStrategy:
         
         for symbol in symbols:
             try:
-                df = data_provider.get_intraday_data(symbol, interval='5m', lookback=80)
+                # 增加数据回溯以支持长期均线 (如MA200)
+                df = data_provider.get_intraday_data(symbol, interval='5m', lookback=300)
                 
                 if df.empty or len(df) < 30:
                     continue

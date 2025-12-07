@@ -23,6 +23,7 @@ from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
 from strategies.a4_pullback import A4PullbackStrategy
 from strategies.a5_multifactor_ai import A5MultiFactorAI
 from strategies.a6_news_trading import A6NewsTrading
+from strategies.a7_cta_trend import A7CTATrendStrategy
 from strategy_manager import StrategyManager
 
 warnings.filterwarnings('ignore')
@@ -56,6 +57,7 @@ class StrategyFactory:
         'a4': A4PullbackStrategy,
         'a5': A5MultiFactorAI,
         'a6': A6NewsTrading,
+        'a7': A7CTATrendStrategy,
     }
     
     @classmethod
@@ -92,6 +94,7 @@ class StrategyFactory:
             'a4': '回调交易策略 - 基于斐波那契回撤',
             'a5': '多因子AI融合策略 - 整合流动性、基本面、情绪、动量',
             'a6': '新闻交易策略 - 基于实时新闻情绪分析',
+            'a7': 'CTA趋势跟踪策略 - 基于唐奇安通道突破',
         }
         return descriptions.get(strategy_name, '未知策略')
 
@@ -485,6 +488,8 @@ class TradingSystem:
         logger.info("  - 在控制台输入 'switch a3' 切换到双均线成交量突破策略")
         logger.info("  - 在控制台输入 'switch a4' 切换到回调交易策略")
         logger.info("  - 在控制台输入 'switch a5' 切换到多因子AI融合策略")
+        logger.info("  - 在控制台输入 'switch a6' 切换到新闻交易策略")
+        logger.info("  - 在控制台输入 'switch a7' 切换到CTA趋势跟踪策略")
         logger.info("  - 在控制台输入 'list' 查看所有策略")
         logger.info("  - 按 Ctrl+C 停止系统\n")
         
@@ -537,6 +542,8 @@ def command_line_interface(system: TradingSystem):
                     system.switch_strategy('a5')
                 elif cmd == 'switch a6':
                     system.switch_strategy('a6')
+                elif cmd == 'switch a7':
+                    system.switch_strategy('a7')
                 elif cmd == 'list':
                     system.list_strategies()
                 elif cmd == 'status':
@@ -548,6 +555,8 @@ def command_line_interface(system: TradingSystem):
                     print("  switch a3    - 切换到双均线成交量突破策略")
                     print("  switch a4    - 切换到回调交易策略")
                     print("  switch a5    - 切换到多因子AI融合策略")
+                    print("  switch a6    - 切换到新闻交易策略")
+                    print("  switch a7    - 切换到CTA趋势跟踪策略")
                     print("  list         - 列出所有可用策略")
                     print("  status       - 显示当前状态")
                     print("  help         - 显示帮助信息")
@@ -574,8 +583,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='多策略交易系统')
-    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6'], default='a1',
-                       help='初始策略 (a1: 动量反转, a2: Z-Score, a3: 双均线成交量突破, a4: 回调交易, a5: 多因子AI融合)')
+    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'], default='a1',
+                       help='初始策略 (a1: 动量反转, a2: Z-Score, a3: 双均线成交量突破, a4: 回调交易, a5: 多因子AI融合, a6: 新闻, a7: CTA趋势)')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='启用命令行交互模式')
     
