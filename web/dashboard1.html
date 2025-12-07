@@ -282,6 +282,147 @@
             padding-bottom: 0;
             border-bottom: none;
         }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 600px) {
+
+            /* Hide watchlist on mobile */
+            aside {
+                display: none;
+            }
+
+            /* Make header scrollable horizontally */
+            header {
+                height: auto;
+                min-height: 50px;
+                flex-wrap: wrap;
+                padding: 10px;
+                overflow-x: auto;
+            }
+
+            /* Adjust header ticker for mobile */
+            #price-ticker {
+                flex-wrap: wrap;
+                margin-left: 0 !important;
+                margin-top: 5px;
+            }
+
+            #price-ticker span {
+                font-size: 14px !important;
+            }
+
+            /* Make controls wrap */
+            .controls {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+
+            /* Smaller buttons on mobile */
+            .btn {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+
+            /* Adjust input size */
+            input[type="text"] {
+                width: 80px;
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+
+            /* Make toolbar scrollable */
+            .toolbar-container {
+                overflow-x: auto;
+                padding: 6px 10px;
+                gap: 8px;
+            }
+
+            .toolbar-group {
+                flex-shrink: 0;
+            }
+
+            .tool-btn {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+
+            /* Compact info bar */
+            #info-bar {
+                font-size: 10px !important;
+                padding: 6px 10px !important;
+                flex-wrap: wrap;
+                height: auto !important;
+                gap: 8px !important;
+            }
+
+            #info-bar>div {
+                gap: 8px !important;
+            }
+
+            #signal-container {
+                flex-wrap: wrap;
+            }
+
+            /* Smaller chart legend */
+            .chart-legend {
+                font-size: 10px;
+                padding: 8px;
+                max-width: 90%;
+            }
+
+            .legend-row {
+                gap: 8px;
+            }
+
+            /* Adjust main container */
+            .main-container {
+                flex-direction: column;
+            }
+
+            main {
+                width: 100%;
+            }
+
+            /* Make chart container take full width */
+            #chart-container {
+                min-height: 300px;
+            }
+
+            /* Adjust sub-chart */
+            #sub-chart-container {
+                min-height: 150px;
+            }
+        }
+
+        /* Extra small screens (phones in portrait) */
+        @media (max-width: 480px) {
+            header {
+                padding: 8px;
+            }
+
+            #price-ticker span {
+                font-size: 12px !important;
+            }
+
+            .btn {
+                padding: 3px 6px;
+                font-size: 10px;
+            }
+
+            .toolbar-container {
+                padding: 5px 8px;
+            }
+
+            #info-bar {
+                font-size: 9px !important;
+                padding: 5px 8px !important;
+            }
+
+            .chart-legend {
+                font-size: 9px;
+                padding: 6px;
+            }
+        }
     </style>
 </head>
 
