@@ -343,8 +343,10 @@
 
     <div class="main-container">
         <aside>
-            <div style="padding: 15px; font-weight: bold; border-bottom: 1px solid var(--border-color);">
-                Watchlist
+            <div
+                style="padding: 10px 15px; font-weight: bold; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; font-size: 11px; color: #8b949e;">
+                <span>Symbol</span>
+                <span>Strategy</span>
             </div>
             <div id="watchlist"></div>
         </aside>
@@ -369,7 +371,7 @@
                     <button id="btn-trades" class="tool-btn active" onclick="toggleTradeMarkers()">交易点</button>
                 </div>
                 <div class="toolbar-divider"></div>
-                
+
             </div>
 
             <div id="chart-container">
@@ -901,19 +903,55 @@
         async function loadWatchlist() {
             try {
                 const response = await fetch('/api/symbols');
-                const symbols = await response.json();
+                const data = await response.json();
                 const div = document.getElementById('watchlist');
                 div.innerHTML = '';
-                if (Array.isArray(symbols)) {
-                    symbols.forEach(sym => {
+
+                // Strategy name mapping
+                const strategyNames = {
+                    'A1': '动量反转',
+                    'A2': 'Z-Score',
+                    'A3': '双均线量能',
+                    'A4': '回调买入',
+                    'A5': '多因子AI',
+                    'A6': '新闻交易',
+                    'A7': 'CTA趋势',
+                    'N/A': '未分配'
+                };
+
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        // Handle both old format (string) and new format (object)
+                        const symbol = typeof item === 'string' ? item : item.symbol;
+                        const strategy = typeof item === 'object' ? item.strategy : 'N/A';
+                        const strategyName = strategyNames[strategy] || strategy;
+
                         const d = document.createElement('div');
                         d.className = 'watchlist-item';
-                        d.innerHTML = `<span>${sym}</span>`;
-                        d.onclick = () => loadSymbol(sym);
+
+                        // Create strategy badge with color coding
+                        const strategyColors = {
+                            'A1': '#58a6ff',
+                            'A2': '#3fb950',
+                            'A3': '#d29922',
+                            'A4': '#f85149',
+                            'A5': '#bc8cff',
+                            'A7': '#ff7b72',
+                            'N/A': '#8b949e'
+                        };
+                        const color = strategyColors[strategy] || '#8b949e';
+
+                        d.innerHTML = `
+                            <span style="flex: 1;">${symbol}</span>
+                            <span style="font-size: 10px; padding: 2px 6px; border-radius: 3px; background: ${color}20; color: ${color}; border: 1px solid ${color}40; white-space: nowrap;">${strategyName}</span>
+                        `;
+                        d.onclick = () => loadSymbol(symbol);
                         div.appendChild(d);
                     });
                 }
-            } catch (e) { }
+            } catch (e) {
+                console.error('Failed to load watchlist:', e);
+            }
         }
 
         // --- Legend Logic ---

@@ -266,9 +266,25 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             from config import CONFIG
             
             symbols = CONFIG.get('trading', {}).get('symbols', [])
-            self._send_json_response(symbols)
+            symbol_strategy_map = CONFIG.get('symbol_strategy_map', {})
+            
+            # Return array of objects with symbol and strategy
+            result = []
+            for sym in symbols:
+                strategy = symbol_strategy_map.get(sym, 'N/A')
+                result.append({
+                    'symbol': sym,
+                    'strategy': strategy.upper() if strategy != 'N/A' else 'N/A'
+                })
+            
+            self._send_json_response(result)
         except Exception as e:
-            self._send_json_response({'error': str(e), 'symbols': ['AAPL','NVDA','TSLA']})
+            # Fallback to simple symbol list
+            self._send_json_response([
+                {'symbol': 'AAPL', 'strategy': 'A4'},
+                {'symbol': 'NVDA', 'strategy': 'A4'},
+                {'symbol': 'TSLA', 'strategy': 'A4'}
+            ])
 
     def _handle_trades_api(self, parsed):
         params = parse_qs(parsed.query)
