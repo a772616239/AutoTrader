@@ -574,7 +574,9 @@
                     const time = new Date(t.timestamp).getTime() / 1000;
                     const priceVal = t.price || t.entry_price || 'N/A';
                     const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
+
                     let text = `${t.action} @ ${priceDisp}`;
+                    if (t.size) text += ` * ${t.size}`;
                     if (t.strategy) text += ` | ${t.strategy}`;
 
                     return {
