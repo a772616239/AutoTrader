@@ -425,43 +425,49 @@ class A4PullbackStrategy(BaseStrategy):
         
         if position_size > 0:
             # 多头追踪止损
-            # 更新最高价
-            highest_price = position.get('highest_price', current_price)
+            # 更新最高价 (初始化默认为0，确保第一时间更新)
+            highest_price = position.get('highest_price', 0.0)
             if current_price > highest_price:
                 self.positions[symbol]['highest_price'] = current_price
                 highest_price = current_price
             
             # 检查回撤
-            drawdown = (highest_price - current_price) / highest_price
-            if drawdown >= trailing_stop_pct and price_change_pct > 0:
-                return {
-                    'symbol': symbol,
-                    'signal_type': 'TRAILING_STOP',
-                    'action': 'SELL',
-                    'price': current_price,
-                    'reason': f"追踪止损:以此前最高价{highest_price:.2f}回撤{drawdown*100:.1f}%",
-                    'position_size': abs(position_size),
-                    'profit_pct': price_change_pct * 100
-                }
+            # 注意: 只有当价格高于成本价(有盈利)一定幅度后才激活追踪止损，或者直接全程追踪
+            # 这里简化为：只要回撤达到比例就止损，不管是否盈利（保护利润 + 限制亏损）
+            # 但通常追踪止损是为了锁住利润。如果为了限制亏损，已有 stop_loss_pct
+            # 改进：如果当前最高价 > 平均成本，才触发追踪逻辑，避免在水下波动时过早止损（水下由硬止损负责）
+            if highest_price > avg_cost * 1.01: # 至少有1%利润后才开始追踪
+                 drawdown = (highest_price - current_price) / highest_price
+                 if drawdown >= trailing_stop_pct:
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'TRAILING_STOP',
+                        'action': 'SELL',
+                        'price': current_price,
+                        'reason': f"追踪止损:最高{highest_price:.2f}回撤{drawdown*100:.1f}%",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100
+                    }
         else:
             # 空头追踪止损
-            # 更新最低价
-            lowest_price = position.get('lowest_price', current_price)
+            # 更新最低价 (初始化默认为无穷大)
+            lowest_price = position.get('lowest_price', float('inf'))
             if current_price < lowest_price:
                 self.positions[symbol]['lowest_price'] = current_price
                 lowest_price = current_price
             
             # 检查反弹
-            rebound = (current_price - lowest_price) / lowest_price
-            if rebound >= trailing_stop_pct and price_change_pct > 0:
-                return {
-                    'symbol': symbol,
-                    'signal_type': 'TRAILING_STOP',
-                    'action': 'BUY',
-                    'price': current_price,
-                    'reason': f"追踪止损:以此前最低价{lowest_price:.2f}反弹{rebound*100:.1f}%",
-                    'position_size': abs(position_size),
-                    'profit_pct': price_change_pct * 100
-                }
+            if lowest_price < avg_cost * 0.99: # 至少有1%利润后才开始追踪
+                rebound = (current_price - lowest_price) / lowest_price
+                if rebound >= trailing_stop_pct:
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'TRAILING_STOP',
+                        'action': 'BUY',
+                        'price': current_price,
+                        'reason': f"追踪止损:最低{lowest_price:.2f}反弹{rebound*100:.1f}%",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100
+                    }
         
         return None
