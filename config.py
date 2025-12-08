@@ -50,7 +50,7 @@ CONFIG = {
         'rsi_oversold': 28,
         'stop_loss_atr_multiple': 1.5,
         'take_profit_atr_multiple': 3.0,
-        'ib_order_type': 'MKT',
+        'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
         'trading_start_time': '09:30',
         'trading_end_time': '16:00',
@@ -96,7 +96,7 @@ CONFIG = {
         'take_profit_pct': 0.03,
         'take_profit_atr_multiple': 2.0,
         'max_holding_minutes': 60,
-        'ib_order_type': 'MKT',
+        'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
         'trading_start_time': '09:45',
         'trading_end_time': '15:30',
@@ -135,7 +135,7 @@ CONFIG = {
         'max_position_notional': 40000.0,      # 单股总仓位上限（美元，严格）
         'min_confidence': 0.65,                # 最小信心度阈值（严格）
         'min_price': 10.0,                     # 最小股价（严格，避免低价股）
-        'min_volume': 200000,                 # 最小日成交量（严格，流动性第一）
+        'min_volume': 40000,                 # 最小日成交量（严格，流动性第一）
         'lookback_period': 90,                 # 基本面指标回溯天数
         'recent_period': 20,                   # 最近期间（天数）
         'liquidity_weight': 0.35,              # 流动性因子权重（优先级最高）
@@ -145,7 +145,7 @@ CONFIG = {
         'buy_threshold': 0.68,                 # 买入复合得分阈值（严格）
         'sell_threshold': 0.55,                # 卖出复合得分阈值（严格）
         'exit_threshold': 0.25,                # 平仓复合得分阈值（更低，快速止损）
-        'ib_order_type': 'MKT',
+        'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
         'trading_start_time': '09:45',
         'trading_end_time': '15:30',
@@ -168,7 +168,7 @@ CONFIG = {
         'min_news_relevance': 0.7,             # 最小新闻相关性评分
         'max_news_age_hours': 4,               # 最大新闻年龄（小时）
         'cooldown_after_news_trade': 60,       # 新闻交易后冷却期（分钟）
-        'ib_order_type': 'MKT',
+        'ib_order_type': 'LMT',
         'ib_limit_offset': 0.005,
         'trading_start_time': '09:45',
         'trading_end_time': '15:30',
