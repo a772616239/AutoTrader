@@ -365,9 +365,9 @@ class A4PullbackStrategy(BaseStrategy):
     def check_exit_conditions(self, symbol: str, current_price: float,
                              current_time: datetime = None) -> Optional[Dict]:
         """检查卖出条件"""
-        if symbol not in self.positions:
-            logger.info(f"{symbol} 无持仓，无法检查卖出条件")
-            return None
+        # if symbol not in self.positions:
+        #     logger.info(f"{symbol} 无持仓，无法检查卖出条件")
+        #     return None
         
         if current_time is None:
             current_time = datetime.now()
