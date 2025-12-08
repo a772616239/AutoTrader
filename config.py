@@ -20,13 +20,31 @@ CONFIG = {
     },
     'trading': {
         'symbols': [
-        'AMD', 'META', 'INTC', 'RIVN', 'COIN',
-        'XOM', 'CVX', 'JPM', 'PFE', 'JNJ',
-        'TEAM', 'GOOGL', 'WDC', 'CRM', 'ORCL',
-        'AMZN', 'BKNG', 'TSLA', 'NFLX', 'DIS',
-        'NVDA', 'MSFT', 'ETN', 'SNOW', 'AI',
-        'OKLO', 'SMCI', 'LEU', 'TSM', 'BA'
-    ],
+    # A1 动量反转（原 5 + 新增 2）
+    'AMD', 'META', 'INTC', 'RIVN', 'COIN',
+    'SQ', 'ZM',
+
+    # A2 Z-Score 均值回归（原 5 + 新增 2）
+    'XOM', 'CVX', 'JPM', 'PFE', 'JNJ',
+    'BAC', 'GS',
+
+    # A3 双均线量能（原 5 + 新增 2）
+    'TEAM', 'GOOGL', 'WDC', 'CRM', 'ORCL',
+    'AVGO', 'IBM',
+
+    # A4 回调买入（原 5 + 新增 2）
+    'AMZN', 'BKNG', 'TSLA', 'NFLX', 'DIS',
+    'NKE', 'SBUX',
+
+    # A5 多因子 AI（原 5 + 新增 2）
+    'NVDA', 'MSFT', 'ETN', 'SNOW', 'AI',
+    'PLTR', 'DDOG',
+
+    # A7 CTA 趋势（原 5 + 新增 2）
+    'OKLO', 'SMCI', 'LEU', 'TSM', 'BA',
+    'ASML', 'LLY'
+]
+,
         'scan_interval_minutes': 1,
         'trading_hours': {
             'start': '00:00',
@@ -113,8 +131,8 @@ CONFIG = {
         'trend_confirmation_bars': 3,      # 趋势确认K线数
         'pullback_lookback': 20,            # 回撤识别窗口
         'fibonacci_levels': [0.236, 0.382, 0.5, 0.618, 0.786],
-        'pullback_buy_ratio': [0.15, 0.7],   # 回撤买入位置
-        'pullback_sell_ratio': [0.15, 0.7],  # 反弹卖出位置
+        'pullback_buy_ratio': [0.08, 0.7],   # 回撤买入位置
+        'pullback_sell_ratio': [0.08, 0.7],  # 反弹卖出位置
         'volume_confirmation': True,
         'min_volume_ratio': 1.0,
         'stop_loss_pct': 0.03,
@@ -218,42 +236,61 @@ existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
 
 # 预设一些需要使用 a2 策略的标的（可按需修改）。仅在用户未显式设置时应用。
 preselect_a2 = {
-    'AMD': 'a1',
+    # A1 动量反转（近期大幅回撤 + 情绪反转潜力）
+    'AMD':  'a1',
     'META': 'a1',
-    'INTC': 'a1',
     'RIVN': 'a1',
     'COIN': 'a1',
+    'SQ':   'a1',
+    'ZM':   'a1',
+    'UBER': 'a1',
 
+    # A2 Z-Score（波动偏离 + 均值回归属性强的大盘股/周期股）
     'XOM': 'a2',
     'CVX': 'a2',
     'JPM': 'a2',
     'PFE': 'a2',
     'JNJ': 'a2',
+    'BAC': 'a2',
+    'GS':  'a2',
 
+    # A3 双均线量能（长线清晰趋势 + 金叉量能信号稳定）
     'TEAM': 'a3',
     'GOOGL': 'a3',
-    'WDC':  'a3',
     'CRM':  'a3',
-    'ORCL':  'a3',
+    'ORCL': 'a3',
+    'AVGO': 'a3',
+    'IBM':  'a3',
+    'NOW':  'a3',
 
+    # A4 回调买入（基本面强 + 逢低吸纳逻辑）
     'AMZN': 'a4',
     'BKNG': 'a4',
-    'TSLA':  'a4',
-    'NFLX':  'a4',
+    'TSLA': 'a4',
+    'NFLX': 'a4',
     'DIS':  'a4',
+    'NKE':  'a4',
+    'SBUX': 'a4',
 
+    # A5 多因子AI（成长 + 质量 + AI 曝露）
     'NVDA': 'a5',
     'MSFT': 'a5',
     'ETN':  'a5',
-    'SNOW':  'a5',
-    'AI':  'a5',
+    'SNOW': 'a5',
+    'PLTR': 'a5',
+    'DDOG': 'a5',
+    'CRWD': 'a5',
 
-    'OKLO': 'a7',
-    'SMCI':  'a7',
-    'LEU':  'a7',
+    # A7 CTA 趋势（中长线趋势最清晰、波动适中）
+    'SMCI': 'a7',
     'TSM':  'a7',
-    'BA':  'a7',
+    'BA':   'a7',
+    'ASML': 'a7',
+    'LLY':  'a7',
+    'RTX':  'a7',
+    'AMAT': 'a7',
 }
+
 
 merged_map = default_symbol_map.copy()
 merged_map.update(preselect_a2)

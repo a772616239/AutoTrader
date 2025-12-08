@@ -29,7 +29,7 @@ class A4PullbackStrategy(BaseStrategy):
             # 趋势识别参数
             'trend_ma_period': 50,           # 长期趋势均线周期
                 'trend_confirmation_bars': 3,   # 趋势确认所需K线数
-                'strong_trend_threshold': 0.0069, # 强势趋势阈值（1%）
+                'strong_trend_threshold': 0.0065, # 强势趋势阈值（1%）
             
             # 回撤识别参数
             'pullback_lookback': 78,         # 回撤识别窗口（扩大到100根K线）
@@ -180,7 +180,7 @@ class A4PullbackStrategy(BaseStrategy):
                 current_volume = data['Volume'].iloc[-1]
                 volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
                 if volume_ratio < self.config['min_volume_ratio']:
-                    logger.info(f"{symbol} 成交量不足: {volume_ratio:.2f}x")
+                    logger.info(f"{symbol} 成交量不足: {volume_ratio:.2f}x --min_volume_ratio {self.config['min_volume_ratio']}")
                     return None
         
         # 计算信号强度（回撤到 0.618 的效果最好）
@@ -254,7 +254,7 @@ class A4PullbackStrategy(BaseStrategy):
         
         # 确认反弹到目标位置
         if not (min_ratio <= rebound_ratio <= max_ratio):
-            logger.info(f"{symbol} 反弹幅度不在目标范围: {rebound_ratio:.1%}")
+            logger.info(f"{symbol} 反弹幅度不在目标范围:min_ratio--{min_ratio:.1%} rebound_ratio--{rebound_ratio:.1%} max_ratio--{max_ratio:.1%}")
             return None
         
         # 确认反弹幅度最小要求

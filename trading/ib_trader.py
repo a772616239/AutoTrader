@@ -92,7 +92,7 @@ class IBTrader:
                     orig_price = float(price)
                     norm_price = round(orig_price, 2)
                     if norm_price != orig_price:
-                        logger.debug(f"规范限价: {orig_price} -> {norm_price}")
+                        logger.info(f"规范限价: {orig_price} -> {norm_price}")
                     price = norm_price
                 except Exception:
                     price = float(price)
