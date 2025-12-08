@@ -96,7 +96,7 @@ class BaseStrategy:
         
         try:
             if not self.ib_trader.connected:
-                logger.warning("IB未连接，跳过持仓同步")
+                logger.info("IB未连接，跳过持仓同步")
                 return False
 
             holdings = self.ib_trader.get_holdings()
@@ -183,7 +183,7 @@ class BaseStrategy:
                 if available_funds > 0:
                     self.equity = available_funds
             except Exception as e:
-                logger.warning(f"获取IB可用资金失败: {e}")
+                logger.info(f"获取IB可用资金失败: {e}")
         
         if self.config.get('max_active_positions'):
             if len(self.positions) >= int(self.config['max_active_positions']):
@@ -218,12 +218,15 @@ class BaseStrategy:
     def execute_signal(self, signal: Dict, current_price: float) -> Dict:
         """执行交易信号 - 子类可以重写此方法"""
         if signal['position_size'] <= 0:
+            logger.info(f"无效仓位: {signal['position_size']}")
             return {'status': 'REJECTED', 'reason': '无效仓位'}
         
         if 'signal_hash' in signal and self._is_signal_cooldown(signal['signal_hash']):
+            logger.info(f"信号冷却期: {signal['signal_hash']}")
             return {'status': 'REJECTED', 'reason': '信号冷却期'}
         
         if not self.ib_trader:
+            logger.info("IB接口未初始化")
             return {'status': 'REJECTED', 'reason': 'IB接口未初始化'}
             
         # 动态资金检查 (仅针对买入)
@@ -233,7 +236,7 @@ class BaseStrategy:
                 # 1. 资金门槛检查 (< $500 则不交易)
                 if available_funds < 500:
                     msg = f"可用资金不足 $500 (${available_funds:.2f})，跳过下单"
-                    logger.warning(f"⚠️ {msg}")
+                    logger.info(f"⚠️ {msg}")
                     return {'status': 'REJECTED', 'reason': msg}
                 
                 # 2. 资金充足性检查 (不够则用剩余全部)
@@ -247,7 +250,7 @@ class BaseStrategy:
                         signal['position_size'] = max_qty
                     else:
                         msg = f"资金不足以买入 1 股 (${available_funds:.2f} < ${current_price:.2f})"
-                        logger.warning(f"⚠️ {msg}")
+                        logger.info(f"⚠️ {msg}")
                         return {'status': 'REJECTED', 'reason': msg}
             except Exception as e:
                 logger.error(f"检查可用资金时出错: {e}")
@@ -260,6 +263,7 @@ class BaseStrategy:
             else:
                 dedupe_price = current_price * (1 + self.config.get('ib_limit_offset', 0.01))
         if self.ib_trader.has_active_order(signal['symbol'], signal['action'], signal['position_size'], dedupe_price):
+            logger.info(f"存在未完成订单，避免重复下单: {signal['symbol']}")
             return {'status': 'REJECTED', 'reason': '存在未完成订单，避免重复下单'}
 
         if signal['action'] == 'SELL':
@@ -289,7 +293,7 @@ class BaseStrategy:
             'size': signal['position_size'],
             'timestamp': datetime.now(),
             'signal_type': signal['signal_type'],
-            'strategy': signal.get('strategy', self.name),  # 记录策略名称
+            # 'strategy': signal.get('strategy', self.name),  # 记录策略名称
             'confidence': signal.get('confidence', 0.5),
             'status': 'PENDING',
             'order_type': self.config.get('ib_order_type', 'MKT')
@@ -370,7 +374,7 @@ class BaseStrategy:
 
                 # 若为 PENDING，则记录警告信息
                 if mapped == 'PENDING':
-                    logger.warning(f"⚠️  订单状态异常或待处理 - ID: {trade.get('order_id')}, 状态: {ib_status_str}")
+                    logger.info(f"⚠️  订单状态异常或待处理 - ID: {trade.get('order_id')}, 状态: {ib_status_str}")
 
                 return trade
             else:
