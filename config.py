@@ -142,7 +142,7 @@ CONFIG = {
         'trading_end_time': '15:30',
         'avoid_open_hour': True,
         'avoid_close_hour': True,
-        'ib_order_type': 'MKT',
+        'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
     },
     'strategy_a5': {  # 多因子AI融合策略配置

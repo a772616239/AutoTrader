@@ -301,16 +301,20 @@ class BaseStrategy:
         
         try:
             order_type = self.config.get('ib_order_type', 'MKT')
-            
+
+            logger.info(f"order_type: {order_type} -- ['action']: {signal['action']} current_price: {current_price} signal['position_size']: {signal['position_size']}")
+
             if order_type == 'LMT' and signal['action'] == 'BUY':
                 limit_price = current_price * (1 - self.config.get('ib_limit_offset', 0.01))
+                logger.info(f"BUY {signal['symbol']} {signal['position_size']} 股，限价 {limit_price}--current_price {current_price}")
                 ib_trade = self.ib_trader.place_buy_order(
-                    signal['symbol'], signal['position_size'], 'LMT', limit_price
+                    signal['symbol'], signal['position_size'], 'LMT', current_price
                 )
             elif order_type == 'LMT' and signal['action'] == 'SELL':
                 limit_price = current_price * (1 + self.config.get('ib_limit_offset', 0.01))
+
                 ib_trade = self.ib_trader.place_sell_order(
-                    signal['symbol'], signal['position_size'], 'LMT', limit_price
+                    signal['symbol'], signal['position_size'], 'LMT', current_price
                 )
             elif signal['action'] == 'BUY':
                 ib_trade = self.ib_trader.place_buy_order(
@@ -479,7 +483,8 @@ class BaseStrategy:
                     
                     # 执行信号
                     for signal in signals:
-                        current_price = df['Close'].iloc[-1]
+                        # 使用信号中的价格，确保与仓位计算时价格一致
+                        current_price = signal.get('price', df['Close'].iloc[-1])
                         try:
                             result = self.execute_signal(signal, current_price)
                             logger.debug(f"  信号执行结果: {result}")
