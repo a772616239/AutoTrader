@@ -136,10 +136,14 @@ class TradingSystem:
                 'client_id': 1
             },
             'trading': {
-                'symbols': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META','MU','INTC','AMD',
-                            'NFLX','BIDU','JD','BABA','TCEHY','PYPL','SHOP','CRM','ORCL','IBM',
-                            'CSCO','QCOM','TXN','AVGO','ADBE','INTU','ZM','DOCU','SNOW','UBER',
-                            'LYFT'],
+                'symbols': [
+                    'AMD', 'META', 'INTC', 'RIVN', 'COIN',
+                    'XOM', 'CVX', 'JPM', 'PFE', 'JNJ',
+                    'TEAM', 'GOOGL', 'WDC', 'CRM', 'ORCL',
+                    'AMZN', 'BKNG', 'TSLA', 'NFLX', 'DIS',
+                    'NVDA', 'MSFT', 'ETN', 'SNOW', 'AI',
+                    'OKLO', 'SMCI', 'LEU', 'TSM', 'BA'
+                ],
                 'scan_interval_minutes': 1,
                 'trading_hours': {
                     'start': '00:00',

@@ -20,14 +20,13 @@ CONFIG = {
     },
     'trading': {
         'symbols': [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META',
-            'MU', 'INTC', 'AMD', 'NFLX', 'BIDU', 'JD', 'BABA',
-            'TCEHY', 'PYPL', 'SHOP', 'CRM', 'ORCL', 'IBM',
-            'CSCO', 'QCOM', 'TXN', 'AVGO', 'ADBE', 'INTU',
-            'ZM', 'DOCU', 'SNOW', 'UBER', 'LYFT', 'SPOT',
-            'TWTR', 'PINS', 'SQ', 'FSLY', 'OKTA', 'DDOG',
-            'CRWD', 'ZS', 'NET', 'WORK',
-        ],
+        'AMD', 'META', 'INTC', 'RIVN', 'COIN',
+        'XOM', 'CVX', 'JPM', 'PFE', 'JNJ',
+        'TEAM', 'GOOGL', 'WDC', 'CRM', 'ORCL',
+        'AMZN', 'BKNG', 'TSLA', 'NFLX', 'DIS',
+        'NVDA', 'MSFT', 'ETN', 'SNOW', 'AI',
+        'OKLO', 'SMCI', 'LEU', 'TSM', 'BA'
+    ],
         'scan_interval_minutes': 1,
         'trading_hours': {
             'start': '00:00',
@@ -219,15 +218,41 @@ existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
 
 # 预设一些需要使用 a2 策略的标的（可按需修改）。仅在用户未显式设置时应用。
 preselect_a2 = {
-    'AAPL': 'a2',
-    'MSFT': 'a2',
-    'GOOGL':'a2',
-    'AMZN': 'a2',
-    'TSLA': 'a2',
-    'NVDA': 'a2',
-    'META': 'a2',
-    'INTC': 'a2',
-    'AMD':  'a2',
+    'AMD': 'a1',
+    'META': 'a1',
+    'INTC': 'a1',
+    'RIVN': 'a1',
+    'COIN': 'a1',
+
+    'XOM': 'a2',
+    'CVX': 'a2',
+    'JPM': 'a2',
+    'PFE': 'a2',
+    'JNJ': 'a2',
+
+    'TEAM': 'a3',
+    'GOOGL': 'a3',
+    'WDC':  'a3',
+    'CRM':  'a3',
+    'ORCL':  'a3',
+
+    'AMZN': 'a4',
+    'BKNG': 'a4',
+    'TSLA':  'a4',
+    'NFLX':  'a4',
+    'DIS':  'a4',
+
+    'NVDA': 'a5',
+    'MSFT': 'a5',
+    'ETN':  'a5',
+    'SNOW':  'a5',
+    'AI':  'a5',
+
+    'OKLO': 'a7',
+    'SMCI':  'a7',
+    'LEU':  'a7',
+    'TSM':  'a7',
+    'BA':  'a7',
 }
 
 merged_map = default_symbol_map.copy()
