@@ -273,9 +273,9 @@ class BaseStrategy:
                     self.equity = available_funds
                     logger.info(f"更新equity为IB可用资金: {self.equity}")
                 else:
-                    logger.warning(f"IB可用资金为0，使用默认equity: {self.equity}")
+                    logger.warning(f"IB可用资金为0，使用默认equity进行模拟交易: {self.equity}")
             except Exception as e:
-                logger.info(f"获取IB可用资金失败: {e}, 使用默认equity: {self.equity}")
+                logger.info(f"获取IB可用资金失败: {e}, 使用默认equity进行模拟交易: {self.equity}")
         
         if self.config.get('max_active_positions'):
             if len(self.positions) >= int(self.config['max_active_positions']):
@@ -297,6 +297,7 @@ class BaseStrategy:
         max_shares_value = min(per_trade_cap, equity_buffered)
         max_shares = int(max_shares_value / signal['price'])
         result = min(shares, max_shares)
+        logger.info(f"计算仓位大小: 风险金额 ${risk_amount:,.2f}, 每股风险 ${risk_per_share:.2f}, 初始股数 {shares}, 最大股数 {max_shares}, 最终股数 {result} equity_buffered {equity_buffered}")
         try:
             logger.info(
                 f"仓位计算: 价格 {signal['price']:.2f}, 权益 {self.equity:,.2f}, 风险股数 {shares}, "
@@ -326,25 +327,28 @@ class BaseStrategy:
         if signal['action'] == 'BUY':
             try:
                 available_funds = self.ib_trader.get_available_funds()
-                # 1. 资金门槛检查 (< $500 则不交易)
-                if available_funds < 500:
+                # 1. 资金门槛检查 (< $500 则不交易，纸面账户除外)
+                if available_funds < 500 and available_funds > 0:
                     msg = f"可用资金不足 $500 (${available_funds:.2f})，跳过下单"
                     logger.info(f"⚠️ {msg}")
                     return {'status': 'REJECTED', 'reason': msg}
+                elif available_funds == 0:
+                    logger.info(f"⚠️ IB可用资金为0，使用模拟交易模式")
                 
-                # 2. 资金充足性检查 (不够则用剩余全部)
-                estimated_cost = signal['position_size'] * current_price
-                if estimated_cost > available_funds:
-                    # 计算最大可买股数
-                    max_qty = int(available_funds // current_price)
-                    if max_qty > 0:
-                        logger.info(f"💰 资金不足全额买入 (${available_funds:.2f} < ${estimated_cost:.2f})，"
-                                   f"调整仓位: {signal['position_size']} -> {max_qty} 股")
-                        signal['position_size'] = max_qty
-                    else:
-                        msg = f"资金不足以买入 1 股 (${available_funds:.2f} < ${current_price:.2f})"
-                        logger.info(f"⚠️ {msg}")
-                        return {'status': 'REJECTED', 'reason': msg}
+                # 2. 资金充足性检查 (真实账户检查，纸面账户跳过)
+                if available_funds > 0:  # 只有真实账户才有资金检查
+                    estimated_cost = signal['position_size'] * current_price
+                    if estimated_cost > available_funds:
+                        # 计算最大可买股数
+                        max_qty = int(available_funds // current_price)
+                        if max_qty > 0:
+                            logger.info(f"💰 资金不足全额买入 (${available_funds:.2f} < ${estimated_cost:.2f})，"
+                                        f"调整仓位: {signal['position_size']} -> {max_qty} 股")
+                            signal['position_size'] = max_qty
+                        else:
+                            msg = f"资金不足以买入 1 股 (${available_funds:.2f} < ${current_price:.2f})"
+                            logger.info(f"⚠️ {msg}")
+                            return {'status': 'REJECTED', 'reason': msg}
             except Exception as e:
                 logger.error(f"检查可用资金时出错: {e}")
         
@@ -373,6 +377,7 @@ class BaseStrategy:
             except:
                 pass
             if current_pos <= 0:
+                logger.info(f"无持仓，禁止卖出: {signal['symbol']}")
                 return {'status': 'REJECTED', 'reason': '无持仓，禁止卖出'}
             if signal['position_size'] > current_pos:
                 signal['position_size'] = current_pos
@@ -631,7 +636,7 @@ class BaseStrategy:
                         current_price = signal.get('price', df['Close'].iloc[-1])
                         try:
                             result = self.execute_signal(signal, current_price, self.force_market_orders)
-                            logger.debug(f"  信号执行结果: {result}")
+                            logger.info(f"  信号执行结果: {result}")
                         except Exception as e:
                             logger.error(f"  执行信号时出错: {e}")
                             continue

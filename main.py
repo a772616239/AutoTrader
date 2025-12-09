@@ -524,6 +524,11 @@ class TradingSystem:
             net_liq = self.ib_trader.get_net_liquidation()
             available = self.ib_trader.get_available_funds()
             logger.info(f"IB账户 - 净资产: ${net_liq:,.2f}, 可用资金: ${available:,.2f}")
+
+            # 打印完整账户摘要用于调试
+            if available == 0:
+                logger.info("检测到可用资金为0，打印完整账户摘要进行诊断...")
+                self.ib_trader.print_account_summary()
         
         # 运行策略分析
         symbols = self.config['trading']['symbols']

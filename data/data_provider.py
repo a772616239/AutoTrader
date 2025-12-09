@@ -246,7 +246,7 @@ class DataProvider:
     
     def get_market_status(self) -> Dict:
         """获取市场状态"""
-        test_symbols = ['AAPL', 'SPY']
+        test_symbols = ['AAPL']
         status = {
             'server_available': False,
             'symbols_available': [],

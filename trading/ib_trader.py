@@ -109,6 +109,7 @@ class IBTrader:
         """
         通用订单提交函数
         """
+        logger.info(f"准备提交订单->ib: {action} {quantity} 股 {symbol} ")
         if not self.connected and not self.connect():
             logger.error("IB未连接，无法提交订单")
             return None
@@ -133,7 +134,7 @@ class IBTrader:
                 logger.error(f"不支持的订单类型或缺少价格参数: {order_type}")
                 return None
             
-            logger.info(f"提交订单: {action} {quantity} 股 {symbol} "
+            logger.info(f"提交了订单: {action} {quantity} 股 {symbol} "
                        f"({order_type} @ {price if price else '市价'})")
             
             trade = self.ib.placeOrder(contract, order)
@@ -151,7 +152,7 @@ class IBTrader:
                 try:
                     if getattr(trade, 'log', None):
                         for entry in trade.log:
-                            logger.debug(f"order log: time={getattr(entry,'time',None)} status={getattr(entry,'status',None)} message={getattr(entry,'message',None)} errorCode={getattr(entry,'errorCode',None)}")
+                            logger.info(f"order log: time={getattr(entry,'time',None)} status={getattr(entry,'status',None)} message={getattr(entry,'message',None)} errorCode={getattr(entry,'errorCode',None)}")
                 except Exception:
                     pass
 
@@ -276,8 +277,21 @@ class IBTrader:
     def get_available_funds(self) -> float:
         """获取可用资金"""
         logger.info(f"开始获取可用资金，连接状态: {self.connected}")
-        funds = self.get_account_value('AvailableFunds')
-        logger.info(f"获取到的可用资金: {funds}")
+
+        # 尝试多个资金字段
+        funds = 0.0
+        fund_fields = ['AvailableFunds', 'TotalCashValue', 'BuyingPower', 'NetLiquidation']
+
+        for field in fund_fields:
+            try:
+                value = self.get_account_value(field)
+                logger.info(f"账户{field}: {value}")
+                if value > 0:
+                    funds = max(funds, value)  # 使用最大的正值
+            except Exception as e:
+                logger.debug(f"获取{field}失败: {e}")
+
+        logger.info(f"最终确定可用资金: {funds}")
         return funds
     
     def get_net_liquidation(self) -> float:
@@ -287,18 +301,18 @@ class IBTrader:
     def print_holdings(self, symbol: Optional[str] = None):
         """打印持仓信息"""
         positions = self.get_holdings(symbol)
-        
+
         if not positions:
             if symbol:
                 logger.info(f"没有找到 {symbol} 的持仓")
             else:
                 logger.info("当前没有任何股票持仓")
             return
-        
+
         logger.info("\n" + "="*60)
         logger.info("当前持仓信息:")
         logger.info("="*60)
-        
+
         for pos in positions:
             contract = pos.contract
             logger.info(f"合约: {contract.symbol} ({contract.secType})")
@@ -307,6 +321,37 @@ class IBTrader:
             if hasattr(contract, 'exchange'):
                 logger.info(f"  交易所: {contract.exchange}")
             logger.info("-" * 40)
+
+    def print_account_summary(self):
+        """打印完整的账户摘要信息"""
+        if not self.connected and not self.connect():
+            logger.error("IB未连接，无法获取账户摘要")
+            return
+
+        try:
+            summary = self.get_account_summary()
+            logger.info("\n" + "="*60)
+            logger.info("完整账户摘要信息:")
+            logger.info("="*60)
+
+            for tag, info in summary.items():
+                value = info['value']
+                currency = info['currency']
+                logger.info(f"{tag}: {value} {currency}")
+
+            # 额外检查关键资金字段
+            logger.info("\n关键资金字段检查:")
+            key_fields = ['AvailableFunds', 'TotalCashValue', 'BuyingPower', 'NetLiquidation', 'TotalCashBalance']
+            for field in key_fields:
+                if field in summary:
+                    value = summary[field]['value']
+                    currency = summary[field]['currency']
+                    logger.info(f"  {field}: {value} {currency}")
+                else:
+                    logger.info(f"  {field}: 未找到")
+
+        except Exception as e:
+            logger.error(f"打印账户摘要失败: {e}")
 
     def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict]:
         """获取未完成订单列表"""
