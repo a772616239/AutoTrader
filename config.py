@@ -52,6 +52,8 @@ CONFIG = {
         },
         'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
+        'close_all_positions_before_market_close': True,  # 是否在收盘前清仓所有持仓（已启用）
+        'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
     },
     'logging': {
         'level': 'INFO',

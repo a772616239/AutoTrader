@@ -11,6 +11,12 @@ import warnings
 import logging
 from datetime import datetime
 from typing import Dict, List
+try:
+    import pytz
+    HAS_PYTZ = True
+except ImportError:
+    HAS_PYTZ = False
+    logging.warning("pytz未安装，将使用本地时间。建议安装pytz以支持美东时间: pip install pytz")
 
 # 添加模块路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -125,6 +131,41 @@ class TradingSystem:
     
     def _load_config(self, config_file: str) -> Dict:
         """加载配置"""
+        # 默认配置（作为后备）
+        default_strategy_config = {
+            'initial_capital': 100000.0,
+            'risk_per_trade': 0.01,
+            'max_position_size': 0.05,
+            'ib_order_type': 'MKT',
+            'ib_limit_offset': 0.01,
+            'min_cash_buffer': 0.3,
+            'per_trade_notional_cap': 10000.0,
+            'max_position_notional': 60000.0,
+            'max_active_positions': 5,
+            'default_max_signals_per_cycle': 3,
+            'max_signals_per_cycle': {
+                'a2': 2,
+            }
+        }
+        
+        # 首先尝试从 config.py 加载配置
+        try:
+            import config as global_config
+            if hasattr(global_config, 'CONFIG'):
+                logger.info("✅ 从 config.py 加载配置")
+                # 使用全局配置，但保留默认值作为后备
+                config = global_config.CONFIG.copy()
+                # 确保必要的配置键存在
+                if 'trading' not in config:
+                    config['trading'] = {}
+                if 'strategy' not in config:
+                    config['strategy'] = default_strategy_config
+                    logger.info("   使用默认 strategy 配置")
+                return config
+        except Exception as e:
+            logger.warning(f"从 config.py 加载配置失败: {e}，使用默认配置")
+        
+        # 如果加载失败，使用默认配置
         default_config = {
             'data_server': {
                 'base_url': 'http://localhost:8001',
@@ -166,23 +207,11 @@ class TradingSystem:
                 'trading_hours': {
                     'start': '00:00',
                     'end': '15:45'
-                }
+                },
+                'close_all_positions_before_market_close': False,
+                'close_positions_time': '15:45'
             },
-            'strategy': {
-                'initial_capital': 100000.0,
-                'risk_per_trade': 0.01,
-                'max_position_size': 0.05,
-                'ib_order_type': 'MKT',
-                'ib_limit_offset': 0.01,
-                'min_cash_buffer': 0.3,
-                'per_trade_notional_cap': 10000.0,
-                'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
-                'max_active_positions': 5,
-                'default_max_signals_per_cycle': 3,
-                'max_signals_per_cycle': {
-                    'a2': 2,  # A2 每周期最多 2 个委托（主线程层面的限制）
-                }
-            }
+            'strategy': default_strategy_config
         }
         
         return default_config
@@ -270,12 +299,25 @@ class TradingSystem:
         logger.info(f"新策略: {self.strategy.get_strategy_name()}")
         logger.info(f"策略描述: {StrategyFactory.get_strategy_description(new_strategy_name)}")
     
+    def _get_eastern_time(self) -> datetime:
+        """获取当前美东时间"""
+        if HAS_PYTZ:
+            try:
+                eastern = pytz.timezone('US/Eastern')
+                return datetime.now(eastern)
+            except Exception as e:
+                logger.warning(f"获取美东时间失败: {e}，使用本地时间")
+                return datetime.now()
+        else:
+            # 如果没有pytz，使用本地时间（假设本地时间就是美东时间）
+            return datetime.now()
+    
     def _within_trading_hours(self) -> bool:
         """检查是否在交易时间内"""
         hours = self.config['trading']['trading_hours']
         start = datetime.strptime(hours['start'], '%H:%M').time()
         end = datetime.strptime(hours['end'], '%H:%M').time()
-        current = datetime.now().time()
+        current = self._get_eastern_time().time()
         
         return start <= current <= end
     
@@ -286,12 +328,90 @@ class TradingSystem:
             return
         
         self.cycle_count += 1
-        current_time = datetime.now()
+        current_time = self._get_eastern_time()  # 使用美东时间
+        local_time = datetime.now()
         
         logger.info(f"\n{'='*60}")
-        logger.info(f"交易周期 #{self.cycle_count} - {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"交易周期 #{self.cycle_count} - 美东时间: {current_time.strftime('%Y-%m-%d %H:%M:%S')} (本地: {local_time.strftime('%H:%M:%S')})")
         logger.info(f"当前策略: {self.strategy.get_strategy_name()}")
         logger.info('='*60)
+        
+        # 检查是否需要收盘前清仓
+        close_positions_enabled = self.config['trading'].get('close_all_positions_before_market_close', False)
+        close_time_str = self.config['trading'].get('close_positions_time', '15:45')
+        
+        logger.info(f"🔍 清仓配置检查: enabled={close_positions_enabled}, time={close_time_str}")
+        
+        if not close_positions_enabled:
+            logger.warning(f"⏰ 收盘前清仓功能未启用 (close_all_positions_before_market_close=False)")
+            logger.warning(f"   如需启用，请在config.py中设置: 'close_all_positions_before_market_close': True")
+        else:
+            try:
+                close_time = datetime.strptime(close_time_str, '%H:%M').time()
+                current_time_only = current_time.time()
+                
+                logger.info(f"⏰ 清仓检查: 当前美东时间={current_time_only.strftime('%H:%M:%S')}, 清仓时间={close_time_str}")
+                logger.info(f"   时间比较结果: {current_time_only} >= {close_time} = {current_time_only >= close_time}")
+                
+                # 检查是否到达清仓时间
+                if current_time_only >= close_time:
+                    logger.info(f"⏰ 到达清仓时间 ({close_time_str})，开始清仓所有持仓...")
+                    
+                    # 清仓所有持仓（支持单策略和多策略模式）
+                    try:
+                        import config as global_config
+                        symbol_map = global_config.CONFIG.get('symbol_strategy_map')
+                        
+                        if symbol_map and self.ib_trader:
+                            # 多策略模式：从IB获取所有持仓，按策略分组清仓
+                            try:
+                                all_holdings = self.ib_trader.get_holdings()
+                                if all_holdings:
+                                    # 按策略分组持仓
+                                    strategy_positions = {}
+                                    for pos in all_holdings:
+                                        symbol = pos.contract.symbol
+                                        strat_name = symbol_map.get(symbol, self.current_strategy_name)
+                                        if strat_name not in strategy_positions:
+                                            strategy_positions[strat_name] = []
+                                        strategy_positions[strat_name].append(symbol)
+                                    
+                                    # 为每个策略清仓
+                                    for strat_name, symbols in strategy_positions.items():
+                                        try:
+                                            cfg_key = global_config.STRATEGY_CONFIG_MAP.get(strat_name)
+                                            strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
+                                            strat_instance = StrategyFactory.create_strategy(strat_name, config=strat_cfg, ib_trader=self.ib_trader)
+                                            strat_instance.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
+                                        except Exception as e:
+                                            logger.error(f"清仓策略 {strat_name} 时出错: {e}")
+                                else:
+                                    logger.info("当前无持仓，无需清仓")
+                            except Exception as e:
+                                logger.error(f"获取持仓信息失败: {e}，尝试使用当前策略清仓")
+                                self.strategy.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
+                        else:
+                            # 单策略模式：直接清仓当前策略
+                            self.strategy.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
+                    except Exception as e:
+                        logger.error(f"执行收盘前清仓时出错: {e}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
+                    
+                    # 清仓后，本周期不再执行其他交易逻辑
+                    logger.info("✅ 清仓完成，本周期结束")
+                    return
+                else:
+                    time_diff = (datetime.combine(datetime.today(), close_time) - 
+                                datetime.combine(datetime.today(), current_time_only)).total_seconds() / 60
+                    if time_diff > 0:
+                        logger.debug(f"   距离清仓时间还有 {int(time_diff)} 分钟")
+                    else:
+                        logger.warning(f"   时间比较异常: 当前时间 {current_time_only} vs 清仓时间 {close_time}")
+            except Exception as e:
+                logger.warning(f"❌ 解析清仓时间配置失败: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
         
         # 检查交易时间
         # if not self._within_trading_hours():

@@ -300,7 +300,12 @@ class BaseStrategy:
         }
         
         try:
-            order_type = self.config.get('ib_order_type', 'MKT')
+            # 清仓时强制使用市价单
+            if signal.get('force_market_order', False):
+                order_type = 'MKT'
+                logger.info(f"🔄 清仓订单，强制使用市价单: {signal['symbol']} {signal['action']} {signal['position_size']} 股")
+            else:
+                order_type = self.config.get('ib_order_type', 'MKT')
 
             logger.info(f"order_type: {order_type} -- ['action']: {signal['action']} current_price: {current_price} signal['position_size']: {signal['position_size']}")
 
@@ -499,6 +504,100 @@ class BaseStrategy:
                 continue
         
         return all_signals
+    
+    def close_all_positions(self, reason: str = "收盘前清仓") -> List[Dict]:
+        """
+        清仓所有持仓
+        
+        Args:
+            reason: 清仓原因
+            
+        Returns:
+            清仓信号列表
+        """
+        close_signals = []
+        
+        if not self.ib_trader:
+            logger.warning("IB接口未初始化，无法清仓")
+            return close_signals
+        
+        # 从IB同步最新持仓
+        self.sync_positions_from_ib()
+        
+        if not self.positions:
+            logger.info(f"当前无持仓，无需清仓")
+            return close_signals
+        
+        logger.info(f"🔄 开始清仓所有持仓 ({reason})，共 {len(self.positions)} 个持仓")
+        
+        # 获取当前价格并生成卖出信号
+        for symbol, position_info in list(self.positions.items()):
+            try:
+                position_size = position_info.get('size', 0)
+                if position_size == 0:
+                    continue
+                
+                # 获取当前价格 - 优先使用平均成本，清仓时使用市价单不需要精确价格
+                current_price = position_info.get('avg_cost', 0)
+                
+                # 如果平均成本无效，尝试从IB获取价格
+                if current_price <= 0:
+                    try:
+                        if hasattr(self.ib_trader, 'ib') and self.ib_trader.connected:
+                            contract = self.ib_trader.get_contract(symbol)
+                            ticker = self.ib_trader.ib.reqMktData(contract, '', False, False)
+                            self.ib_trader.ib.sleep(0.5)  # 等待价格更新
+                            current_price = ticker.last if ticker.last > 0 else ticker.close
+                            self.ib_trader.ib.cancelMktData(contract)
+                    except Exception as e:
+                        logger.warning(f"无法获取 {symbol} 实时价格: {e}，将使用市价单")
+                        current_price = 1.0  # 使用占位价格，实际会以市价执行
+                
+                if current_price <= 0:
+                    logger.warning(f"{symbol} 价格无效，使用市价单清仓")
+                    current_price = 1.0  # 占位价格
+                
+                # 生成卖出信号 - 清仓时强制使用市价单
+                action = 'SELL' if position_size > 0 else 'BUY'  # 空头用BUY平仓
+                signal = {
+                    'symbol': symbol,
+                    'signal_type': 'CLOSE_ALL_POSITIONS',
+                    'action': action,
+                    'price': current_price,
+                    'quantity': abs(position_size),
+                    'position_size': abs(position_size),
+                    'confidence': 1.0,
+                    'reason': reason,
+                    'timestamp': datetime.now(),
+                    'force_market_order': True  # 标记为强制市价单
+                }
+                
+                close_signals.append(signal)
+                
+                logger.info(
+                    f"  📤 生成清仓信号: {symbol} {action} {abs(position_size)} 股 @ ${current_price:.2f}"
+                )
+                
+            except Exception as e:
+                logger.error(f"生成 {symbol} 清仓信号时出错: {e}")
+                continue
+        
+        # 执行清仓信号
+        executed_count = 0
+        for signal in close_signals:
+            try:
+                result = self.execute_signal(signal, signal['price'])
+                if result.get('status') in ['EXECUTED', 'PENDING']:
+                    executed_count += 1
+                    logger.info(f"  ✅ {signal['symbol']} 清仓订单已提交")
+                else:
+                    logger.warning(f"  ⚠️ {signal['symbol']} 清仓订单提交失败: {result.get('reason', '未知原因')}")
+            except Exception as e:
+                logger.error(f"执行 {signal['symbol']} 清仓信号时出错: {e}")
+        
+        logger.info(f"✅ 清仓完成: 共 {len(close_signals)} 个持仓，已提交 {executed_count} 个清仓订单")
+        
+        return close_signals
     
     def generate_report(self) -> Dict:
         """生成交易报告"""
