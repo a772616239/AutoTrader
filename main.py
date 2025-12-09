@@ -110,9 +110,12 @@ class TradingSystem:
     """主交易系统控制器"""
     
     def __init__(self, config_file: str = None, strategy_name: str = 'a1'):
+        # 初始化配置模块引用
+        self.config_module = None
+
         self.config = self._load_config(config_file)
         self.start_time = datetime.now()
-        
+
         # 初始化组件
         self.data_provider = None
         self.ib_trader = None
@@ -479,9 +482,9 @@ class TradingSystem:
                 logger.debug(traceback.format_exc())
         
         # 检查交易时间
-        # if not self._within_trading_hours():
-        #     logger.info("⏸️  非交易时间，跳过...")
-        #     return
+        if not self._within_trading_hours():
+            logger.info("⏸️  非交易时间，跳过...")
+            return
         
         # 周期开始前取消所有未完成委托 (如果配置启用)
         if self.config['trading'].get('auto_cancel_orders', True):

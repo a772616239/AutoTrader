@@ -48,8 +48,8 @@ CONFIG = {
 ,
         'scan_interval_minutes': 1,
         'trading_hours': {
-            'start': '00:00',
-            'end': '15:45'
+            'start': '09:30',
+            'end': '16:00'
         },
         'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
