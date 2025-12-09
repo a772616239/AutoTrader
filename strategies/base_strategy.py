@@ -39,6 +39,8 @@ class BaseStrategy:
         # 信号管理
         self.signal_cache = {}
         self.executed_signals = set()
+        # 检测是否在交易时间内，设置force_market_orders标志
+        self.force_market_orders = not self._within_trading_hours()
         
         # 性能跟踪
         self.signals_generated = 0
@@ -57,11 +59,39 @@ class BaseStrategy:
             'per_trade_notional_cap': 4000.0,
             'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
             'max_active_positions': 5,
+            'trading_hours': {
+                'start': '09:30',
+                'end': '16:00'
+            },
         }
     
     def get_strategy_name(self) -> str:
         """获取策略名称"""
         return self.__class__.__name__
+
+    def _within_trading_hours(self) -> bool:
+        """检查是否在交易时间内（美东时间）"""
+        try:
+            import pytz
+            HAS_PYTZ = True
+        except ImportError:
+            HAS_PYTZ = False
+
+        hours = self.config.get('trading_hours', {'start': '09:30', 'end': '16:00'})
+        start = datetime.strptime(hours['start'], '%H:%M').time()
+        end = datetime.strptime(hours['end'], '%H:%M').time()
+
+        # 获取美东时间
+        if HAS_PYTZ:
+            try:
+                eastern = pytz.timezone('US/Eastern')
+                current = datetime.now(eastern).time()
+            except Exception:
+                current = datetime.now().time()  # 假设本地时间就是美东时间
+        else:
+            current = datetime.now().time()  # 假设本地时间就是美东时间
+
+        return start <= current <= end
     
     def _generate_signal_hash(self, signal: Dict) -> str:
         """生成信号唯一哈希"""
@@ -273,7 +303,7 @@ class BaseStrategy:
             pass
         return result
     
-    def execute_signal(self, signal: Dict, current_price: float) -> Dict:
+    def execute_signal(self, signal: Dict, current_price: float, force_market_order: bool = False) -> Dict:
         """执行交易信号 - 子类可以重写此方法"""
         if signal['position_size'] <= 0:
             logger.info(f"无效仓位: {signal['position_size']}")
@@ -358,10 +388,13 @@ class BaseStrategy:
         }
         
         try:
-            # 清仓时强制使用市价单
-            if signal.get('force_market_order', False):
+            # 清仓时或非交易时间强制使用市价单
+            if signal.get('force_market_order', False) or force_market_order or self.force_market_orders:
                 order_type = 'MKT'
-                logger.info(f"🔄 清仓订单，强制使用市价单: {signal['symbol']} {signal['action']} {signal['position_size']} 股")
+                if force_market_order or self.force_market_orders:
+                    logger.info(f"🔄 非交易时间，强制使用市价单: {signal['symbol']} {signal['action']} {signal['position_size']} 股")
+                else:
+                    logger.info(f"🔄 清仓订单，强制使用市价单: {signal['symbol']} {signal['action']} {signal['position_size']} 股")
             else:
                 order_type = self.config.get('ib_order_type', 'MKT')
 
@@ -591,7 +624,7 @@ class BaseStrategy:
                         # 使用信号中的价格，确保与仓位计算时价格一致
                         current_price = signal.get('price', df['Close'].iloc[-1])
                         try:
-                            result = self.execute_signal(signal, current_price)
+                            result = self.execute_signal(signal, current_price, self.force_market_orders)
                             logger.debug(f"  信号执行结果: {result}")
                         except Exception as e:
                             logger.error(f"  执行信号时出错: {e}")

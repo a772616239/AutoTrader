@@ -483,14 +483,12 @@ class TradingSystem:
         
         # 检查交易时间
         allow_outside_hours = self.config['trading'].get('allow_orders_outside_trading_hours', False)
-        force_market_orders = False
         if not self._within_trading_hours():
             if not allow_outside_hours:
                 logger.info("⏸️  非交易时间，跳过...")
                 return
             else:
-                force_market_orders = True
-                logger.info("⏸️  非交易时间，使用市价单模式...")
+                logger.info("⏸️  非交易时间，继续执行（策略将使用市价单）...")
         
         # 周期开始前取消所有未完成委托 (如果配置启用)
         if self.config['trading'].get('auto_cancel_orders', True):
@@ -545,10 +543,12 @@ class TradingSystem:
             executor, futures = mgr.stream_run(symbols, signal_queue)
             signals = {}
         else:
+            # 单策略模式 - force_market_orders已在策略初始化时设置
             signals = self.strategy.run_analysis_cycle(self.data_provider, symbols)
         
         # 处理信号：流式模式下主线程即时消费 signal_queue 并执行下单
         if symbol_map and self.ib_trader:
+            # 多策略模式已在上面处理
             from queue import Empty
             logger.info("开始在主线程即时消费信号队列并下单")
             # 在工作线程运行期间，持续消费队列
@@ -627,6 +627,7 @@ class TradingSystem:
                         cfg_key = global_config.STRATEGY_CONFIG_MAP.get(origin)
                         strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
                         exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_trader)
+                        exec_strategy.force_market_orders = force_market_orders
                         exec_strategy.sync_positions_from_ib()
                         current_price = sig.get('price') or 0
                         atr = None
