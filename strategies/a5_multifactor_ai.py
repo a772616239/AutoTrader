@@ -41,7 +41,8 @@ class A5MultiFactorAI(BaseStrategy):
             'max_position_notional': 40000.0,
             'min_confidence': 0.65,
             'min_price': 10.0,
-            'min_volume': 2000000,
+            'min_volume_ratio': 0.5,  # 最小成交量相对历史平均值的比例（0.5表示至少是历史平均的50%）
+            'volume_lookback_period': 30,  # 计算历史平均成交量的回溯天数
             'lookback_period': 90,
             'recent_period': 20,
             'liquidity_weight': 0.35,
@@ -73,7 +74,11 @@ class A5MultiFactorAI(BaseStrategy):
         self.lookback_period = self.config.get('lookback_period', 90)
         self.recent_period = self.config.get('recent_period', 20)
         self.min_price = self.config.get('min_price', 5.0)
-        self.min_volume = self.config.get('min_volume', 500000)
+        # 成交量过滤改为相对历史平均值
+        self.min_volume_ratio = self.config.get('min_volume_ratio', 0.5)
+        self.volume_lookback_period = self.config.get('volume_lookback_period', 30)
+        # 保留min_volume作为向后兼容的绝对最小值（可选，用于极端情况）
+        self.min_volume_absolute = self.config.get('min_volume', None)
         self.buy_threshold = self.config.get('buy_threshold', 0.55)
         self.sell_threshold = self.config.get('sell_threshold', 0.45)
         self.exit_threshold = self.config.get('exit_threshold', 0.35)
@@ -350,8 +355,39 @@ class A5MultiFactorAI(BaseStrategy):
                     # 如果触发硬止损，直接返回信号，不再计算复杂的AI逻辑
                     return signals
             
-            if current_volume < self.min_volume:
-                logger.info(f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 最小值 {self.min_volume:.0f}")
+            # 成交量过滤 - 基于历史相对值
+            volume_filter_passed = True
+            if len(data) >= self.volume_lookback_period:
+                # 计算历史平均成交量
+                historical_volumes = data[vol_col].tail(self.volume_lookback_period)
+                avg_historical_volume = historical_volumes.mean()
+                
+                if avg_historical_volume > 0:
+                    volume_ratio = current_volume / avg_historical_volume
+                    if volume_ratio < self.min_volume_ratio:
+                        logger.info(
+                            f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 历史平均 {avg_historical_volume:.0f} "
+                            f"的 {self.min_volume_ratio:.0%} (比例={volume_ratio:.2f})"
+                        )
+                        volume_filter_passed = False
+                else:
+                    # 历史平均成交量为0，使用绝对最小值（如果配置了）
+                    if self.min_volume_absolute and current_volume < self.min_volume_absolute:
+                        logger.info(
+                            f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 绝对最小值 {self.min_volume_absolute:.0f} "
+                            f"(历史平均为0)"
+                        )
+                        volume_filter_passed = False
+            else:
+                # 数据不足，使用绝对最小值（如果配置了）
+                if self.min_volume_absolute and current_volume < self.min_volume_absolute:
+                    logger.info(
+                        f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 绝对最小值 {self.min_volume_absolute:.0f} "
+                        f"(数据不足{self.volume_lookback_period}天)"
+                    )
+                    volume_filter_passed = False
+            
+            if not volume_filter_passed:
                 return signals
             
             # 额外过滤 - 价格波动性（避免高波动不稳定的股票）

@@ -153,7 +153,8 @@ CONFIG = {
         'max_position_notional': 40000.0,      # 单股总仓位上限（美元，严格）
         'min_confidence': 0.65,                # 最小信心度阈值（严格）
         'min_price': 10.0,                     # 最小股价（严格，避免低价股）
-        'min_volume': 40000,                 # 最小日成交量（严格，流动性第一）
+        'min_volume_ratio': 0.5,               # 最小成交量相对历史平均值的比例（0.5=50%，基于历史对比）
+        'volume_lookback_period': 30,          # 计算历史平均成交量的回溯天数
         'lookback_period': 90,                 # 基本面指标回溯天数
         'recent_period': 20,                   # 最近期间（天数）
         'liquidity_weight': 0.35,              # 流动性因子权重（优先级最高）

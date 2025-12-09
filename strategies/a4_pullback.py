@@ -283,7 +283,7 @@ class A4PullbackStrategy(BaseStrategy):
         )
         # 置信度门槛过滤，避免过多低质量信号
         if confidence < self.config.get('min_confidence', 0.5):
-            logger.debug(f"{symbol} 信号置信度过低: {confidence:.1%} < {self.config.get('min_confidence', 0.5):.1%}")
+            logger.info(f"{symbol} 信号置信度过低: {confidence:.1%} < {self.config.get('min_confidence', 0.5):.1%}")
             return None
         
         signal = {
