@@ -284,30 +284,38 @@ class A1MomentumReversalStrategy(BaseStrategy):
             price_change_pct = (avg_cost - current_price) / avg_cost
             unrealized_pnl = abs(position_size) * (avg_cost - current_price)
         
-        # 检查止损条件
-        stop_loss_pct = -self.config['stop_loss_atr_multiple'] * 0.02
+        # 检查止损条件（优先使用百分比止损，如果没有则使用ATR倍数估算）
+        stop_loss_pct = -abs(self.config.get('stop_loss_pct', self.config.get('stop_loss_atr_multiple', 1.5) * 0.02))
         if price_change_pct <= stop_loss_pct:
+            logger.warning(f"⚠️ {symbol} A1触发止损: 亏损{price_change_pct*100:.2f}% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
             return {
                 'symbol': symbol,
                 'signal_type': 'STOP_LOSS',
                 'action': 'SELL' if position_size > 0 else 'BUY',
                 'price': current_price,
-                'reason': f"触发止损: 亏损{price_change_pct*100:.1f}%",
+                'reason': f"触发止损: 亏损{price_change_pct*100:.2f}% (阈值: {abs(stop_loss_pct)*100:.1f}%)",
                 'position_size': abs(position_size),
-                'profit_pct': price_change_pct * 100
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0
             }
         
-        # 检查止盈条件
-        take_profit_pct = self.config['take_profit_atr_multiple'] * 0.02
+        # 检查止盈条件（优先使用百分比止盈，如果没有则使用ATR倍数估算）
+        # 注意：基于ATR的止盈需要实际ATR值，这里使用百分比作为后备
+        take_profit_pct = abs(self.config.get('take_profit_pct', None))
+        if take_profit_pct is None:
+            # 如果没有配置百分比止盈，使用ATR倍数估算（约4-6%）
+            take_profit_pct = self.config.get('take_profit_atr_multiple', 3.0) * 0.02
         if price_change_pct >= take_profit_pct:
+            logger.info(f"✅ {symbol} A1触发止盈: 盈利{price_change_pct*100:.2f}% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
             return {
                 'symbol': symbol,
                 'signal_type': 'TAKE_PROFIT',
                 'action': 'SELL' if position_size > 0 else 'BUY',
                 'price': current_price,
-                'reason': f"触发止盈: 盈利{price_change_pct*100:.1f}%",
+                'reason': f"触发止盈: 盈利{price_change_pct*100:.2f}% (阈值: {take_profit_pct*100:.1f}%)",
                 'position_size': abs(position_size),
-                'profit_pct': price_change_pct * 100
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0
             }
         
         # 快速止损
@@ -335,18 +343,25 @@ class A1MomentumReversalStrategy(BaseStrategy):
                 'profit_pct': price_change_pct * 100
             }
         
-        # 尾盘强制平仓
+        # 尾盘强制平仓（使用配置的时间，如果没有则使用默认15:45）
+        force_close_time_str = self.config.get('force_close_time', '15:45')
+        try:
+            force_close_time = datetime.strptime(force_close_time_str, "%H:%M").time()
+        except:
+            force_close_time = datetime.strptime("15:45", "%H:%M").time()
+        
         current_time_of_day = current_time.time()
-        market_close = datetime.strptime("15:45", "%H:%M").time()
-        if current_time_of_day >= market_close and abs(position_size) > 0:
+        if current_time_of_day >= force_close_time and abs(position_size) > 0:
+            logger.info(f"🕐 {symbol} A1尾盘强制平仓: 当前时间 {current_time_of_day.strftime('%H:%M')} >= {force_close_time_str}")
             return {
                 'symbol': symbol,
                 'signal_type': 'MARKET_CLOSE',
                 'action': 'SELL' if position_size > 0 else 'BUY',
                 'price': current_price,
-                'reason': f"尾盘强制平仓",
+                'reason': f"尾盘强制平仓: {current_time_of_day.strftime('%H:%M')} >= {force_close_time_str}",
                 'position_size': abs(position_size),
-                'profit_pct': price_change_pct * 100
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0
             }
         
         return None

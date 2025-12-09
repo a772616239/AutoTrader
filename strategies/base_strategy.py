@@ -144,29 +144,87 @@ class BaseStrategy:
             price_change_pct = (avg_cost - current_price) / avg_cost
         
         # 简单的退出条件 - 使用配置或默认值
-        stop_loss_pct = -self.config.get('stop_loss_pct', 0.02)
-        take_profit_pct = self.config.get('take_profit_pct', 0.03)
+        stop_loss_pct = -abs(self.config.get('stop_loss_pct', 0.02))  # 确保为负值
+        take_profit_pct = abs(self.config.get('take_profit_pct', 0.03))  # 确保为正值
         
+        # 检查最大持有时间（优先检查分钟级别，适用于日内交易）
+        max_holding_minutes = self.config.get('max_holding_minutes', None)
+        if max_holding_minutes:
+            holding_minutes = (current_time - entry_time).total_seconds() / 60
+            if holding_minutes > max_holding_minutes:
+                return {
+                    'symbol': symbol,
+                    'signal_type': 'MAX_HOLDING_TIME',
+                    'action': 'SELL' if position_size > 0 else 'BUY',
+                    'price': current_price,
+                    'reason': f"超过最大持有时间: {holding_minutes:.0f}分钟 > {max_holding_minutes}分钟",
+                    'position_size': abs(position_size),
+                    'profit_pct': price_change_pct * 100,
+                    'confidence': 1.0
+                }
+        
+        # 检查最大持有天数（适用于多日持仓策略）
+        max_holding_days = self.config.get('max_holding_days', None)
+        if max_holding_days:
+            holding_days = (current_time - entry_time).total_seconds() / (24 * 3600)
+            if holding_days > max_holding_days:
+                return {
+                    'symbol': symbol,
+                    'signal_type': 'MAX_HOLDING_TIME',
+                    'action': 'SELL' if position_size > 0 else 'BUY',
+                    'price': current_price,
+                    'reason': f"超过最大持有时间: {holding_days:.1f}天 > {max_holding_days}天",
+                    'position_size': abs(position_size),
+                    'profit_pct': price_change_pct * 100,
+                    'confidence': 1.0
+                }
+        
+        # 收盘前强制平仓检查（适用于日内交易策略）
+        force_close_time = self.config.get('force_close_time', None)
+        if force_close_time:
+            try:
+                close_time = datetime.strptime(force_close_time, '%H:%M').time()
+                current_time_of_day = current_time.time()
+                if current_time_of_day >= close_time and abs(position_size) > 0:
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'FORCE_CLOSE_BEFORE_MARKET_CLOSE',
+                        'action': 'SELL' if position_size > 0 else 'BUY',
+                        'price': current_price,
+                        'reason': f"收盘前强制平仓: 当前时间 {current_time_of_day.strftime('%H:%M')} >= {force_close_time}",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100,
+                        'confidence': 1.0
+                    }
+            except Exception as e:
+                logger.debug(f"解析force_close_time失败: {e}")
+        
+        # 止损检查（优先检查，保护资金）
         if price_change_pct <= stop_loss_pct:
+            logger.warning(f"⚠️ {symbol} 触发止损: 亏损{price_change_pct*100:.2f}% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
             return {
                 'symbol': symbol,
                 'signal_type': 'STOP_LOSS',
                 'action': 'SELL' if position_size > 0 else 'BUY',
                 'price': current_price,
-                'reason': f"触发止损: 亏损{price_change_pct*100:.1f}%",
+                'reason': f"触发止损: 亏损{price_change_pct*100:.2f}% (阈值: {abs(stop_loss_pct)*100:.1f}%)",
                 'position_size': abs(position_size),
-                'profit_pct': price_change_pct * 100
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0  # 止损信号置信度最高
             }
         
+        # 止盈检查
         if price_change_pct >= take_profit_pct:
+            logger.info(f"✅ {symbol} 触发止盈: 盈利{price_change_pct*100:.2f}% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
             return {
                 'symbol': symbol,
                 'signal_type': 'TAKE_PROFIT',
                 'action': 'SELL' if position_size > 0 else 'BUY',
                 'price': current_price,
-                'reason': f"触发止盈: 盈利{price_change_pct*100:.1f}%",
+                'reason': f"触发止盈: 盈利{price_change_pct*100:.2f}% (阈值: {take_profit_pct*100:.1f}%)",
                 'position_size': abs(position_size),
-                'profit_pct': price_change_pct * 100
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0  # 止盈信号置信度最高
             }
         
         return None
@@ -470,6 +528,46 @@ class BaseStrategy:
         
         logger.info(f"策略 {self.get_strategy_name()} 开始分析周期，共 {len(symbols)} 个标的")
         
+        # 首先检查所有现有持仓的退出条件（即使不在当前扫描列表中）
+        if self.positions:
+            logger.info(f"📊 检查 {len(self.positions)} 个现有持仓的退出条件...")
+            for symbol in list(self.positions.keys()):
+                try:
+                    # 获取当前价格数据
+                    df = data_provider.get_intraday_data(symbol, interval='5m', lookback=50)
+                    if df.empty or len(df) < 5:
+                        # 如果无法获取数据，尝试使用IB获取价格
+                        if self.ib_trader and self.ib_trader.connected:
+                            try:
+                                contract = self.ib_trader.get_contract(symbol)
+                                ticker = self.ib_trader.ib.reqMktData(contract, '', False, False)
+                                self.ib_trader.ib.sleep(0.3)
+                                current_price = ticker.last if ticker.last > 0 else ticker.close
+                                self.ib_trader.ib.cancelMktData(contract)
+                                
+                                if current_price > 0:
+                                    exit_signal = self.check_exit_conditions(symbol, current_price)
+                                    if exit_signal:
+                                        if symbol not in all_signals:
+                                            all_signals[symbol] = []
+                                        all_signals[symbol].append(exit_signal)
+                                        logger.info(f"  ✅ {symbol} 触发退出条件: {exit_signal.get('reason', '')}")
+                            except Exception as e:
+                                logger.debug(f"  无法获取 {symbol} 实时价格: {e}")
+                        continue
+                    
+                    current_price = df['Close'].iloc[-1]
+                    exit_signal = self.check_exit_conditions(symbol, current_price)
+                    if exit_signal:
+                        if symbol not in all_signals:
+                            all_signals[symbol] = []
+                        all_signals[symbol].append(exit_signal)
+                        logger.info(f"  ✅ {symbol} 触发退出条件: {exit_signal.get('reason', '')} (价格: ${current_price:.2f})")
+                except Exception as e:
+                    logger.warning(f"检查 {symbol} 退出条件时出错: {e}")
+                    continue
+        
+        # 然后处理扫描列表中的标的
         for symbol in symbols:
             try:
                 # 增加数据回溯以支持长期均线 (如MA200)
@@ -483,7 +581,9 @@ class BaseStrategy:
                 signals = self.generate_signals(symbol, df, indicators)
                 
                 if signals:
-                    all_signals[symbol] = signals
+                    if symbol not in all_signals:
+                        all_signals[symbol] = []
+                    all_signals[symbol].extend(signals)
                     logger.info(f"  {symbol} 生成 {len(signals)} 个信号")
                     
                     # 执行信号

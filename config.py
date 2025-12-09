@@ -52,7 +52,7 @@ CONFIG = {
         },
         'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
-        'close_all_positions_before_market_close': True,  # 是否在收盘前清仓所有持仓（已启用）
+        'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
     },
     'logging': {
@@ -60,7 +60,7 @@ CONFIG = {
         'file': os.path.join('logs', f'trading_{datetime.now():%Y%m%d_%H%M%S}.log'),
         'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     },
-    'strategy_a1': {  # 动量反转策略配置
+    'strategy_a1': {  # 动量反转策略配置（日内交易）
         'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
@@ -68,8 +68,13 @@ CONFIG = {
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'rsi_overbought': 72,
         'rsi_oversold': 28,
-        'stop_loss_atr_multiple': 1.5,
-        'take_profit_atr_multiple': 3.0,
+        'stop_loss_atr_multiple': 1.5,      # ATR止损倍数（用于仓位计算）
+        'stop_loss_pct': 0.025,             # 止损百分比（2.5%，优先使用）
+        'take_profit_atr_multiple': 3.0,    # ATR止盈倍数（用于仓位计算）
+        'take_profit_pct': 0.045,           # 止盈百分比（4.5%，基于ATR 3.0倍估算，优先使用）
+        'max_holding_minutes': 120,         # 最大持有时间（120分钟，日内交易）
+        'quick_loss_cutoff': -0.03,         # 快速止损阈值（-3%）
+        'force_close_time': '15:45',        # 收盘前强制平仓时间
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
         'trading_start_time': '09:30',
@@ -86,15 +91,16 @@ CONFIG = {
         'zscore_lookback': 20,
         'zscore_entry_threshold': 2.0,
         'zscore_exit_threshold': 0.5,
-        'stop_loss_pct': 0.03,
-        'take_profit_pct': 0.05,
+        'stop_loss_pct': 0.03,              # 止损百分比（3%）
+        'take_profit_pct': 0.05,             # 止盈百分比（5%）
+        'max_holding_days': 5,               # 最大持有天数
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.005,
         'trading_start_time': '09:30',
         'trading_end_time': '16:00',
         'trading_hours_only': True,
     },
-    'strategy_a3': {  # 双均线成交量突破策略配置
+    'strategy_a3': {  # 双均线成交量突破策略配置（日内交易）
         'trading': {
             'initial_capital': 40000.0,  # 初始资金
             'risk_per_trade': 0.02,    # 单笔交易风险 (2% equity) (A6 uses 0.015)
@@ -113,9 +119,11 @@ CONFIG = {
         'volume_sma_period': 20,
         'volume_surge_ratio': 1.5,
         'min_volume_threshold': 500000,
-        'take_profit_pct': 0.03,
-        'take_profit_atr_multiple': 2.0,
-        'max_holding_minutes': 60,
+        'stop_loss_pct': 0.025,            # 止损百分比（2.5%，日内交易）
+        'take_profit_pct': 0.03,           # 止盈百分比（3%）
+        'take_profit_atr_multiple': 2.0,   # 基于ATR的止盈倍数
+        'max_holding_minutes': 60,         # 最大持有时间（60分钟，日内交易）
+        'force_close_time': '15:30',       # 收盘前强制平仓时间
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
         'trading_start_time': '09:45',
@@ -123,7 +131,7 @@ CONFIG = {
         'avoid_open_hour': True,
         'avoid_close_hour': True,
     },
-    'strategy_a4': {  # 回调交易策略配置（斐波那契回撤）
+    'strategy_a4': {  # 回调交易策略配置（斐波那契回撤，多日持仓）
         'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
@@ -147,7 +155,7 @@ CONFIG = {
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
     },
-    'strategy_a5': {  # 多因子AI融合策略配置
+    'strategy_a5': {  # 多因子AI融合策略配置（多日持仓）
         'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.06,
@@ -166,6 +174,9 @@ CONFIG = {
         'buy_threshold': 0.68,                 # 买入复合得分阈值（严格）
         'sell_threshold': 0.55,                # 卖出复合得分阈值（严格）
         'exit_threshold': 0.25,                # 平仓复合得分阈值（更低，快速止损）
+        'stop_loss_pct': 0.02,                 # 止损百分比（2%，重要！）
+        'take_profit_pct': 0.035,              # 止盈百分比（3.5%，优化后）
+        'max_holding_days': 5,                 # 最大持有天数（强制平仓）
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
         'trading_start_time': '09:45',
@@ -173,7 +184,7 @@ CONFIG = {
         'avoid_open_hour': True,
         'avoid_close_hour': True,
     },
-    'strategy_a6': {  # 新闻交易策略配置
+    'strategy_a6': {  # 新闻交易策略配置（日内交易）
         'initial_capital': 40000.0,
         'risk_per_trade': 0.015,              # 新闻交易风险控制更严格
         'max_position_size': 0.04,             # 小仓位，快速进出
@@ -189,6 +200,10 @@ CONFIG = {
         'min_news_relevance': 0.7,             # 最小新闻相关性评分
         'max_news_age_hours': 4,               # 最大新闻年龄（小时）
         'cooldown_after_news_trade': 60,       # 新闻交易后冷却期（分钟）
+        'stop_loss_pct': 0.02,                 # 止损百分比（2%，新闻交易风险大）
+        'take_profit_pct': 0.025,              # 止盈百分比（2.5%，快速锁定利润）
+        'max_holding_minutes': 60,            # 最大持有时间（60分钟，日内交易）
+        'force_close_time': '15:30',          # 收盘前强制平仓时间
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.005,
         'trading_start_time': '09:45',
@@ -196,7 +211,7 @@ CONFIG = {
         'avoid_open_hour': True,
         'avoid_close_hour': True,
     },
-    'strategy_a7': {  # A7 CTA 趋势跟踪策略
+    'strategy_a7': {  # A7 CTA 趋势跟踪策略（中短期持仓）
         'initial_capital': 40000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
@@ -206,7 +221,11 @@ CONFIG = {
         'donchian_exit_period': 20,     # 出场通道周期
         'trend_filter_sma_period': 200, # 慢速趋势线 (MA200)
         'trend_filter_fast_sma_period': 50, # 快速趋势线 (MA50) - 新增：要求 MA50 > MA200
-        'stop_loss_atr_multiple': 2.0,
+        'stop_loss_atr_multiple': 2.0,  # ATR止损倍数
+        'stop_loss_pct': 0.03,           # 止损百分比（3%，作为ATR止损的后备）
+        'take_profit_pct': 0.04,         # 止盈百分比（4%，趋势跟踪可以稍高）
+        'take_profit_atr_multiple': 2.5, # 或使用ATR止盈（2.5倍ATR）
+        'max_holding_days': 10,          # 最大持有天数（趋势跟踪可能较长）
         'ib_order_type': 'LMT', # 使用限价单 (无行情权限需用LMT)
         'ib_limit_offset': -0.003, # 激进单 (Marketable Limit)
         'trading_start_time': '09:45',
