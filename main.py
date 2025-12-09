@@ -321,6 +321,28 @@ class TradingSystem:
         
         return start <= current <= end
     
+    def _check_and_reconnect_ib(self) -> bool:
+        """检查IB连接状态，如果断开则尝试重连"""
+        if not self.ib_trader:
+            logger.debug("IB交易接口未初始化")
+            return False
+        
+        # 检查连接健康状态
+        if self.ib_trader.is_connection_healthy():
+            return True
+        
+        # 连接异常，尝试重连
+        logger.warning("⚠️  IB连接异常，尝试重连...")
+        if self.ib_trader.reconnect():
+            logger.info("✅ IB重连成功")
+            # 更新策略中的ib_trader引用
+            if self.strategy:
+                self.strategy.ib_trader = self.ib_trader
+            return True
+        else:
+            logger.error("❌ IB重连失败，本周期将跳过需要IB的操作")
+            return False
+    
     def trading_cycle(self):
         """交易循环"""
         if not self.is_running:
@@ -335,6 +357,11 @@ class TradingSystem:
         logger.info(f"交易周期 #{self.cycle_count} - 美东时间: {current_time.strftime('%Y-%m-%d %H:%M:%S')} (本地: {local_time.strftime('%H:%M:%S')})")
         logger.info(f"当前策略: {self.strategy.get_strategy_name()}")
         logger.info('='*60)
+        
+        # 检查并确保IB连接正常
+        ib_connected = self._check_and_reconnect_ib()
+        if not ib_connected:
+            logger.warning("⚠️  IB未连接，本周期将跳过需要IB的操作（如清仓、下单等）")
         
         # 检查是否需要收盘前清仓
         close_positions_enabled = self.config['trading'].get('close_all_positions_before_market_close', False)
@@ -357,50 +384,55 @@ class TradingSystem:
                 if current_time_only >= close_time:
                     logger.info(f"⏰ 到达清仓时间 ({close_time_str})，开始清仓所有持仓...")
                     
-                    # 清仓所有持仓（支持单策略和多策略模式）
-                    try:
-                        import config as global_config
-                        symbol_map = global_config.CONFIG.get('symbol_strategy_map')
-                        
-                        if symbol_map and self.ib_trader:
-                            # 多策略模式：从IB获取所有持仓，按策略分组清仓
-                            try:
-                                all_holdings = self.ib_trader.get_holdings()
-                                if all_holdings:
-                                    # 按策略分组持仓
-                                    strategy_positions = {}
-                                    for pos in all_holdings:
-                                        symbol = pos.contract.symbol
-                                        strat_name = symbol_map.get(symbol, self.current_strategy_name)
-                                        if strat_name not in strategy_positions:
-                                            strategy_positions[strat_name] = []
-                                        strategy_positions[strat_name].append(symbol)
-                                    
-                                    # 为每个策略清仓
-                                    for strat_name, symbols in strategy_positions.items():
-                                        try:
-                                            cfg_key = global_config.STRATEGY_CONFIG_MAP.get(strat_name)
-                                            strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
-                                            strat_instance = StrategyFactory.create_strategy(strat_name, config=strat_cfg, ib_trader=self.ib_trader)
-                                            strat_instance.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
-                                        except Exception as e:
-                                            logger.error(f"清仓策略 {strat_name} 时出错: {e}")
-                                else:
-                                    logger.info("当前无持仓，无需清仓")
-                            except Exception as e:
-                                logger.error(f"获取持仓信息失败: {e}，尝试使用当前策略清仓")
+                    # 确保IB连接正常才能执行清仓
+                    if not ib_connected:
+                        logger.error("❌ IB未连接，无法执行清仓操作，请检查IB连接")
+                        # 继续执行其他逻辑，但跳过清仓
+                    else:
+                        # 清仓所有持仓（支持单策略和多策略模式）
+                        try:
+                            import config as global_config
+                            symbol_map = global_config.CONFIG.get('symbol_strategy_map')
+                            
+                            if symbol_map and self.ib_trader:
+                                # 多策略模式：从IB获取所有持仓，按策略分组清仓
+                                try:
+                                    all_holdings = self.ib_trader.get_holdings()
+                                    if all_holdings:
+                                        # 按策略分组持仓
+                                        strategy_positions = {}
+                                        for pos in all_holdings:
+                                            symbol = pos.contract.symbol
+                                            strat_name = symbol_map.get(symbol, self.current_strategy_name)
+                                            if strat_name not in strategy_positions:
+                                                strategy_positions[strat_name] = []
+                                            strategy_positions[strat_name].append(symbol)
+                                        
+                                        # 为每个策略清仓
+                                        for strat_name, symbols in strategy_positions.items():
+                                            try:
+                                                cfg_key = global_config.STRATEGY_CONFIG_MAP.get(strat_name)
+                                                strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
+                                                strat_instance = StrategyFactory.create_strategy(strat_name, config=strat_cfg, ib_trader=self.ib_trader)
+                                                strat_instance.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
+                                            except Exception as e:
+                                                logger.error(f"清仓策略 {strat_name} 时出错: {e}")
+                                    else:
+                                        logger.info("当前无持仓，无需清仓")
+                                except Exception as e:
+                                    logger.error(f"获取持仓信息失败: {e}，尝试使用当前策略清仓")
+                                    self.strategy.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
+                            else:
+                                # 单策略模式：直接清仓当前策略
                                 self.strategy.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
-                        else:
-                            # 单策略模式：直接清仓当前策略
-                            self.strategy.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
-                    except Exception as e:
-                        logger.error(f"执行收盘前清仓时出错: {e}")
-                        import traceback
-                        logger.debug(traceback.format_exc())
-                    
-                    # 清仓后，本周期不再执行其他交易逻辑
-                    logger.info("✅ 清仓完成，本周期结束")
-                    return
+                        except Exception as e:
+                            logger.error(f"执行收盘前清仓时出错: {e}")
+                            import traceback
+                            logger.debug(traceback.format_exc())
+                        
+                        # 清仓后，本周期不再执行其他交易逻辑
+                        logger.info("✅ 清仓完成，本周期结束")
+                        return
                 else:
                     time_diff = (datetime.combine(datetime.today(), close_time) - 
                                 datetime.combine(datetime.today(), current_time_only)).total_seconds() / 60

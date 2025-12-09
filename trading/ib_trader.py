@@ -23,10 +23,40 @@ class IBTrader:
         
         logger.info(f"IB交易接口初始化: {host}:{port} (clientId={client_id})")
     
+    def is_connection_healthy(self) -> bool:
+        """检查IB连接是否健康"""
+        try:
+            if not self.connected:
+                return False
+            # 尝试检查连接状态
+            if hasattr(self.ib, 'isConnected'):
+                return self.ib.isConnected()
+            return self.connected
+        except Exception as e:
+            logger.debug(f"检查IB连接健康状态时出错: {e}")
+            return False
+    
+    def reconnect(self) -> bool:
+        """重新连接IB（先断开再连接）"""
+        try:
+            if self.connected:
+                logger.info("断开现有IB连接...")
+                self.disconnect()
+                time.sleep(1)  # 等待断开完成
+        except Exception as e:
+            logger.warning(f"断开连接时出错: {e}")
+        
+        return self.connect()
+    
     def connect(self) -> bool:
         """连接IB"""
-        if self.connected:
+        if self.connected and self.is_connection_healthy():
             return True
+            
+        # 如果已连接但健康检查失败，重置连接状态
+        if self.connected:
+            logger.warning("IB连接状态异常，将重新连接")
+            self.connected = False
             
         for attempt in range(self.max_retries):
             try:
