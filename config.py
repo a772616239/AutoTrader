@@ -15,7 +15,7 @@ CONFIG = {
     },
     'ib_server': {
         'host': '127.0.0.1',
-        'port': 7497,
+        'port': 7496,
         'client_id': 1,
         'max_retries': 3,
     },
@@ -51,8 +51,8 @@ CONFIG = {
             'start': '09:30',
             'end': '16:00'
         },
-        'allow_orders_outside_trading_hours': True,  # 是否允许在非交易时间提交委托单
-        'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
+        'allow_orders_outside_trading_hours': False,  # 是否允许在非交易时间提交委托单
+        'auto_cancel_orders': True, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
         'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
@@ -63,10 +63,10 @@ CONFIG = {
         'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     },
     'strategy_a1': {  # 动量反转策略配置（日内交易）
-        'initial_capital': 40000.0,
+        'initial_capital': 2000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 700.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'rsi_overbought': 72,
         'rsi_oversold': 28,
@@ -85,10 +85,10 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a2': {  # Z-Score策略配置
-        'initial_capital': 40000.0,
+        'initial_capital': 2000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 700.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'zscore_lookback': 20,
         'zscore_entry_threshold': 2.0,
@@ -104,11 +104,11 @@ CONFIG = {
     },
     'strategy_a3': {  # 双均线成交量突破策略配置（日内交易）
         'trading': {
-            'initial_capital': 40000.0,  # 初始资金
+            'initial_capital': 2000.0,  # 初始资金
             'risk_per_trade': 0.02,    # 单笔交易风险 (2% equity) (A6 uses 0.015)
             'max_position_size': 0.1,  # 最大仓位 (10% equity)
             'min_cash_buffer': 0.1,    # 最小现金缓冲
-            'per_trade_notional_cap': 4000.0, # 单笔名义价值上限 (USD)
+            'per_trade_notional_cap': 700.0, # 单笔名义价值上限 (USD)
             'max_position_notional': 60000.0, # 单个标的持仓名义价值上限 (USD)
             
             # 交易时间
@@ -134,10 +134,10 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a4': {  # 回调交易策略配置（斐波那契回撤，多日持仓）
-        'initial_capital': 40000.0,
+        'initial_capital': 2000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
+        'per_trade_notional_cap': 700.0,  # 单笔交易美元上限
         'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
         'trend_ma_period': 80,              # 长期趋势均线
         'trend_confirmation_bars': 3,      # 趋势确认K线数
@@ -158,10 +158,10 @@ CONFIG = {
         'ib_limit_offset': 0.01,
     },
     'strategy_a5': {  # 多因子AI融合策略配置（多日持仓）
-        'initial_capital': 40000.0,
+        'initial_capital': 2000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.06,
-        'per_trade_notional_cap': 4000.0,      # 单笔交易美元上限（严格）
+        'per_trade_notional_cap': 700.0,      # 单笔交易美元上限（严格）
         'max_position_notional': 40000.0,      # 单股总仓位上限（美元，严格）
         'min_confidence': 0.65,                # 最小信心度阈值（严格）
         'min_price': 10.0,                     # 最小股价（严格，避免低价股）
@@ -187,10 +187,10 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a6': {  # 新闻交易策略配置（日内交易）
-        'initial_capital': 40000.0,
+        'initial_capital': 2000.0,
         'risk_per_trade': 0.015,              # 新闻交易风险控制更严格
         'max_position_size': 0.04,             # 小仓位，快速进出
-        'per_trade_notional_cap': 4000.0,     # 单笔交易美元上限（更严格）
+        'per_trade_notional_cap': 700.0,     # 单笔交易美元上限（更严格）
         'max_position_notional': 20000.0,     # 单股总仓位上限（美元，更严格）
         'polygon_api_key': '0SgE61bAeLNqkcDks0y0FDtP2t7l_8an',  # 🔴 需要替换为您的Polygon API密钥
         # 获取API密钥: https://polygon.io/
@@ -214,10 +214,10 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a7': {  # A7 CTA 趋势跟踪策略（中短期持仓）
-        'initial_capital': 40000.0,
+        'initial_capital': 2000.0,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
-        'per_trade_notional_cap': 4000.0,
+        'per_trade_notional_cap': 700.0,
         'max_position_notional': 60000.0,
         'donchian_entry_period': 60,    # 入场通道周期 (调大到60)
         'donchian_exit_period': 20,     # 出场通道周期
