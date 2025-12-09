@@ -193,32 +193,32 @@ class TradingSystem:
                 'client_id': 1
             },
             'trading': {
-                'symbols': [
-    # A1 动量反转（原 5 + 新增 2）
-    'AMD', 'META', 'INTC', 'RIVN', 'COIN',
-    'SQ', 'ZM',
+#                 'symbols': [
+#     # A1 动量反转（原 5 + 新增 2）
+#     'AMD', 'META', 'INTC', 'RIVN', 'COIN',
+#     'SQ', 'ZM',
 
-    # A2 Z-Score 均值回归（原 5 + 新增 2）
-    'XOM', 'CVX', 'JPM', 'PFE', 'JNJ',
-    'BAC', 'GS',
+#     # A2 Z-Score 均值回归（原 5 + 新增 2）
+#     'XOM', 'CVX', 'JPM', 'PFE', 'JNJ',
+#     'BAC', 'GS',
 
-    # A3 双均线量能（原 5 + 新增 2）
-    'TEAM', 'GOOGL', 'WDC', 'CRM', 'ORCL',
-    'AVGO', 'IBM',
+#     # A3 双均线量能（原 5 + 新增 2）
+#     'TEAM', 'GOOGL', 'WDC', 'CRM', 'ORCL',
+#     'AVGO', 'IBM',
 
-    # A4 回调买入（原 5 + 新增 2）
-    'AMZN', 'BKNG', 'TSLA', 'NFLX', 'DIS',
-    'NKE', 'SBUX',
+#     # A4 回调买入（原 5 + 新增 2）
+#     'AMZN', 'BKNG', 'TSLA', 'NFLX', 'DIS',
+#     'NKE', 'SBUX',
 
-    # A5 多因子 AI（原 5 + 新增 2）
-    'NVDA', 'MSFT', 'ETN', 'SNOW', 'AI',
-    'PLTR', 'DDOG',
+#     # A5 多因子 AI（原 5 + 新增 2）
+#     'NVDA', 'MSFT', 'ETN', 'SNOW', 'AI',
+#     'PLTR', 'DDOG',
 
-    # A7 CTA 趋势（原 5 + 新增 2）
-    'OKLO', 'SMCI', 'LEU', 'TSM', 'BA',
-    'ASML', 'LLY'
-]
-,
+#     # A7 CTA 趋势（原 5 + 新增 2）
+#     'OKLO', 'SMCI', 'LEU', 'TSM', 'BA',
+#     'ASML', 'LLY'
+# ]
+# ,
                 'scan_interval_minutes': 1,
                 'trading_hours': {
                     'start': '00:00',
