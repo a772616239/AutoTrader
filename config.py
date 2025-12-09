@@ -3,6 +3,7 @@
 配置文件
 """
 import os
+import json
 from datetime import datetime
 
 # 基本配置
@@ -317,6 +318,11 @@ preselect_a2 = {
 merged_map = default_symbol_map.copy()
 merged_map.update(preselect_a2)
 CONFIG['symbol_strategy_map'] = merged_map
+
+# 持久化映射到文件
+os.makedirs('config', exist_ok=True)
+with open('config/symbol_strategy_map.json', 'w') as f:
+    json.dump(merged_map, f, indent=4)
 
 # 打印最终的策略映射
 a1_symbols = [s for s, strat in merged_map.items() if strat == 'a1']

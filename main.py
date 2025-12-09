@@ -9,6 +9,7 @@ import time
 import schedule
 import warnings
 import logging
+import importlib
 from datetime import datetime
 from typing import Dict, List
 try:
@@ -122,6 +123,7 @@ class TradingSystem:
         self.is_running = False
         self.cycle_count = 0
         self.last_signals = {}
+        self.config_needs_reload = False
         
         logger.info("=" * 70)
         logger.info("多策略日内交易系统")
@@ -129,7 +131,7 @@ class TradingSystem:
         logger.info("=" * 70)
         logger.info(f"日志文件: {log_file}")
     
-    def _load_config(self, config_file: str) -> Dict:
+    def _load_config(self, config_file: str = None, force_reload: bool = False) -> Dict:
         """加载配置"""
         # 默认配置（作为后备）
         default_strategy_config = {
@@ -147,12 +149,23 @@ class TradingSystem:
                 'a2': 2,
             }
         }
-        
+
         # 首先尝试从 config.py 加载配置
         try:
-            import config as global_config
-            if hasattr(global_config, 'CONFIG'):
+            if self.config_module and force_reload:
+                # 重新加载已导入的模块
+                self.config_module = importlib.reload(self.config_module)
+                logger.info("🔄 已重新加载 config.py")
+            elif not self.config_module:
+                # 首次导入
+                import config as global_config
+                self.config_module = global_config
                 logger.info("✅ 从 config.py 加载配置")
+            else:
+                # 使用已缓存的模块
+                global_config = self.config_module
+
+            if hasattr(global_config, 'CONFIG'):
                 # 使用全局配置，但保留默认值作为后备
                 config = global_config.CONFIG.copy()
                 # 确保必要的配置键存在
@@ -350,6 +363,26 @@ class TradingSystem:
             return
         
         self.cycle_count += 1
+
+        # 检查是否需要重新加载配置
+        if self.config_needs_reload:
+            logger.info("🔄 检测到配置更新请求，重新加载配置...")
+            self.config = self._load_config(force_reload=True)
+            self.config_needs_reload = False
+            logger.info("✅ 配置已重新加载")
+
+        # 检查外部重新加载请求（API调用后）
+        if os.path.exists('config/.reload_needed'):
+            try:
+                with open('config/.reload_needed', 'r') as f:
+                    reason = f.read().strip()
+                logger.info(f"🔄 检测到外部配置更新请求: {reason}，重新加载配置...")
+                self.config = self._load_config(force_reload=True)
+                os.remove('config/.reload_needed')
+                logger.info("✅ 配置已重新加载")
+            except Exception as e:
+                logger.warning(f"处理重新加载请求失败: {e}")
+
         current_time = self._get_eastern_time()  # 使用美东时间
         local_time = datetime.now()
         

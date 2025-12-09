@@ -626,9 +626,10 @@
         const volumeSeries = chart.addHistogramSeries({
             color: '#26a69a',
             priceFormat: { type: 'volume' },
-            priceScaleId: '', // Overlay
-            scaleMargins: { top: 0.3, bottom: -0.5 },
+            priceScaleId: 'volume', // Dedicated volume scale to avoid jitter
+            scaleMargins: { top: 0.8, bottom: 0 },
         });
+        const volumeScale = chart.priceScale('volume');
 
         // --- Sub Chart Setup ---
         const subChartContainer = document.getElementById('sub-chart-container');
@@ -671,6 +672,7 @@
         let currentData = [];
         let dataMap = new Map();
         let tradesMap = new Map(); // Map<timestamp, trade> for quick lookup
+        let currentMaxVolume = 0;
 
         // --- Functions ---
         async function loadSymbol(symbol) {
@@ -711,6 +713,7 @@
             // Clear previous trades data
             tradesMap.clear();
             updateTradeInfoPanel(null);
+            currentMaxVolume = 0;
 
             try {
                 let period = '1y';
@@ -784,6 +787,13 @@
                     color: d.close > d.open ? '#238636' : '#da3633'
                 }));
                 volumeSeries.setData(volData);
+                currentMaxVolume = Math.max(...volData.map(v => v.value || 0), 0);
+                if (currentMaxVolume > 0) {
+                    volumeScale.applyOptions({ autoScale: false });
+                    volumeScale.setPriceRange({ minValue: 0, maxValue: currentMaxVolume * 1.2 });
+                } else {
+                    volumeScale.applyOptions({ autoScale: true });
+                }
 
                 updateIndicators();
 
@@ -918,6 +928,14 @@
 
             const showVol = document.getElementById('btn-vol').classList.contains('active');
             volumeSeries.applyOptions({ visible: showVol });
+            if (showVol) {
+                if (currentMaxVolume > 0) {
+                    volumeScale.setAutoScale(false);
+                    volumeScale.setPriceRange({ minValue: 0, maxValue: currentMaxVolume * 1.2 });
+                } else {
+                    volumeScale.setAutoScale(true);
+                }
+            }
 
             // Subchart
             let subType = 'none';
@@ -1124,6 +1142,13 @@
                         color: d.close > d.open ? '#238636' : '#da3633'
                     }));
                     volumeSeries.setData(volData);
+                    currentMaxVolume = Math.max(...volData.map(v => v.value || 0), currentMaxVolume);
+                    if (currentMaxVolume > 0) {
+                        volumeScale.setAutoScale(false);
+                        volumeScale.setPriceRange({ minValue: 0, maxValue: currentMaxVolume * 1.2 });
+                    } else {
+                        volumeScale.setAutoScale(true);
+                    }
 
                     // Update others... simple reload for now
                     updateIndicators();
@@ -1225,7 +1250,8 @@
             dropdown.onchange = async () => {
                 const newStrategy = dropdown.value;
                 try {
-                    const response = await fetch(`/api/update-strategy?symbol=${symbol}&strategy=${newStrategy}`);
+                    // Update runtime strategy mapping without touching config.py
+                    const response = await fetch(`/api/runtime-strategy?symbol=${symbol}&strategy=${newStrategy}`);
                     const result = await response.json();
 
                     if (result.success) {
@@ -1265,43 +1291,39 @@
         // Helper function to find trade at or near given time
         function findTradeAtTime(time) {
             if (!time || tradesMap.size === 0) {
-                console.log('findTradeAtTime: no time or empty tradesMap', time, tradesMap.size);
                 return null;
             }
-            
+
             // First try direct string match (for date strings like "2024-01-15")
             if (typeof time === 'string') {
                 if (tradesMap.has(time)) {
-                    console.log('findTradeAtTime: found by string match', time);
                     return tradesMap.get(time);
                 }
             }
-            
+
             // Convert time to Unix timestamp
             let unixTime;
             let dateStr = null;
-            
+
             if (typeof time === 'number') {
                 unixTime = time;
             } else if (typeof time === 'object' && time.year) {
                 // Convert LightweightCharts time object to Unix timestamp
                 const date = new Date(time.year, time.month - 1, time.day);
                 unixTime = Math.floor(date.getTime() / 1000);
-                
+
                 // Also try date string format
                 dateStr = `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
                 if (tradesMap.has(dateStr)) {
-                    console.log('findTradeAtTime: found by date string', dateStr);
                     return tradesMap.get(dateStr);
                 }
             } else {
-                console.log('findTradeAtTime: unsupported time format', typeof time, time);
+                // Unsupported time format
                 return null;
             }
 
             // Try exact Unix timestamp match
             if (tradesMap.has(unixTime)) {
-                console.log('findTradeAtTime: found by Unix timestamp', unixTime);
                 return tradesMap.get(unixTime);
             }
 
@@ -1322,12 +1344,6 @@
                     }
                 }
             });
-
-            if (closestTrade) {
-                console.log('findTradeAtTime: found closest trade', minDiff, 'seconds away');
-            } else {
-                console.log('findTradeAtTime: no trade found for time', time, 'unixTime', unixTime, 'dateStr', dateStr);
-            }
 
             return closestTrade;
         }

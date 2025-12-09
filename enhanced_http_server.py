@@ -60,9 +60,19 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         elif path == '/api/update-strategy':
             self._handle_update_strategy_api(parsed)
             return
+        elif path == '/api/runtime-strategy':
+            self._handle_runtime_strategy_api(parsed)
+            return
             
         # 404
         self.send_error(404, "File not found")
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
     def _serve_file(self, filename):
         filepath = os.path.join(self.web_dir, filename)
@@ -378,6 +388,41 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             
             self._send_json_response({'success': True, 'symbol': symbol, 'strategy': strategy})
             
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
+
+    def _handle_runtime_strategy_api(self, parsed):
+        """仅更新运行时的策略映射，不写入 config.py。"""
+        try:
+            params = parse_qs(parsed.query)
+            symbol = params.get('symbol', [None])[0]
+            strategy = params.get('strategy', [None])[0]
+
+            if not symbol or not strategy:
+                self._send_json_response({'success': False, 'error': 'Missing symbol or strategy'})
+                return
+
+            # 动态导入并更新内存中的 CONFIG
+            import importlib
+            import sys
+            if os.getcwd() not in sys.path:
+                sys.path.append(os.getcwd())
+            config_module = importlib.import_module('config')
+            # 刷新模块，确保取到最新 CONFIG 引用
+            importlib.reload(config_module)
+
+            cfg = config_module.CONFIG
+            symbol_map = cfg.get('symbol_strategy_map', {})
+            symbol_map[symbol] = strategy.lower()
+            cfg['symbol_strategy_map'] = symbol_map
+
+            # 创建重新加载标志文件
+            os.makedirs('config', exist_ok=True)
+            with open('config/.reload_needed', 'w') as f:
+                f.write(f"{datetime.now().isoformat()}: Strategy updated for {symbol} to {strategy}")
+
+            # 返回更新后的映射
+            self._send_json_response({'success': True, 'symbol': symbol, 'strategy': strategy})
         except Exception as e:
             self._send_json_response({'success': False, 'error': str(e)})
 
