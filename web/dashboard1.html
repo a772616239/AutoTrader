@@ -52,6 +52,7 @@
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         main {
@@ -104,6 +105,31 @@
             background-color: var(--accent-color);
             color: white;
             border-color: var(--accent-color);
+        }
+
+        #watchlist {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+        }
+
+        /* Custom scrollbar styling */
+        #watchlist::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #watchlist::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+
+        #watchlist::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        #watchlist::-webkit-scrollbar-thumb:hover {
+            background: #484f58;
         }
 
         .watchlist-item {
