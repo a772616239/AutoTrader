@@ -268,10 +268,14 @@ class BaseStrategy:
         if self.ib_trader:
             try:
                 available_funds = self.ib_trader.get_available_funds()
+                logger.info(f"从IB获取可用资金: {available_funds}")
                 if available_funds > 0:
                     self.equity = available_funds
+                    logger.info(f"更新equity为IB可用资金: {self.equity}")
+                else:
+                    logger.warning(f"IB可用资金为0，使用默认equity: {self.equity}")
             except Exception as e:
-                logger.info(f"获取IB可用资金失败: {e}")
+                logger.info(f"获取IB可用资金失败: {e}, 使用默认equity: {self.equity}")
         
         if self.config.get('max_active_positions'):
             if len(self.positions) >= int(self.config['max_active_positions']):
@@ -305,6 +309,7 @@ class BaseStrategy:
     
     def execute_signal(self, signal: Dict, current_price: float, force_market_order: bool = False) -> Dict:
         """执行交易信号 - 子类可以重写此方法"""
+        logger.info(f"执行交易信号: {signal['symbol']}, {signal['action']} {signal['position_size']} shares")
         if signal['position_size'] <= 0:
             logger.info(f"无效仓位: {signal['position_size']}")
             return {'status': 'REJECTED', 'reason': '无效仓位'}
@@ -607,6 +612,7 @@ class BaseStrategy:
                 df = data_provider.get_intraday_data(symbol, interval='5m', lookback=300)
                 
                 if df.empty or len(df) < 30:
+                    logger.info(f"跳过 {symbol}，数据不足")
                     continue
                 
                 indicators = data_provider.get_technical_indicators(symbol, '1d', '5m')

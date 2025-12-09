@@ -260,7 +260,8 @@ class IBTrader:
         获取账户净值
         """
         summary = self.get_account_summary()
-        
+        logger.debug(f"账户摘要内容: {summary}")
+
         if tag in summary:
             try:
                 value = float(summary[tag]['value'])
@@ -268,13 +269,16 @@ class IBTrader:
                 return value
             except:
                 logger.error(f"无法解析账户{tag}值: {summary[tag]['value']}")
-        
+
         logger.warning(f"未找到账户字段: {tag}")
         return 0.0
     
     def get_available_funds(self) -> float:
         """获取可用资金"""
-        return self.get_account_value('AvailableFunds')
+        logger.info(f"开始获取可用资金，连接状态: {self.connected}")
+        funds = self.get_account_value('AvailableFunds')
+        logger.info(f"获取到的可用资金: {funds}")
+        return funds
     
     def get_net_liquidation(self) -> float:
         """获取净资产"""

@@ -626,8 +626,8 @@
         const volumeSeries = chart.addHistogramSeries({
             color: '#26a69a',
             priceFormat: { type: 'volume' },
-            priceScaleId: 'volume', // Dedicated volume scale to avoid jitter
-            scaleMargins: { top: 0.8, bottom: 0 },
+            priceScaleId: '', // Overlay
+            scaleMargins: { top: 0.3, bottom: -0.5 },
         });
         const volumeScale = chart.priceScale('volume');
 
