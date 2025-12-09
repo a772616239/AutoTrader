@@ -309,6 +309,62 @@
             border-bottom: none;
         }
 
+        /* Trade Info Panel */
+        .trade-info-panel {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 20;
+            font-size: 12px;
+            font-family: 'SF Mono', 'Roboto Mono', monospace;
+            line-height: 18px;
+            color: #c9d1d9;
+            pointer-events: none;
+            background: rgba(13, 17, 23, 0.85);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(48, 54, 61, 0.6);
+            backdrop-filter: blur(4px);
+            min-width: 200px;
+            max-width: 300px;
+            display: none;
+        }
+
+        .trade-info-panel.visible {
+            display: block;
+        }
+
+        .trade-info-title {
+            font-weight: bold;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .trade-info-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 4px;
+        }
+
+        .trade-info-label {
+            color: #8b949e;
+        }
+
+        .trade-info-value {
+            color: #e6edf3;
+            font-weight: 600;
+        }
+
+        .trade-info-buy {
+            color: #2196F3;
+        }
+
+        .trade-info-sell {
+            color: #FFC107;
+        }
+
         /* Mobile Responsive Design */
         @media (max-width: 600px) {
 
@@ -543,6 +599,7 @@
 
             <div id="chart-container">
                 <div id="chart-legend" class="chart-legend"></div>
+                <div id="trade-info-panel" class="trade-info-panel"></div>
             </div>
             <div id="sub-chart-container" style="flex: 1; border-top: 1px solid var(--border-color); display: none;">
             </div>
@@ -613,6 +670,7 @@
         let currentInterval = localStorage.getItem('lastInterval') || '1d';
         let currentData = [];
         let dataMap = new Map();
+        let tradesMap = new Map(); // Map<timestamp, trade> for quick lookup
 
         // --- Functions ---
         async function loadSymbol(symbol) {
@@ -649,6 +707,10 @@
         async function fetchData() {
             const loading = document.getElementById('loading');
             loading.classList.add('visible');
+            
+            // Clear previous trades data
+            tradesMap.clear();
+            updateTradeInfoPanel(null);
 
             try {
                 let period = '1y';
@@ -968,40 +1030,42 @@
                     return;
                 }
 
+                // Clear previous trades map
+                tradesMap.clear();
+
                 const tradeMarkers = trades.map(t => {
                     const tradeDate = new Date(t.timestamp);
                     const priceVal = t.price || t.entry_price || 'N/A';
                     const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
 
-                    let text = `${t.action}@ ${priceDisp}`;
-                    if (t.size) text += ` * ${t.size}`;
-                    if (t.strategy) text += ` | ${t.strategy}`;
-
-                    // Add order status emoji at the end
-                    const orderStatus = t.order_status || t.status || '';
-                    if (orderStatus === 'Filled') {
-                        text += ' ✅';
-                    } else if (orderStatus === 'Cancelled') {
-                        text += ' ❎';
-                    } else if (orderStatus === 'PreSubmitted') {
-                        text += ' ⌛️';
-                    }
-
                     // Always use Unix timestamp for markers (Lightweight Charts handles conversion)
                     const markerTime = Math.floor(tradeDate.getTime() / 1000);
+
+                    // Store trade data in map for crosshair lookup
+                    // Store by Unix timestamp
+                    tradesMap.set(markerTime, t);
+                    
+                    // Also store by date string format (YYYY-MM-DD) for daily charts
+                    const dateStr = `${tradeDate.getFullYear()}-${String(tradeDate.getMonth() + 1).padStart(2, '0')}-${String(tradeDate.getDate()).padStart(2, '0')}`;
+                    tradesMap.set(dateStr, t);
+
+                    // Only show emoji, no text
+                    const emoji = t.action === 'BUY' ? '🚀' : '💰';
 
                     return {
                         time: markerTime,
                         position: t.action === 'BUY' ? 'belowBar' : 'aboveBar',
                         color: t.action === 'BUY' ? '#2196F3' : '#FFC107',
                         shape: 'text',
-                        text: t.action === 'BUY' ? '🚀' + text : '💰' + text,
+                        text: emoji,
                     };
                 });
 
                 tradeMarkers.sort((a, b) => a.time - b.time);
 
                 console.log(`Created ${tradeMarkers.length} markers:`, tradeMarkers);
+                console.log('Trades map size:', tradesMap.size);
+                console.log('Trades map keys (first 5):', Array.from(tradesMap.keys()).slice(0, 5));
 
                 candleSeries.setMarkers([...daySeparators, ...tradeMarkers]);
 
@@ -1187,6 +1251,8 @@
 
         // --- Legend Logic ---
         const legend = document.getElementById('chart-legend');
+        const tradeInfoPanel = document.getElementById('trade-info-panel');
+        
         function formatVal(val) { return (val !== undefined && val !== null) ? val.toFixed(2) : 'N/A'; }
         function formatNumber(num) {
             if (num === undefined || num === null || isNaN(num)) return 'N/A';
@@ -1196,11 +1262,182 @@
             return num.toString();
         }
 
+        // Helper function to find trade at or near given time
+        function findTradeAtTime(time) {
+            if (!time || tradesMap.size === 0) {
+                console.log('findTradeAtTime: no time or empty tradesMap', time, tradesMap.size);
+                return null;
+            }
+            
+            // First try direct string match (for date strings like "2024-01-15")
+            if (typeof time === 'string') {
+                if (tradesMap.has(time)) {
+                    console.log('findTradeAtTime: found by string match', time);
+                    return tradesMap.get(time);
+                }
+            }
+            
+            // Convert time to Unix timestamp
+            let unixTime;
+            let dateStr = null;
+            
+            if (typeof time === 'number') {
+                unixTime = time;
+            } else if (typeof time === 'object' && time.year) {
+                // Convert LightweightCharts time object to Unix timestamp
+                const date = new Date(time.year, time.month - 1, time.day);
+                unixTime = Math.floor(date.getTime() / 1000);
+                
+                // Also try date string format
+                dateStr = `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
+                if (tradesMap.has(dateStr)) {
+                    console.log('findTradeAtTime: found by date string', dateStr);
+                    return tradesMap.get(dateStr);
+                }
+            } else {
+                console.log('findTradeAtTime: unsupported time format', typeof time, time);
+                return null;
+            }
+
+            // Try exact Unix timestamp match
+            if (tradesMap.has(unixTime)) {
+                console.log('findTradeAtTime: found by Unix timestamp', unixTime);
+                return tradesMap.get(unixTime);
+            }
+
+            // Find closest trade within tolerance
+            // For 1m charts: 5 minutes (300 seconds) - trades should be very close to candle time
+            // For daily charts: 24 hours (86400 seconds) - trades can be anywhere in the day
+            const tolerance = currentInterval === '1m' ? 300 : 86400; // 5 minutes or 1 day
+            let closestTrade = null;
+            let minDiff = Infinity;
+
+            tradesMap.forEach((trade, tradeTime) => {
+                // Only compare numeric timestamps
+                if (typeof tradeTime === 'number') {
+                    const diff = Math.abs(tradeTime - unixTime);
+                    if (diff < tolerance && diff < minDiff) {
+                        minDiff = diff;
+                        closestTrade = trade;
+                    }
+                }
+            });
+
+            if (closestTrade) {
+                console.log('findTradeAtTime: found closest trade', minDiff, 'seconds away');
+            } else {
+                console.log('findTradeAtTime: no trade found for time', time, 'unixTime', unixTime, 'dateStr', dateStr);
+            }
+
+            return closestTrade;
+        }
+
+        // Mapping for order types and signal types
+        const ORDER_TYPE_MAP = {
+            'LMT': '限价',
+            'MKT': '市价',
+            'STP': '止损',
+            'STP_LMT': '止损限价'
+        };
+
+        const SIGNAL_TYPE_MAP = {
+            'CTA_BREAKOUT_LONG': 'CTA 突破做多',
+            'CTA_BREAKOUT_SHORT': 'CTA 突破做空',
+            'MA_CROSSOVER_BUY': '均线金叉买入',
+            'MA_CROSSOVER_SELL': '均线死叉卖出',
+            'MEAN_REVERSION_BUY': '均值回归买入',
+            'MEAN_REVERSION_SELL': '均值回归卖出',
+            'MOMENTUM_BUY': '动量买入',
+            'MOMENTUM_SELL': '动量卖出',
+            'AI_MULTI_FACTOR_BUY': '多因子买入',
+            'RSI_OVERBOUGHT_SELL': 'RSI 超买卖出',
+            'RSI_OVERSOLD_BUY': 'RSI 超卖买入'
+        };
+
+        // Function to update trade info panel
+        function updateTradeInfoPanel(trade) {
+            if (!trade) {
+                tradeInfoPanel.classList.remove('visible');
+                return;
+            }
+
+            const priceVal = trade.price || trade.entry_price || 'N/A';
+            const priceDisp = (typeof priceVal === 'number') ? priceVal.toFixed(2) : priceVal;
+            const orderStatus = trade.order_status || trade.status || '';
+            
+            let statusEmoji = '';
+            if (orderStatus === 'Filled') {
+                statusEmoji = ' ✅';
+            } else if (orderStatus === 'Cancelled') {
+                statusEmoji = ' ❎';
+            } else if (orderStatus === 'PreSubmitted') {
+                statusEmoji = ' ⌛️';
+            }
+
+            const actionClass = trade.action === 'BUY' ? 'trade-info-buy' : 'trade-info-sell';
+            const actionText = trade.action === 'BUY' ? '买入' : '卖出';
+
+            const tradeDate = new Date(trade.timestamp);
+            const dateStr = tradeDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            tradeInfoPanel.innerHTML = `
+                <div class="trade-info-title">
+                    <span class="${actionClass}">${trade.action === 'BUY' ? '🚀' : '💰'} ${actionText}</span>${statusEmoji}
+                </div>
+                <div class="trade-info-row">
+                    <span class="trade-info-label">价格:</span>
+                    <span class="trade-info-value">${priceDisp}</span>
+                </div>
+                ${trade.order_type ? `
+                <div class="trade-info-row">
+                    <span class="trade-info-label">委托类型:</span>
+                    <span class="trade-info-value">${ORDER_TYPE_MAP[trade.order_type] || trade.order_type}</span>
+                </div>
+                ` : ''}
+                ${trade.size ? `
+                <div class="trade-info-row">
+                    <span class="trade-info-label">数量:</span>
+                    <span class="trade-info-value">${trade.size}</span>
+                </div>
+                ` : ''}
+                ${trade.signal_type ? `
+                <div class="trade-info-row">
+                    <span class="trade-info-label">信号:</span>
+                    <span class="trade-info-value">${SIGNAL_TYPE_MAP[trade.signal_type] || trade.signal_type}</span>
+                </div>
+                ` : ''}
+                ${trade.strategy ? `
+                <div class="trade-info-row">
+                    <span class="trade-info-label">策略:</span>
+                    <span class="trade-info-value">${trade.strategy}</span>
+                </div>
+                ` : ''}
+                <div class="trade-info-row">
+                    <span class="trade-info-label">时间:</span>
+                    <span class="trade-info-value" style="font-size: 11px;">${dateStr}</span>
+                </div>
+                ${orderStatus ? `
+                <div class="trade-info-row">
+                    <span class="trade-info-label">状态:</span>
+                    <span class="trade-info-value">${orderStatus}</span>
+                </div>
+                ` : ''}
+            `;
+
+            tradeInfoPanel.classList.add('visible');
+        }
+
         chart.subscribeCrosshairMove(param => {
             // Hide legend for 1 minute interval as requested
-            if (currentInterval === '1m') {
+            const is1mInterval = currentInterval === '1m';
+            if (is1mInterval) {
                 legend.style.display = 'none';
-                return;
             }
 
             const valid = param.time && param.point.x >= 0 && param.point.x < chartContainer.clientWidth && param.point.y >= 0 && param.point.y < chartContainer.clientHeight;
@@ -1215,6 +1452,13 @@
                         bbU: param.seriesData.get(bbUpperSeries)?.value,
                         bbL: param.seriesData.get(bbLowerSeries)?.value
                     };
+
+                    // Check for trade at this time (works for all intervals including 1m)
+                    const trade = findTradeAtTime(c.time);
+                    if (trade) {
+                        console.log('Found trade at time:', c.time, trade);
+                    }
+                    updateTradeInfoPanel(trade);
 
                     // Lookup extra fields using Map
                     let lookupKey = c.time;
@@ -1231,17 +1475,32 @@
                         // Fallback debug
                         // console.log('Lookup failed for', lookupKey);
                     }
+                } else {
+                    // No candle data, hide trade panel
+                    updateTradeInfoPanel(null);
                 }
-            } else if (currentData.length) {
-                const l = currentData[currentData.length - 1];
-                d = {
-                    open: l.open, high: l.high, low: l.low, close: l.close, time: l.time, volume: l.volume,
-                    ma5: l.MA5, ma10: l.MA10, bbU: l.BB_upper, bbL: l.BB_lower,
-                    Turnover: l.Turnover, TurnoverRate: l.TurnoverRate, PE: l.PE
-                };
-            } else { legend.style.display = 'none'; return; }
+            } else {
+                // Mouse is outside chart, hide trade panel
+                updateTradeInfoPanel(null);
+                if (currentData.length) {
+                    const l = currentData[currentData.length - 1];
+                    d = {
+                        open: l.open, high: l.high, low: l.low, close: l.close, time: l.time, volume: l.volume,
+                        ma5: l.MA5, ma10: l.MA10, bbU: l.BB_upper, bbL: l.BB_lower,
+                        Turnover: l.Turnover, TurnoverRate: l.TurnoverRate, PE: l.PE
+                    };
+                } else { 
+                    if (!is1mInterval) {
+                        legend.style.display = 'none';
+                    }
+                    return; 
+                }
+            }
 
-            legend.style.display = 'block';
+            // Only show legend for non-1m intervals
+            if (!is1mInterval) {
+                legend.style.display = 'block';
+            }
             const chg = d.close - d.open;
             const pct = (chg / d.open) * 100;
             const color = chg >= 0 ? 'legend-up' : 'legend-down';
