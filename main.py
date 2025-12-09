@@ -482,9 +482,15 @@ class TradingSystem:
                 logger.debug(traceback.format_exc())
         
         # 检查交易时间
+        allow_outside_hours = self.config['trading'].get('allow_orders_outside_trading_hours', False)
+        force_market_orders = False
         if not self._within_trading_hours():
-            logger.info("⏸️  非交易时间，跳过...")
-            return
+            if not allow_outside_hours:
+                logger.info("⏸️  非交易时间，跳过...")
+                return
+            else:
+                force_market_orders = True
+                logger.info("⏸️  非交易时间，使用市价单模式...")
         
         # 周期开始前取消所有未完成委托 (如果配置启用)
         if self.config['trading'].get('auto_cancel_orders', True):

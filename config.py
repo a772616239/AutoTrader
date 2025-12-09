@@ -51,6 +51,7 @@ CONFIG = {
             'start': '09:30',
             'end': '16:00'
         },
+        'allow_orders_outside_trading_hours': True,  # 是否允许在非交易时间提交委托单
         'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
         'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
