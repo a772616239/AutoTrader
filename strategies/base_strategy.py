@@ -8,6 +8,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import logging
+from config import CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -377,8 +378,9 @@ class BaseStrategy:
             except:
                 pass
             if current_pos <= 0:
-                logger.info(f"无持仓，禁止卖出: {signal['symbol']}")
-                return {'status': 'REJECTED', 'reason': '无持仓，禁止卖出'}
+                if not CONFIG['trading'].get('allow_short_selling', False):
+                    logger.info(f"无持仓，禁止卖出: {signal['symbol']}")
+                    return {'status': 'REJECTED', 'reason': '无持仓，禁止卖出'}
             if signal['position_size'] > current_pos:
                 signal['position_size'] = current_pos
 

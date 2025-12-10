@@ -20,6 +20,7 @@ CONFIG = {
         'max_retries': 3,
     },
     'trading': {
+'allow_short_selling': False,  # 是否允许无持仓卖出（空头交易）
 'symbols': [
     # A1 动量反转（更新）
     'AMD',
