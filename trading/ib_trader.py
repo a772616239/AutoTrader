@@ -20,7 +20,8 @@ class IBTrader:
         self.ib = IB()
         self.connected = False
         self.max_retries = 3
-        
+        self.last_order_times = {}  # 按股票代码跟踪上次订单时间
+
         logger.info(f"IB交易接口初始化: {host}:{port} (clientId={client_id})")
     
     def is_connection_healthy(self) -> bool:
@@ -110,6 +111,15 @@ class IBTrader:
         通用订单提交函数
         """
         logger.info(f"准备提交订单->ib: {action} {quantity} 股 {symbol} ")
+
+        # 检查下单冷却期 (按股票分别跟踪)
+        last_time = self.last_order_times.get(symbol)
+        if last_time is not None:
+            time_diff = (datetime.now() - last_time).total_seconds()
+            if time_diff < 600:
+                logger.warning(f"{symbol} 下单冷却期中，还需等待 {600 - time_diff:.1f} 秒")
+                return None
+
         if not self.connected and not self.connect():
             logger.error("IB未连接，无法提交订单")
             return None
@@ -166,6 +176,7 @@ class IBTrader:
 
             # 最终状态处理
             if status_str in ['Filled', 'Submitted', 'PreSubmitted']:
+                self.last_order_times[symbol] = datetime.now()
                 return trade
             else:
                 logger.warning(f"⚠️  订单状态异常 - ID: {getattr(getattr(trade,'order',None),'orderId',None)}, 状态: {status_str}")
