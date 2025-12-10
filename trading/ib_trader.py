@@ -250,13 +250,14 @@ class IBTrader:
         获取指定符号的持仓详情
         """
         holdings = self.get_holdings(symbol)
-        
+
         if holdings:
             pos = holdings[0]
             return {
                 'symbol': symbol,
                 'position': pos.position,
                 'avg_cost': pos.avgCost,
+                'unrealized_pnl': getattr(pos, 'unrealizedPNL', 0),
                 'contract': pos.contract
             }
         return None

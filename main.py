@@ -356,6 +356,30 @@ class TradingSystem:
         logger.info(f"交易时间: {self.config['trading']['trading_hours']['start']} - "
                    f"{self.config['trading']['trading_hours']['end']}")
         logger.info(f"IB连接: {'✅ 成功' if self.ib_trader and self.ib_trader.connected else '❌ 失败/模拟'}")
+
+        # 输出IB账户资产信息
+        if self.ib_trader and self.ib_trader.connected:
+            try:
+                logger.info("\n💰 IB账户资产信息:")
+                net_liq = self.ib_trader.get_net_liquidation()
+                available = self.ib_trader.get_available_funds()
+                logger.info(f"  净资产 (Net Liquidation): ${net_liq:,.2f}")
+                logger.info(f"  可用资金 (Available Funds): ${available:,.2f}")
+
+                # 获取并显示更多账户信息
+                account_summary = self.ib_trader.get_account_summary()
+                if account_summary:
+                    logger.info("  详细账户信息:")
+                    key_fields = ['TotalCashValue', 'BuyingPower', 'TotalCashBalance', 'GrossPositionValue', 'UnrealizedPnL']
+                    for field in key_fields:
+                        if field in account_summary:
+                            value = account_summary[field]['value']
+                            currency = account_summary[field]['currency']
+                            logger.info(f"    {field}: {value} {currency}")
+            except Exception as e:
+                logger.warning(f"获取IB账户资产信息失败: {e}")
+        else:
+            logger.info("IB未连接，跳过账户资产信息显示")
         
         return True
     

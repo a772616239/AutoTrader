@@ -21,7 +21,7 @@ CONFIG = {
     },
     'trading': {
 'allow_short_selling': False,  # 是否允许无持仓卖出（空头交易）
- 'same_day_sell_only': False,  # 是否限制当日不能重复买入
+ 'same_day_sell_only': True,  # 是否限制当日不能重复买入
 'symbols': [
     # A1 动量反转（更新）
     'AMD',
@@ -129,6 +129,7 @@ CONFIG = {
         'stop_loss_pct': 0.025,             # 止损百分比（2.5%，优先使用）
         'take_profit_atr_multiple': 3.0,    # ATR止盈倍数（用于仓位计算）
         'take_profit_pct': 0.045,           # 止盈百分比（4.5%，基于ATR 3.0倍估算，优先使用）
+ 'take_profit_pnl_threshold': 200.0, # IB未实现盈利止盈阈值（美元，默认$500）
         'max_holding_minutes': 120,         # 最大持有时间（120分钟，日内交易）
         'quick_loss_cutoff': -0.03,         # 快速止损阈值（-3%）
         'force_close_time': '15:45',        # 收盘前强制平仓时间

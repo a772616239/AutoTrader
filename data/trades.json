@@ -1,33 +1,5 @@
 [
   {
-    "symbol": "TSLA",
-    "action": "SELL",
-    "entry_price": 445.57501220703125,
-    "price": 445.57501220703125,
-    "size": 6,
-    "timestamp": "2025-12-11T01:30:09.688259",
-    "signal_type": "MA_DEATH_CROSS",
-    "confidence": 0.6,
-    "status": "CANCELLED",
-    "order_type": "MKT",
-    "order_id": 1340,
-    "order_status": "Cancelled"
-  },
-  {
-    "symbol": "UBER",
-    "action": "BUY",
-    "entry_price": 83.63500213623047,
-    "price": 83.63500213623047,
-    "size": 47,
-    "timestamp": "2025-12-11T01:30:13.008491",
-    "signal_type": "RSI_OVERSOLD",
-    "confidence": 0.5228762042914167,
-    "status": "CANCELLED",
-    "order_type": "MKT",
-    "order_id": 1342,
-    "order_status": "Cancelled"
-  },
-  {
     "symbol": "DUOL",
     "action": "BUY",
     "entry_price": 198.66000366210938,
@@ -1377,6 +1349,34 @@
     "status": "FAILED",
     "order_type": "LMT",
     "order_id": 58,
+    "order_status": "Inactive"
+  },
+  {
+    "symbol": "DIS",
+    "action": "BUY",
+    "entry_price": 108.63999938964844,
+    "price": 108.63999938964844,
+    "size": 5,
+    "timestamp": "2025-12-11T03:44:04.193581",
+    "signal_type": "PULLBACK_BUY_UPTREND",
+    "confidence": 0.3875272998177919,
+    "status": "FAILED",
+    "order_type": "LMT",
+    "order_id": 66,
+    "order_status": "Inactive"
+  },
+  {
+    "symbol": "NKE",
+    "action": "BUY",
+    "entry_price": 65.43000030517578,
+    "price": 65.43000030517578,
+    "size": 9,
+    "timestamp": "2025-12-11T03:50:33.959254",
+    "signal_type": "PULLBACK_BUY_UPTREND",
+    "confidence": 0.3,
+    "status": "FAILED",
+    "order_type": "LMT",
+    "order_id": 72,
     "order_status": "Inactive"
   }
 ]

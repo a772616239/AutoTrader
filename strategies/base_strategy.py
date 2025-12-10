@@ -257,6 +257,34 @@ class BaseStrategy:
                 'profit_pct': price_change_pct * 100,
                 'confidence': 1.0  # 止盈信号置信度最高
             }
+
+        # 基于IB未实现盈利的止盈检查
+        if self.ib_trader and self.ib_trader.connected:
+            try:
+                ib_holding = self.ib_trader.get_holding_for_symbol(symbol)
+                if ib_holding and 'unrealized_pnl' in ib_holding:
+                    unrealized_pnl = ib_holding['unrealized_pnl']
+                    position_value = abs(position_size) * current_price
+                    if position_value > 0:
+                        pnl_pct = (unrealized_pnl / position_value) * 100
+                        take_profit_pnl_threshold = self.config.get('take_profit_pnl_threshold', 500.0)  # 默认$500未实现盈利
+                        logger.debug(f"📊 {symbol} IB未实现盈利检查: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%), 阈值: ${take_profit_pnl_threshold:.2f}, 持仓价值: ${position_value:.2f}")
+                        if unrealized_pnl >= take_profit_pnl_threshold:
+                            logger.info(f"✅ {symbol} 触发IB未实现盈利止盈: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%) >= ${take_profit_pnl_threshold:.2f}")
+                            return {
+                                'symbol': symbol,
+                                'signal_type': 'TAKE_PROFIT_PNL',
+                                'action': 'SELL' if position_size > 0 else 'BUY',
+                                'price': current_price,
+                                'reason': f"IB未实现盈利止盈: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%)",
+                                'position_size': abs(position_size),
+                                'profit_pct': pnl_pct,
+                                'confidence': 1.0
+                            }
+                else:
+                    logger.debug(f"⚠️ {symbol} 无法获取IB持仓信息进行未实现盈利检查")
+            except Exception as e:
+                logger.debug(f"检查IB未实现盈利时出错: {e}")
         
         return None
     
