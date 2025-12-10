@@ -844,6 +844,14 @@ def command_line_interface(system: TradingSystem):
                     system.switch_strategy('a6')
                 elif cmd == 'switch a7':
                     system.switch_strategy('a7')
+                elif cmd == 'switch a8':
+                    system.switch_strategy('a8')
+                elif cmd == 'switch a9':
+                    system.switch_strategy('a9')
+                elif cmd == 'switch a10':
+                    system.switch_strategy('a10')
+                elif cmd == 'switch a11':
+                    system.switch_strategy('a11')
                 elif cmd == 'list':
                     system.list_strategies()
                 elif cmd == 'status':
