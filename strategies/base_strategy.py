@@ -297,7 +297,7 @@ class BaseStrategy:
         max_shares_value = min(per_trade_cap, equity_buffered)
         max_shares = int(max_shares_value / signal['price'])
         result = min(shares, max_shares)
-        logger.info(f"计算仓位大小: 风险金额 ${risk_amount:,.2f}, 每股风险 ${risk_per_share:.2f}, 初始股数 {shares}, 最大股数 {max_shares}, 最终股数 {result} equity_buffered {equity_buffered}")
+        logger.info(f"[{self.get_strategy_name()}] 计算仓位大小: 风险金额 ${risk_amount:,.2f}, 每股风险 ${risk_per_share:.2f}, 初始股数 {shares}, 最大股数 {max_shares}, 最终股数 {result} equity_buffered {equity_buffered}")
         try:
             logger.info(
                 f"仓位计算: 价格 {signal['price']:.2f}, 权益 {self.equity:,.2f}, 风险股数 {shares}, "
