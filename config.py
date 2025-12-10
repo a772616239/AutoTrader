@@ -116,7 +116,7 @@ CONFIG = {
         'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     },
     'strategy_a1': {  # 动量反转策略配置（日内交易）
-        'initial_capital': 40000.0,
+        'initial_capital': 50000,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
         'per_trade_notional_cap': 700.0,  # 单笔交易美元上限
@@ -138,7 +138,7 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a2': {  # Z-Score策略配置
-        'initial_capital': 40000.0,
+        'initial_capital': 50000,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
         'per_trade_notional_cap': 700.0,  # 单笔交易美元上限
@@ -157,7 +157,7 @@ CONFIG = {
     },
     'strategy_a3': {  # 双均线成交量突破策略配置（日内交易）
         'trading': {
-            'initial_capital': 40000.0,  # 初始资金
+            'initial_capital': 50000,  # 初始资金
             'risk_per_trade': 0.02,    # 单笔交易风险 (2% equity) (A6 uses 0.015)
             'max_position_size': 0.1,  # 最大仓位 (10% equity)
             'min_cash_buffer': 0.1,    # 最小现金缓冲
@@ -187,7 +187,7 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a4': {  # 回调交易策略配置（斐波那契回撤，多日持仓）
-        'initial_capital': 40000.0,
+        'initial_capital': 50000,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
         'per_trade_notional_cap': 700.0,  # 单笔交易美元上限
@@ -211,11 +211,11 @@ CONFIG = {
         'ib_limit_offset': 0.01,
     },
     'strategy_a5': {  # 多因子AI融合策略配置（多日持仓）
-        'initial_capital': 40000.0,
+        'initial_capital': 50000,
         'risk_per_trade': 0.02,
         'max_position_size': 0.06,
         'per_trade_notional_cap': 700.0,      # 单笔交易美元上限（严格）
-        'max_position_notional': 40000.0,      # 单股总仓位上限（美元，严格）
+        'max_position_notional': 50000,      # 单股总仓位上限（美元，严格）
         'min_confidence': 0.65,                # 最小信心度阈值（严格）
         'min_price': 10.0,                     # 最小股价（严格，避免低价股）
         'min_volume_ratio': 0.1,               # 最小成交量相对历史平均值的比例（0.5=50%，基于历史对比）
@@ -240,7 +240,7 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a6': {  # 新闻交易策略配置（日内交易）
-        'initial_capital': 40000.0,
+        'initial_capital': 50000,
         'risk_per_trade': 0.015,              # 新闻交易风险控制更严格
         'max_position_size': 0.04,             # 小仓位，快速进出
         'per_trade_notional_cap': 700.0,     # 单笔交易美元上限（更严格）
@@ -267,7 +267,7 @@ CONFIG = {
         'avoid_close_hour': True,
     },
     'strategy_a7': {  # A7 CTA 趋势跟踪策略（中短期持仓）
-        'initial_capital': 40000.0,
+        'initial_capital': 50000,
         'risk_per_trade': 0.02,
         'max_position_size': 0.1,
         'per_trade_notional_cap': 700.0,
@@ -355,7 +355,6 @@ preselect_a2 = {
 
     # A4 回调交易策略 - 基于斐波那契回撤
     'AMZN': 'a4',
-    'BKNG': 'a4',
     'TSLA': 'a4',
     'NFLX': 'a4',
     'DIS':  'a4',
