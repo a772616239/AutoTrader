@@ -10,7 +10,8 @@ import schedule
 import warnings
 import logging
 import importlib
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from typing import Dict, List
 try:
     import pytz
@@ -34,6 +35,57 @@ from strategies.a7_cta_trend import A7CTATrendStrategy
 from strategy_manager import StrategyManager
 
 warnings.filterwarnings('ignore')
+
+def cleanup_old_logs(log_dir: str, days_to_keep: int = 3):
+    """
+    清理指定天数前的旧日志文件
+
+    参数:
+        log_dir: 日志目录路径
+        days_to_keep: 保留天数，默认3天
+    """
+    if not os.path.exists(log_dir):
+        return
+
+    # 计算截止日期（三天前）
+    cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+    deleted_count = 0
+
+    # 匹配日志文件名的正则表达式
+    # 支持 trading_YYYYMMDD.log 和 trading_YYYYMMDD_HHMMSS.log 格式
+    log_pattern = re.compile(r'trading_(\d{8})(?:_\d{6})?\.log$')
+
+    try:
+        for filename in os.listdir(log_dir):
+            if not filename.endswith('.log'):
+                continue
+
+            match = log_pattern.match(filename)
+            if not match:
+                continue
+
+            # 提取日期并转换为datetime对象
+            date_str = match.group(1)
+            try:
+                file_date = datetime.strptime(date_str, '%Y%m%d')
+            except ValueError:
+                continue
+
+            # 删除三天前的文件
+            if file_date < cutoff_date:
+                file_path = os.path.join(log_dir, filename)
+                try:
+                    os.remove(file_path)
+                    deleted_count += 1
+                    print(f"已删除旧日志文件: {filename}")
+                except OSError as e:
+                    print(f"删除日志文件失败 {filename}: {e}")
+
+        if deleted_count > 0:
+            print(f"日志清理完成，共删除 {deleted_count} 个三天前日志文件")
+
+    except Exception as e:
+        print(f"日志清理过程中出错: {e}")
 
 # ==================== 全局日志配置 ====================
 # 先导入config获取日志配置
@@ -65,6 +117,10 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+# 清理三天前的旧日志文件
+cleanup_old_logs(log_dir)
+
 logger.info(f"日志文件保存在: {os.path.abspath(log_file)}")
 
 # ==================== 策略工厂 ====================
