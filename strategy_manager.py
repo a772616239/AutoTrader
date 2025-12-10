@@ -19,6 +19,10 @@ from strategies.a4_pullback import A4PullbackStrategy
 from strategies.a5_multifactor_ai import A5MultiFactorAI
 from strategies.a6_news_trading import A6NewsTrading
 from strategies.a7_cta_trend import A7CTATrendStrategy
+from strategies.a8_rsi_oscillator import A8RSIOscillatorStrategy
+from strategies.a9_macd_crossover import A9MACDCrossoverStrategy
+from strategies.a10_bollinger_bands import A10BollingerBandsStrategy
+from strategies.a11_moving_average_crossover import A11MovingAverageCrossoverStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,10 @@ STRATEGY_CLASSES = {
     'a5': A5MultiFactorAI,
     'a6': A6NewsTrading,
     'a7': A7CTATrendStrategy,
+    'a8': A8RSIOscillatorStrategy,
+    'a9': A9MACDCrossoverStrategy,
+    'a10': A10BollingerBandsStrategy,
+    'a11': A11MovingAverageCrossoverStrategy,
 }
 
 

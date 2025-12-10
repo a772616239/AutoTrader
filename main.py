@@ -32,6 +32,11 @@ from strategies.a4_pullback import A4PullbackStrategy
 from strategies.a5_multifactor_ai import A5MultiFactorAI
 from strategies.a6_news_trading import A6NewsTrading
 from strategies.a7_cta_trend import A7CTATrendStrategy
+from strategies.a8_rsi_oscillator import A8RSIOscillatorStrategy
+from strategies.a9_macd_crossover import A9MACDCrossoverStrategy
+from strategies.a10_bollinger_bands import A10BollingerBandsStrategy
+from strategies.a11_moving_average_crossover import A11MovingAverageCrossoverStrategy
+
 from strategy_manager import StrategyManager
 
 warnings.filterwarnings('ignore')
@@ -135,6 +140,11 @@ class StrategyFactory:
         'a5': A5MultiFactorAI,
         'a6': A6NewsTrading,
         'a7': A7CTATrendStrategy,
+        'a8': A8RSIOscillatorStrategy,
+        'a9': A9MACDCrossoverStrategy,
+        'a10': A10BollingerBandsStrategy,
+        'a11': A11MovingAverageCrossoverStrategy
+        
     }
     
     @classmethod
@@ -891,7 +901,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='多策略交易系统')
-    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'], default='a1',
+    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11'], default='a1',
                        help='初始策略 (a1: 动量反转, a2: Z-Score, a3: 双均线成交量突破, a4: 回调交易, a5: 多因子AI融合, a6: 新闻, a7: CTA趋势)')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='启用命令行交互模式')
