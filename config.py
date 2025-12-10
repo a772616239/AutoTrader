@@ -20,31 +20,83 @@ CONFIG = {
         'max_retries': 3,
     },
     'trading': {
-        'symbols': [
-    # A1 动量反转（原 5 + 新增 2）
-    'AMD', 'META', 'INTC', 'RIVN', 'COIN',
-    'SQ', 'ZM',
-
-    # A2 Z-Score 均值回归（原 5 + 新增 2）
-    'XOM', 'CVX', 'JPM', 'PFE', 'JNJ',
-    'BAC', 'GS',
-
-    # A3 双均线量能（原 5 + 新增 2）
-    'TEAM', 'GOOGL', 'WDC', 'CRM', 'ORCL',
-    'AVGO', 'IBM',
-
-    # A4 回调买入（原 5 + 新增 2）
-    'AMZN', 'BKNG', 'TSLA', 'NFLX', 'DIS',
-    'NKE', 'SBUX',
-
-    # A5 多因子 AI（原 5 + 新增 2）
-    'NVDA', 'MSFT', 'ETN', 'SNOW', 'AI',
-    'PLTR', 'DDOG',
-
-    # A7 CTA 趋势（原 5 + 新增 2）
-    'OKLO', 'SMCI', 'LEU', 'TSM', 'BA',
-    'ASML', 'LLY'
+'symbols': [
+    # A1 动量反转（更新）
+    'AMD',
+    'META',
+    'INTC',
+    'RIVN',
+    'COIN',
+    'SQ',
+    'ZM',
+    'UBER',
+    'UPST',
+    'DUOL',
+    'AUDC',
+    'TMDX',
+    # A2 Z-Score 均值回归（更新）
+    'XOM',
+    'CVX',
+    'JPM',
+    'PFE',
+    'JNJ',
+    'BAC',
+    'GS',
+    'PEP',
+    'CSCO',
+    'TXN',
+    'COMM',
+    'UNH',
+    'DINO',
+    # A3 双均线量能（更新）
+    'TEAM',
+    'GOOGL',
+    'WDC',
+    'CRM',
+    'ORCL',
+    'AVGO',
+    'IBM',
+    'NOW',
+    'AAPL',
+    'ADP',
+    'DV',
+    # A4 回调买入（更新）
+    'AMZN',
+    'BKNG',
+    'TSLA',
+    'NFLX',
+    'DIS',
+    'NKE',
+    'SBUX',
+    'BABA',
+    'BIDU',
+    'LAC',
+    # A5 多因子 AI（更新）
+    'NVDA',
+    'MSFT',
+    'ETN',
+    'SNOW',
+    'AI',
+    'PLTR',
+    'DDOG',
+    'CRWD',
+    'INCY',
+    'PRIM',
+    'MSTR',
+    # A7 CTA 趋势（更新）
+    'OKLO',
+    'SMCI',
+    'LEU',
+    'TSM',
+    'BA',
+    'ASML',
+    'LLY',
+    'RTX',
+    'AMAT',
+    'AZN',
+    'STX',
 ]
+
 ,
         'scan_interval_minutes': 1,
         'trading_hours': {
@@ -52,7 +104,7 @@ CONFIG = {
             'end': '16:00'
         },
         'allow_orders_outside_trading_hours': False,  # 是否允许在非交易时间提交委托单
-        'auto_cancel_orders': True, # 每个周期开始时是否自动取消未完成订单
+        'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
         'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
@@ -146,7 +198,7 @@ CONFIG = {
         'pullback_buy_ratio': [0.08, 0.7],   # 回撤买入位置
         'pullback_sell_ratio': [0.08, 0.7],  # 反弹卖出位置
         'volume_confirmation': True,
-        'min_volume_ratio': 1.0,
+        'min_volume_ratio': 0.6,          # 最小成交量相对历史平均值的比例（0.5=50%，基于历史对比）
         'stop_loss_pct': 0.03,
         'take_profit_pct': 0.05,
         'max_holding_days': 5,
@@ -165,7 +217,7 @@ CONFIG = {
         'max_position_notional': 40000.0,      # 单股总仓位上限（美元，严格）
         'min_confidence': 0.65,                # 最小信心度阈值（严格）
         'min_price': 10.0,                     # 最小股价（严格，避免低价股）
-        'min_volume_ratio': 0.5,               # 最小成交量相对历史平均值的比例（0.5=50%，基于历史对比）
+        'min_volume_ratio': 0.1,               # 最小成交量相对历史平均值的比例（0.5=50%，基于历史对比）
         'volume_lookback_period': 30,          # 计算历史平均成交量的回溯天数
         'lookback_period': 90,                 # 基本面指标回溯天数
         'recent_period': 20,                   # 最近期间（天数）

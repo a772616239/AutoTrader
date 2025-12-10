@@ -280,7 +280,7 @@ class IBTrader:
 
         # 尝试多个资金字段
         funds = 0.0
-        fund_fields = ['AvailableFunds', 'TotalCashValue', 'BuyingPower', 'NetLiquidation']
+        fund_fields = ['AvailableFunds', 'TotalCashValue', 'BuyingPower', 'NetLiquidation', 'TotalCashBalance']
 
         for field in fund_fields:
             try:

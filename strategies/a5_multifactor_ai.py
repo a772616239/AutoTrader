@@ -41,7 +41,7 @@ class A5MultiFactorAI(BaseStrategy):
             'max_position_notional': 40000.0,
             'min_confidence': 0.65,
             'min_price': 10.0,
-            'min_volume_ratio': 0.5,  # 最小成交量相对历史平均值的比例（0.5表示至少是历史平均的50%）
+            'min_volume_ratio': 0.1,  # 最小成交量相对历史平均值的比例（0.5表示至少是历史平均的50%）
             'volume_lookback_period': 30,  # 计算历史平均成交量的回溯天数
             'lookback_period': 90,
             'recent_period': 20,
@@ -75,7 +75,7 @@ class A5MultiFactorAI(BaseStrategy):
         self.recent_period = self.config.get('recent_period', 20)
         self.min_price = self.config.get('min_price', 5.0)
         # 成交量过滤改为相对历史平均值
-        self.min_volume_ratio = self.config.get('min_volume_ratio', 0.5)
+        self.min_volume_ratio = self.config.get('min_volume_ratio', 0.1)
         self.volume_lookback_period = self.config.get('volume_lookback_period', 30)
         # 保留min_volume作为向后兼容的绝对最小值（可选，用于极端情况）
         self.min_volume_absolute = self.config.get('min_volume', None)

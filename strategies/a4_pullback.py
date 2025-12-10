@@ -269,7 +269,7 @@ class A4PullbackStrategy(BaseStrategy):
                 current_volume = data['Volume'].iloc[-1]
                 volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
                 if volume_ratio < self.config['min_volume_ratio']:
-                    logger.info(f"{symbol} 成交量不足: {volume_ratio:.2f}x")
+                    logger.info(f"{symbol} 成交量不足: {volume_ratio:.2f}x--min_volume_ratio {self.config['min_volume_ratio']}")
                     return None
         
         # 计算信号强度
