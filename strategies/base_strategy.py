@@ -381,7 +381,8 @@ class BaseStrategy:
                 if not CONFIG['trading'].get('allow_short_selling', False):
                     logger.info(f"无持仓，禁止卖出: {signal['symbol']}")
                     return {'status': 'REJECTED', 'reason': '无持仓，禁止卖出'}
-            if signal['position_size'] > current_pos:
+            # 只有在有持仓且卖出数量超过持仓时才调整，否则保持原值（允许开空）
+            elif signal['position_size'] > current_pos:
                 signal['position_size'] = current_pos
 
         # 创建交易记录
@@ -410,7 +411,7 @@ class BaseStrategy:
             else:
                 order_type = self.config.get('ib_order_type', 'MKT')
 
-            logger.info(f"order_type: {order_type} -- ['action']: {signal['action']} current_price: {current_price} signal['position_size']: {signal['position_size']}")
+            logger.info(f"order_type: {order_type} -- action: {signal['action']} current_price: {current_price} position_size: {signal['position_size']}")
 
             if order_type == 'LMT' and signal['action'] == 'BUY':
                 limit_price = current_price * (1 - self.config.get('ib_limit_offset', 0.01))
@@ -490,26 +491,62 @@ class BaseStrategy:
 
                 return trade
             else:
-                if signal['symbol'] in self.positions:
-                    old_pos = self.positions[signal['symbol']]
-                    remaining = max(0, int(old_pos.get('size', 0)) - int(signal['position_size']))
-                    if remaining > 0:
+                logger.debug(f"DEBUG: 模拟交易模式 - 更新本地持仓，信号: {signal['symbol']} {signal['action']} {signal['position_size']}")
+
+                if signal['action'] == 'BUY':
+                    # 买入操作：增加持仓
+                    if signal['symbol'] in self.positions:
+                        old_pos = self.positions[signal['symbol']]
+                        old_size = int(old_pos.get('size', 0))
+                        new_size = old_size + int(signal['position_size'])
+                        # 计算新的平均成本
+                        old_cost_total = old_size * old_pos.get('avg_cost', current_price)
+                        new_cost_total = old_cost_total + int(signal['position_size']) * current_price
+                        new_avg_cost = new_cost_total / new_size
                         self.positions[signal['symbol']] = {
-                            'size': remaining,
-                            'avg_cost': old_pos.get('avg_cost', current_price),
+                            'size': new_size,
+                            'avg_cost': new_avg_cost,
                             'entry_time': old_pos.get('entry_time', datetime.now())
                         }
+                        logger.debug(f"DEBUG: 买入 - 原持仓: {old_size}股，新增: {signal['position_size']}股，总计: {new_size}股，平均成本: ${new_avg_cost:.2f}")
                     else:
-                        del self.positions[signal['symbol']]
-                
+                        # 新建持仓
+                        self.positions[signal['symbol']] = {
+                            'size': int(signal['position_size']),
+                            'avg_cost': current_price,
+                            'entry_time': datetime.now()
+                        }
+                        logger.debug(f"DEBUG: 新建持仓 - {signal['symbol']}: {signal['position_size']}股 @ ${current_price:.2f}")
+
+                elif signal['action'] == 'SELL':
+                    # 卖出操作：减少持仓
+                    if signal['symbol'] in self.positions:
+                        old_pos = self.positions[signal['symbol']]
+                        old_size = int(old_pos.get('size', 0))
+                        logger.debug(f"DEBUG: 原持仓: {old_size}股")
+                        remaining = max(0, old_size - int(signal['position_size']))
+                        logger.debug(f"DEBUG: 卖出后剩余: {remaining}股")
+                        if remaining > 0:
+                            self.positions[signal['symbol']] = {
+                                'size': remaining,
+                                'avg_cost': old_pos.get('avg_cost', current_price),
+                                'entry_time': old_pos.get('entry_time', datetime.now())
+                            }
+                        else:
+                            logger.debug(f"DEBUG: 持仓清空，删除 {signal['symbol']}")
+                            del self.positions[signal['symbol']]
+                    else:
+                        logger.warning(f"DEBUG: 模拟模式卖出时无持仓记录: {signal['symbol']}")
+                else:
+                    logger.warning(f"DEBUG: 未知操作类型: {signal['action']}")
+
                 self.trade_history.append(trade)
                 self.trades_executed += 1
-                
+
                 action_icon = "🟢" if signal['action'] == 'BUY' else "🔴"
                 logger.info(f"{action_icon} 执行交易: {signal['symbol']} {signal['action']} "
                            f"@{current_price:.2f}, 数量: {signal['position_size']}")
-                
-                return trade
+
                 return trade
             # else:
             #     trade['status'] = 'FAILED'
