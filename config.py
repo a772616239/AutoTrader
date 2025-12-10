@@ -21,7 +21,7 @@ CONFIG = {
     },
     'trading': {
 'allow_short_selling': False,  # 是否允许无持仓卖出（空头交易）
- 'same_day_sell_only': True,  # 是否限制当日不能重复买入
+ 'same_day_sell_only': False,  # 是否限制当日不能买入
 'symbols': [
     # A1 动量反转（更新）
     'AMD',
@@ -55,7 +55,7 @@ CONFIG = {
     'GOOGL',
     'WDC',
     'CRM',
-    'ORCL',
+    # 'ORCL',
     'AVGO',
     'IBM',
     'NOW',
@@ -86,7 +86,7 @@ CONFIG = {
     'PRIM',
     'MSTR',
     # A7 CTA 趋势（更新）
-    'OKLO',
+    # 'OKLO',
     'SMCI',
     'LEU',
     'TSM',
@@ -106,7 +106,7 @@ CONFIG = {
             'end': '16:00'
         },
         'allow_orders_outside_trading_hours': True,  # 是否允许在非交易时间提交委托单
-        'auto_cancel_orders': True, # 每个周期开始时是否自动取消未完成订单
+        'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
         'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
@@ -348,7 +348,7 @@ preselect_a2 = {
     'TEAM': 'a3',
     'GOOGL': 'a3',
     'CRM':  'a3',
-    'ORCL': 'a3',
+    # 'ORCL': 'a3',
     'AVGO': 'a3',
     'IBM':  'a3',
     'NOW':  'a3',

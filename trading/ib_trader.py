@@ -12,17 +12,20 @@ logger = logging.getLogger(__name__)
 
 class IBTrader:
     """IB交易接口封装"""
-    
-    def __init__(self, host='127.0.0.1', port=7497, client_id=1):
+
+    def __init__(self, host='127.0.0.1', port=7497, client_id=1, manual_available_funds=None):
         self.host = host
         self.port = port
         self.client_id = client_id
+        self.manual_available_funds = manual_available_funds  # 手动设置的可用资金
         self.ib = IB()
         self.connected = False
         self.max_retries = 3
         self.last_order_times = {}  # 按股票代码跟踪上次订单时间
 
         logger.info(f"IB交易接口初始化: {host}:{port} (clientId={client_id})")
+        if manual_available_funds:
+            logger.info(f"手动设置可用资金: ${manual_available_funds:,.2f}")
     
     def is_connection_healthy(self) -> bool:
         """检查IB连接是否健康"""
@@ -127,7 +130,7 @@ class IBTrader:
                         if trade_date == today:
                             filled_symbols_today.add(trade['symbol'])
                 if symbol in filled_symbols_today:
-                    logger.warning(f"当天 {symbol} 已有Filled交易，不能再交易")
+                    logger.info(f"当天 {symbol} 已有Filled交易，不能再交易")
                     return None
         except Exception as e:
             logger.debug(f"检查trades.json失败: {e}")
@@ -307,25 +310,89 @@ class IBTrader:
         return 0.0
     
     def get_available_funds(self) -> float:
-        """获取可用资金"""
-        logger.info(f"开始获取可用资金，连接状态: {self.connected}")
-
-        # 尝试多个资金字段
-        funds = 0.0
-        fund_fields = ['AvailableFunds', 'TotalCashValue', 'BuyingPower', 'NetLiquidation', 'TotalCashBalance']
-
-        for field in fund_fields:
+        """获取可用资金 (针对多币种/BASE货币账户)"""
+        logger.info("开始获取可用资金（多币种账户模式）")
+        
+        # 优先级：CashBalance -> AvailableFunds -> TotalCashBalance
+        primary_field = 'CashBalance'  # 这直接对应“已结算现金”
+        fallback_fields = ['AvailableFunds', 'TotalCashValue', 'TotalCashBalance']
+        
+        try:
+            # 1. 首要目标：获取已结算现金 (CashBalance)
+            settled_cash = self.get_account_value(primary_field)
+            currency_info = self.get_account_summary().get(primary_field, {})
+            currency = currency_info.get('currency', 'UNKNOWN') if isinstance(currency_info, dict) else 'UNKNOWN'
+            
+            logger.info(f"账户 {primary_field}: {settled_cash} {currency}")
+            
+            if settled_cash != 0:
+                # 重要提示：这里返回的是 BASE 货币单位的数值
+                # 它的美元等值就是你需要的 309.42 USD
+                logger.info(f"使用 {primary_field} 作为可用资金: {settled_cash} {currency}")
+                # 如果你最终需要美元数值，且汇率已知(例: 1 BASE = 0.5238 USD)，可在此换算：
+                # usd_rate = 0.5238  # 根据 309.422 BASE = 309.42 USD 推算
+                # usd_value = settled_cash * usd_rate
+                # return usd_value
+                return settled_cash  # 目前先返回 BASE 值
+                
+        except Exception as e:
+            logger.warning(f"获取主要字段 {primary_field} 失败: {e}")
+        
+        # 2. 备用方案
+        for field in fallback_fields:
             try:
                 value = self.get_account_value(field)
-                logger.info(f"账户{field}: {value}")
-                if value > 0:
-                    funds = max(funds, value)  # 使用最大的正值
+                if value != 0:
+                    logger.info(f"回退到字段 {field} 作为可用资金: {value}")
+                    return value
             except Exception as e:
-                logger.debug(f"获取{field}失败: {e}")
-
-        logger.info(f"最终确定可用资金: {funds}")
+                continue
+        
+        logger.error("无法获取任何可用资金字段")
+        return 0.0
         return funds
-    
+    def debug_account_values(self):
+        """调试：打印所有账户字段的详细值"""
+        debug_fields = [
+            # 核心资金字段
+            'SettledCash',           # 已结算现金 - 很可能就是你要找的
+            'AvailableFunds',
+            'BuyingPower',
+            'TotalCashValue',
+            'TotalCashBalance', 
+            'CashBalance',
+            'NetLiquidation',
+            'EquityWithLoanValue',
+            'ExcessLiquidity',
+            # 其他相关字段
+            'FullAvailableFunds',
+            'FullInitMarginReq',
+            'UnsettledCash'
+        ]
+        
+        print("=== IBKR 账户字段详细调试 ===")
+        for field in debug_fields:
+            try:
+                # 1. 获取字段值
+                value = self.get_account_value(field)
+                # 2. 获取该字段的货币信息（关键步骤）
+                summary = self.get_account_summary()
+                currency = 'UNKNOWN'
+                if field in summary:
+                    # 重点检查这里的结构，currency 可能是一个字符串，也可能是字典的一个键
+                    currency_info = summary[field]
+                    if isinstance(currency_info, dict) and 'currency' in currency_info:
+                        currency = currency_info['currency']
+                    elif isinstance(currency_info, str):
+                        # 如果 summary[field] 直接是货币代码字符串
+                        currency = currency_info
+                    else:
+                        currency = str(type(currency_info))
+                
+                print(f"{field:25} = {value:15.2f} [{currency}]")
+                
+            except Exception as e:
+                print(f"{field:25} = 获取失败: {e}")
     def get_net_liquidation(self) -> float:
         """获取净资产"""
         return self.get_account_value('NetLiquidation')

@@ -333,7 +333,8 @@ class TradingSystem:
         self.ib_trader = IBTrader(
             host=ib_config['host'],
             port=ib_config['port'],
-            client_id=ib_config['client_id']
+            client_id=ib_config['client_id'],
+            manual_available_funds=ib_config.get('manual_available_funds')
         )
         
         # 连接IB

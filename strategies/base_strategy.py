@@ -367,9 +367,9 @@ class BaseStrategy:
                         
         if signal['action'] == 'BUY':
             # 检查当日不能重复买入限制
-            if CONFIG['trading'].get('same_day_sell_only', False):
-                            logger.info(f"当日不能重复买入限制: {signal['symbol']} 今日已买入，禁止再次买入")
-                            return {'status': 'REJECTED', 'reason': "当日不能重复买入限制{signal['symbol']}"}
+            if CONFIG['trading'].get('same_day_sell_only', True):
+                 logger.info(f"当日不能重复买入限制: {signal['symbol']} 今日已买入，禁止再次买入")
+                 return {'status': 'REJECTED', 'reason': F"用完现金当日只能卖出了{signal['symbol']}"}
             try:
                 available_funds = self.ib_trader.get_available_funds()
                 # 1. 资金门槛检查 (< $500 则不交易，纸面账户除外)
