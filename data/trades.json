@@ -1,19 +1,5 @@
 [
   {
-    "symbol": "AI",
-    "action": "SELL",
-    "entry_price": 16.030000686645508,
-    "price": 16.030000686645508,
-    "size": 249,
-    "timestamp": "2025-12-11T01:27:21.241746",
-    "signal_type": "MA_DEATH_CROSS",
-    "confidence": 0.5,
-    "status": "CANCELLED",
-    "order_type": "MKT",
-    "order_id": 1312,
-    "order_status": "Cancelled"
-  },
-  {
     "symbol": "ETN",
     "action": "SELL",
     "entry_price": 346.3699951171875,
@@ -1380,5 +1366,33 @@
     "confidence": 0.8,
     "status": "PENDING",
     "order_type": "LMT"
+  },
+  {
+    "symbol": "INTC",
+    "action": "SELL",
+    "entry_price": 40.150001525878906,
+    "price": 40.150001525878906,
+    "size": 7,
+    "timestamp": "2025-12-11T02:51:04.660016",
+    "signal_type": "MA_DEATH_CROSS",
+    "confidence": 0.6,
+    "status": "EXECUTED",
+    "order_type": "MKT",
+    "order_id": 40,
+    "order_status": "Filled"
+  },
+  {
+    "symbol": "META",
+    "action": "SELL",
+    "entry_price": 660.0,
+    "price": 660.0,
+    "size": 6,
+    "timestamp": "2025-12-11T03:00:00.000000",
+    "signal_type": "MA_DEATH_CROSS",
+    "confidence": 0.6,
+    "status": "EXECUTED",
+    "order_type": "MKT",
+    "order_id": 42,
+    "order_status": "Filled"
   }
 ]

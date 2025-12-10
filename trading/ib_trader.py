@@ -112,6 +112,26 @@ class IBTrader:
         """
         logger.info(f"准备提交订单->ib: {action} {quantity} 股 {symbol} ")
 
+        # 检查当天交易规则：通过trades.json检查当天是否已有Filled交易
+        today = datetime.now().date()
+        try:
+            import json
+            import os
+            if os.path.exists('data/trades.json'):
+                with open('data/trades.json', 'r', encoding='utf-8') as f:
+                    trades = json.load(f)
+                filled_symbols_today = set()
+                for trade in trades:
+                    if trade.get('status') == 'EXECUTED' or trade.get('order_status') == 'Filled':
+                        trade_date = datetime.fromisoformat(trade['timestamp']).date()
+                        if trade_date == today:
+                            filled_symbols_today.add(trade['symbol'])
+                if symbol in filled_symbols_today:
+                    logger.warning(f"当天 {symbol} 已有Filled交易，不能再交易")
+                    return None
+        except Exception as e:
+            logger.debug(f"检查trades.json失败: {e}")
+
         # 检查下单冷却期 (按股票分别跟踪)
         last_time = self.last_order_times.get(symbol)
         if last_time is not None:
