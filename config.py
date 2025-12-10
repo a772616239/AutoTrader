@@ -110,6 +110,7 @@ CONFIG = {
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
     },
     'logging': {
+        'debug_mode': False,  # 调试模式：每次运行生成新日志文件
         'level': 'INFO',
         'file': os.path.join('logs', f'trading_{datetime.now():%Y%m%d_%H%M%S}.log'),
         'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',

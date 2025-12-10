@@ -36,13 +36,27 @@ from strategy_manager import StrategyManager
 warnings.filterwarnings('ignore')
 
 # ==================== 全局日志配置 ====================
+# 先导入config获取日志配置
+import config as config_module
+
+log_config = config_module.CONFIG.get('logging', {})
+debug_mode = log_config.get('debug_mode', False)
+log_level = logging.DEBUG if debug_mode else logging.INFO
+
+# 根据调试模式决定日志文件名
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "trading_system.log")
+
+if debug_mode:
+    # 调试模式：每次运行生成带完整时间戳的新日志文件
+    log_file = log_config.get('file', os.path.join(log_dir, f'trading_{datetime.now():%Y%m%d_%H%M%S}.log'))
+else:
+    # 非调试模式：生成每日日期日志文件
+    log_file = os.path.join(log_dir, f'trading_{datetime.now():%Y%m%d}.log')
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=log_level,
+    format=log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
     datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[
         logging.FileHandler(log_file, encoding='utf-8'),
