@@ -326,6 +326,22 @@ class BaseStrategy:
             
         # 动态资金检查 (仅针对买入)
         if signal['action'] == 'BUY':
+            # 检查当日不能重复买入限制
+            # if CONFIG['trading'].get('same_day_sell_only', False):
+                if signal['symbol'] in self.positions:
+                    entry_time = self.positions[signal['symbol']].get('entry_time')
+                    if entry_time:
+                        today = datetime.now().date()
+                        entry_date = entry_time.date()
+                        if entry_date == today:
+                            logger.info(f"当日不能重复买入限制: {signal['symbol']} 今日已买入，禁止再次买入")
+                            return {'status': 'REJECTED', 'reason': "当日不能重复买入限制{signal['symbol']}"}
+                        
+        if signal['action'] == 'BUY':
+            # 检查当日不能重复买入限制
+            if CONFIG['trading'].get('same_day_sell_only', False):
+                            logger.info(f"当日不能重复买入限制: {signal['symbol']} 今日已买入，禁止再次买入")
+                            return {'status': 'REJECTED', 'reason': "当日不能重复买入限制{signal['symbol']}"}
             try:
                 available_funds = self.ib_trader.get_available_funds()
                 # 1. 资金门槛检查 (< $500 则不交易，纸面账户除外)
@@ -335,7 +351,7 @@ class BaseStrategy:
                     return {'status': 'REJECTED', 'reason': msg}
                 elif available_funds == 0:
                     logger.info(f"⚠️ IB可用资金为0，使用模拟交易模式")
-                
+
                 # 2. 资金充足性检查 (真实账户检查，纸面账户跳过)
                 if available_funds > 0:  # 只有真实账户才有资金检查
                     estimated_cost = signal['position_size'] * current_price
