@@ -2,6 +2,7 @@
 """
 A6 策略: 基于新闻的交易策略
 快速反应突发新闻带来的市场波动，结合新闻情感分析和价格波动检测。
+增强版: 包含利好出尽、情绪背离和动量衰竭的卖出逻辑。
 """
 
 import logging
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from strategies.base_strategy import BaseStrategy
+from strategies import indicators  # 假设有这个模块用于计算RSI/MA
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,7 @@ class A6NewsTrading(BaseStrategy):
     基于新闻的交易策略
 
     核心机制:
-    1. 实时监控Alpha Vantage新闻API
+    1. 实时监控Alpha Vantage/Polygon新闻API
     2. 分析新闻情感和相关性
     3. 检测新闻发布后的价格波动
     4. 基于情感和波动强度生成交易信号
@@ -35,7 +37,7 @@ class A6NewsTrading(BaseStrategy):
             'max_position_size': 0.04,
             'per_trade_notional_cap': 4000.0,
             'max_position_notional': 20000.0,
-            'alpha_vantage_api_key': 'S4DJM04D0PS02401',
+            'alpha_vantage_api_key': 'YOUR_API_KEY_HERE',
             'news_lookback_hours': 24,
             'sentiment_threshold_positive': 0.3,
             'sentiment_threshold_negative': -0.3,
@@ -89,7 +91,7 @@ class A6NewsTrading(BaseStrategy):
         )
 
     def generate_signals(self, symbol: str, data: pd.DataFrame,
-                        indicators: Dict) -> List[Dict]:
+                        indicators_dict: Dict) -> List[Dict]:
         """
         基于新闻分析生成交易信号。
 
@@ -112,7 +114,7 @@ class A6NewsTrading(BaseStrategy):
                 logger.warning(f"[{symbol}] A6 需要有效的Polygon API密钥")
                 return signals
 
-            if data is None or len(data) < 10:
+            if data is None or len(data) < 20:
                 logger.warning(f"[{symbol}] A6信号生成: 数据不足")
                 return signals
 
@@ -121,24 +123,39 @@ class A6NewsTrading(BaseStrategy):
 
             # 预过滤 - 检查交易时间和基本条件
             current_time = datetime.now()
-            trading_start = datetime.strptime(self.config.get('trading_start_time', '09:45'), '%H:%M').time()
-            trading_end = datetime.strptime(self.config.get('trading_end_time', '15:30'), '%H:%M').time()
-
-            #     logger.info(f"[{symbol}] A6 不在交易时间范围内")
-            #     return signals
+            
+            # --- 辅助指标计算 (用于增强卖出逻辑) ---
+            # 计算 MA20 (作为短期趋势线)
+            ma20 = data[close_col].rolling(20).mean().iloc[-1]
+            # 计算 RSI (用于判断超买/衰竭)
+            delta = data[close_col].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs)).iloc[-1]
+            if np.isnan(rsi): rsi = 50.0
 
             # 1. 检查持仓止损止盈 (CRITICAL: 即使没有新闻也要检查止损)
             if symbol in self.positions:
                 exit_signal = self.check_exit_conditions(symbol, current_price)
                 if exit_signal:
                     signals.append(exit_signal)
+                    return signals # 触发硬止损直接返回
 
-            # 检查最近是否进行过新闻交易
+            # 检查最近是否进行过新闻交易 (冷却期)
             if symbol in self.last_news_trade_time:
                 time_since_last_trade = (current_time - self.last_news_trade_time[symbol]).total_seconds() / 60
                 if time_since_last_trade < self.cooldown_after_news_trade:
-                    logger.info(f"[{symbol}] A6 新闻交易冷却中，还需 {self.cooldown_after_news_trade - time_since_last_trade:.1f} 分钟")
-                    return signals
+                    # 即使在冷却期，如果满足"紧急离场条件"，也允许生成卖出信号
+                    if symbol in self.positions:
+                        # 紧急离场：价格跌破均线 且 RSI 极高回落
+                        if current_price < ma20 and rsi > 70:
+                             pass # 允许继续执行下面的逻辑以生成卖出信号
+                        else:
+                            logger.info(f"[{symbol}] A6 新闻交易冷却中，还需 {self.cooldown_after_news_trade - time_since_last_trade:.1f} 分钟")
+                            return signals
+                    else:
+                        return signals
 
             # 获取新闻影响分析
             news_impact = self.data_provider.get_recent_news_impact(
@@ -146,7 +163,17 @@ class A6NewsTrading(BaseStrategy):
             )
 
             if not news_impact or news_impact.get('news_count', 0) == 0:
-                logger.info(f"[{symbol}] A6 无相关新闻数据")
+                # 即使没有新新闻，如果持仓且技术面恶化，也应该检查是否该卖出（"Sell the News" 后期）
+                if symbol in self.positions:
+                     # 构造一个空的/中性的新闻对象来触发 _generate_news_signal 中的纯技术检查
+                     dummy_news = {'title': 'No recent news', 'sentiment_score': 0, 'relevance_score': 0}
+                     signal = self._generate_news_signal(
+                        symbol, dummy_news, 0, 0, 0, self.positions[symbol], current_price, ma20, rsi
+                     )
+                     if signal:
+                         signals.append(signal)
+                else:
+                    logger.info(f"[{symbol}] A6 无相关新闻数据")
                 return signals
 
             impact_score = news_impact.get('impact_score', 0.0)
@@ -157,10 +184,16 @@ class A6NewsTrading(BaseStrategy):
             )
             logger.info(
                 f"[{symbol}] 新闻影响评分: {impact_score:.2f}, 显著新闻数量: {len(significant_news)}, "
-                f"总新闻数: {news_impact.get('news_count', 0)}"
+                f"总新闻数: {news_impact.get('news_count', 0)}, RSI={rsi:.1f}, MA20={ma20:.2f}"
             )
 
             # 分析显著新闻
+            # 如果没有显著新闻，但也持仓，使用最新的一条普通新闻进行检查
+            if not significant_news and symbol in self.positions:
+                pass 
+                # 这里可以扩展，如果没有显著新闻但持仓，也可以触发卖出检查，
+                # 但上面的 dummy_news 逻辑或者下面的循环逻辑覆盖了一部分
+
             for news_data in significant_news:
                 news = news_data['news']
                 news_impact_score = news_data['impact_score']
@@ -176,32 +209,39 @@ class A6NewsTrading(BaseStrategy):
                     f"发布时间差={time_diff_minutes:.1f}分钟"
                 )
 
-                # 过滤条件
+                # 过滤条件 (买入时严格，卖出时宽松)
                 if relevance_score < self.min_news_relevance:
-                    logger.info(f"[{symbol}] 新闻相关性不足: {relevance_score:.2f} < {self.min_news_relevance}")
                     continue
 
                 if time_diff_minutes > (self.max_news_age_hours * 60):
-                    logger.info(f"[{symbol}] 新闻太旧: {time_diff_minutes:.1f} > {self.max_news_age_hours * 60} 分钟")
                     continue
 
-                if volatility < self.volatility_threshold:
-                    logger.info(f"[{symbol}] 价格波动不足: {volatility:.4f} < {self.volatility_threshold}")
+                # 买入需要波动率支持，卖出(止损)不需要太高的波动率限制
+                if symbol not in self.positions and volatility < self.volatility_threshold:
+                    logger.info(f"[{symbol}] 价格波动不足以开仓: {volatility:.4f} < {self.volatility_threshold}")
                     continue
 
                 # 获取当前持仓
                 current_position = self.positions.get(symbol, 0)
 
-                # 生成交易信号
+                # 生成交易信号 (传入 MA20 和 RSI)
                 signal = self._generate_news_signal(
                     symbol, news, sentiment_score, volatility,
-                    news_impact_score, current_position, current_price
+                    news_impact_score, current_position, current_price,
+                    ma20, rsi
                 )
 
                 if signal:
                     # 生成信号哈希用于冷却
                     signal_hash = self._generate_signal_hash(signal)
-                    if not self._is_signal_cooldown(signal_hash):
+                    
+                    # 卖出信号通常不需要太严格的冷却，或者冷却逻辑不同
+                    if signal['action'] == 'SELL' and current_position > 0:
+                        signals.append(signal)
+                        logger.info(f"[{symbol}] ✅ 生成卖出/平仓信号: {signal['reason']}")
+                        break
+                    
+                    elif not self._is_signal_cooldown(signal_hash):
                         signals.append(signal)
                         self._add_signal_to_cache(signal_hash, minutes=30)  # 30分钟冷却
                         self.last_news_trade_time[symbol] = current_time
@@ -226,38 +266,41 @@ class A6NewsTrading(BaseStrategy):
 
     def _generate_news_signal(self, symbol: str, news: Dict, sentiment_score: float,
                             volatility: float, impact_score: float,
-                            current_position: int, current_price: float) -> Optional[Dict]:
+                            current_position: int, current_price: float,
+                            ma20: float, rsi: float) -> Optional[Dict]:
         """
         基于新闻分析生成具体的交易信号
         """
         try:
+            # --- 1. 买入逻辑 (保持原样，略微增加 MA20 过滤) ---
             # 正面新闻且价格上涨 -> 买入信号
-            if (sentiment_score >= self.sentiment_threshold_positive and
-                impact_score > 5.0 and current_position == 0):
+            if (current_position == 0 and 
+                sentiment_score >= self.sentiment_threshold_positive and
+                impact_score > 5.0):
+                
+                # 简单过滤: 最好价格在均线之上，或者即使在之下但波动率极大(超跌反弹)
+                if current_price > ma20 or volatility > self.volatility_threshold * 2:
+                    confidence = min(sentiment_score * 0.8 + volatility * 2.0, 1.0)
 
-                confidence = min(sentiment_score * 0.8 + volatility * 2.0, 1.0)
-
-                signal = {
-                    'symbol': symbol,
-                    'signal_type': 'NEWS_POSITIVE_BREAKOUT',
-                    'action': 'BUY',
-                    'price': current_price,
-                    'quantity': 0,  # 执行时计算
-                    'confidence': confidence,
-                    'reason': f'A6正面新闻突破: 情感={sentiment_score:.2f}, 波动={volatility:.4f}, '
-                             f'影响={impact_score:.2f}, 标题="{news["title"][:50]}..."',
-                    'timestamp': datetime.now(),
-                    'news_data': {
-                        'sentiment': sentiment_score,
-                        'volatility': volatility,
-                        'impact_score': impact_score
+                    signal = {
+                        'symbol': symbol,
+                        'signal_type': 'NEWS_POSITIVE_BREAKOUT',
+                        'action': 'BUY',
+                        'price': current_price,
+                        'quantity': 0,  # 执行时计算
+                        'confidence': confidence,
+                        'reason': f'A6正面新闻: 情感={sentiment_score:.2f}, 波动={volatility:.4f}, '
+                                 f'MA20之上/高波',
+                        'timestamp': datetime.now(),
+                        'news_data': {'sentiment': sentiment_score, 'volatility': volatility}
                     }
-                }
-                return signal
+                    return signal
 
+            # --- 2. 空头开仓逻辑 ---
             # 负面新闻且价格下跌 -> 卖出信号（空头）
-            elif (sentiment_score <= self.sentiment_threshold_negative and
-                  impact_score > 5.0 and current_position == 0):
+            elif (current_position == 0 and 
+                  sentiment_score <= self.sentiment_threshold_negative and
+                  impact_score > 5.0):
 
                 confidence = min(abs(sentiment_score) * 0.8 + volatility * 2.0, 1.0)
 
@@ -266,54 +309,92 @@ class A6NewsTrading(BaseStrategy):
                     'signal_type': 'NEWS_NEGATIVE_BREAKOUT',
                     'action': 'SELL',  # 做空
                     'price': current_price,
-                    'quantity': 0,  # 执行时计算
+                    'quantity': 0,
                     'confidence': confidence,
-                    'reason': f'A6负面新闻突破: 情感={sentiment_score:.2f}, 波动={volatility:.4f}, '
-                             f'影响={impact_score:.2f}, 标题="{news["title"][:50]}..."',
+                    'reason': f'A6负面新闻: 情感={sentiment_score:.2f}, 波动={volatility:.4f}',
                     'timestamp': datetime.now(),
-                    'news_data': {
-                        'sentiment': sentiment_score,
-                        'volatility': volatility,
-                        'impact_score': impact_score
+                    'news_data': {'sentiment': sentiment_score, 'volatility': volatility}
+                }
+                return signal
+
+            # --- 3. 持多仓时的卖出逻辑 (增强版) ---
+            elif current_position > 0:
+                should_sell = False
+                sell_reason = ""
+                sell_confidence = 0.5
+
+                # 逻辑 A: 传统的负面新闻离场
+                if sentiment_score <= self.sentiment_threshold_negative:
+                    should_sell = True
+                    sell_reason = f"负面新闻出现 (情感={sentiment_score:.2f})"
+                    sell_confidence = min(abs(sentiment_score) + 0.3, 1.0)
+
+                # 逻辑 B: "Sell the News" / 情绪背离 (Good News but Price Drops)
+                # 新闻是好的，但是价格跌破了 MA20，或者在大幅下跌
+                elif sentiment_score > 0 and current_price < ma20:
+                    should_sell = True
+                    sell_reason = f"利好出尽/技术破位 (情感正, 但价格 < MA20)"
+                    sell_confidence = 0.7
+
+                # 逻辑 C: 动量衰竭 / 极度超买 (Profit Taking)
+                # 即使没有负面新闻，如果 RSI 太高且价格开始滞涨
+                elif rsi > 75 and volatility < self.volatility_threshold:
+                    should_sell = True
+                    sell_reason = f"动量衰竭 (RSI {rsi:.1f} > 75, 波动率低)"
+                    sell_confidence = 0.6
+
+                # 逻辑 D: 纯技术面恶化 (作为保底)
+                # 假设 impact_score 很低(无新新闻)，但价格跌破关键位
+                elif impact_score < 2.0 and current_price < ma20 * 0.98:
+                    should_sell = True
+                    sell_reason = f"趋势转弱 (无新闻支撑, Price < MA20 * 0.98)"
+                    sell_confidence = 0.6
+
+                if should_sell:
+                    signal = {
+                        'symbol': symbol,
+                        'signal_type': 'NEWS_EXIT_LONG',
+                        'action': 'SELL',
+                        'price': current_price,
+                        'quantity': current_position,
+                        'confidence': sell_confidence,
+                        'reason': f'A6平多: {sell_reason}',
+                        'timestamp': datetime.now()
                     }
-                }
-                return signal
+                    return signal
 
-            # 多头持仓且负面新闻 -> 平多
-            elif (current_position > 0 and sentiment_score <= self.sentiment_threshold_negative and
-                  impact_score > 3.0):
+            # --- 4. 持空仓时的平仓逻辑 ---
+            elif current_position < 0:
+                should_cover = False
+                cover_reason = ""
+                
+                # 逻辑 A: 正面新闻
+                if sentiment_score >= self.sentiment_threshold_positive:
+                    should_cover = True
+                    cover_reason = f"正面新闻出现 (情感={sentiment_score:.2f})"
 
-                confidence = min(abs(sentiment_score) * 0.7 + volatility * 1.5, 1.0)
+                # 逻辑 B: 技术反转 (价格站上 MA20)
+                elif current_price > ma20:
+                    should_cover = True
+                    cover_reason = "趋势反转 (Price > MA20)"
 
-                signal = {
-                    'symbol': symbol,
-                    'signal_type': 'NEWS_EXIT_LONG',
-                    'action': 'SELL',
-                    'price': current_price,
-                    'quantity': current_position,
-                    'confidence': confidence,
-                    'reason': f'A6平多头仓位: 负面新闻情感={sentiment_score:.2f}, 影响={impact_score:.2f}',
-                    'timestamp': datetime.now()
-                }
-                return signal
+                # 逻辑 C: 超卖 (RSI < 25)
+                elif rsi < 25:
+                    should_cover = True
+                    cover_reason = f"超卖反弹风险 (RSI {rsi:.1f})"
 
-            # 空头持仓且正面新闻 -> 平空
-            elif (current_position < 0 and sentiment_score >= self.sentiment_threshold_positive and
-                  impact_score > 3.0):
-
-                confidence = min(sentiment_score * 0.7 + volatility * 1.5, 1.0)
-
-                signal = {
-                    'symbol': symbol,
-                    'signal_type': 'NEWS_EXIT_SHORT',
-                    'action': 'BUY',
-                    'price': current_price,
-                    'quantity': abs(current_position),
-                    'confidence': confidence,
-                    'reason': f'A6平空头仓位: 正面新闻情感={sentiment_score:.2f}, 影响={impact_score:.2f}',
-                    'timestamp': datetime.now()
-                }
-                return signal
+                if should_cover:
+                    signal = {
+                        'symbol': symbol,
+                        'signal_type': 'NEWS_EXIT_SHORT',
+                        'action': 'BUY',
+                        'price': current_price,
+                        'quantity': abs(current_position),
+                        'confidence': 0.7,
+                        'reason': f'A6平空: {cover_reason}',
+                        'timestamp': datetime.now()
+                    }
+                    return signal
 
             return None
 

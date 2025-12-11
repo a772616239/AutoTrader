@@ -132,10 +132,6 @@ class A4PullbackStrategy(BaseStrategy):
             logger.info(f"{symbol} 已有持仓，跳过买入信号")
             return None
         
-        # if len(data) < self.config['pullback_lookback'] + self.config['trend_ma_period']:
-        #     logger.info(f"{symbol} 数据不足: {len(data)} < {self.config['pullback_lookback'] + self.config['trend_ma_period']}")
-        #     return None
-        
         # 识别趋势
         trend, trend_strength, current_price = self.identify_trend(data)
         if trend != 'UPTREND':
@@ -215,15 +211,11 @@ class A4PullbackStrategy(BaseStrategy):
     def detect_pullback_in_downtrend(self, symbol: str, data: pd.DataFrame,
                                     indicators: Dict) -> Optional[Dict]:
         """
-        在下降趋势中检测反弹卖出信号
+        在下降趋势中检测反弹卖出信号 (开空)
         """
         if symbol in self.positions:
-            logger.info(f"{symbol} 已有持仓，跳过卖出信号")
+            logger.info(f"{symbol} 已有持仓，跳过卖出信号（开空）")
             return None
-        
-        # if len(data) < self.config['pullback_lookback'] + self.config['trend_ma_period']:
-        #     logger.info(f"{symbol} 数据不足: {len(data)} < {self.config['pullback_lookback'] + self.config['trend_ma_period']}")
-        #     return None
         
         # 识别趋势
         trend, trend_strength, current_price = self.identify_trend(data)
@@ -310,16 +302,14 @@ class A4PullbackStrategy(BaseStrategy):
             logger.info(f"{symbol} 数据不足，无法生成信号")
             return signals
             
-        # if len(data) < self.config['pullback_lookback'] + self.config['trend_ma_period']:
-        #     logger.info(f"{symbol} 数据不足，无法生成信号- len(){len(data)}-需要至少 {self.config['pullback_lookback'] + self.config['trend_ma_period']} 根K线")
-        #     return signals
         # 获取ATR用于仓位管理
         atr = indicators.get('ATR', data['Close'].std() * 0.01)
         
         # 检查是否有持仓需要卖出
         if symbol in self.positions:
             current_price = data['Close'].iloc[-1]
-            exit_signal = self.check_exit_conditions(symbol, current_price)
+            # 将 data 传入 check_exit_conditions，以便做更多基于历史数据的平仓判断
+            exit_signal = self.check_exit_conditions(symbol, current_price, data)
             if exit_signal:
                 exit_signal['position_size'] = abs(self.positions[symbol]['size'])
                 logger.info(f"🔴 {symbol} 卖出信号: {exit_signal['reason']}")
@@ -363,11 +353,21 @@ class A4PullbackStrategy(BaseStrategy):
         return signals
     
     def check_exit_conditions(self, symbol: str, current_price: float,
+                             data: pd.DataFrame = None,
                              current_time: datetime = None) -> Optional[Dict]:
-        """检查卖出条件"""
-        # if symbol not in self.positions:
-        #     logger.info(f"{symbol} 无持仓，无法检查卖出条件")
-        #     return None
+        """检查卖出条件（增强版）
+        
+        增强逻辑：
+        - 原有的 止损 / 止盈 / 最大持仓时间 / 追踪止损 保留
+        - 新增基于历史数据的主动平仓：
+          1) 短期均线下穿长期均线（趋势反转） -> 平多；反之平空
+          2) 跌破近期支撑（近20根K线最低）且跌破幅度达到阈值 -> 平多
+          3) 成交量放大并伴随快速下跌 -> 平多（成交量确认）
+        注意：不新增 positions 的字段，仅使用临时计算
+        """
+        if symbol not in self.positions:
+            logger.debug(f"{symbol} 无持仓，跳过平仓检查")
+            return None
         
         if current_time is None:
             current_time = datetime.now()
@@ -383,6 +383,7 @@ class A4PullbackStrategy(BaseStrategy):
         else:
             price_change_pct = (avg_cost - current_price) / avg_cost
         
+        # --- 原有硬止损/止盈/超时 ---
         # 止损
         if price_change_pct <= -self.config['stop_loss_pct']:
             return {
@@ -420,22 +421,15 @@ class A4PullbackStrategy(BaseStrategy):
                 'profit_pct': price_change_pct * 100
             }
         
-        # 追踪止损
+        # 追踪止损（原有逻辑）
         trailing_stop_pct = self.config.get('trailing_stop_pct', 0.02)
         
         if position_size > 0:
-            # 多头追踪止损
-            # 更新最高价 (初始化默认为0，确保第一时间更新)
             highest_price = position.get('highest_price', 0.0)
             if current_price > highest_price:
                 self.positions[symbol]['highest_price'] = current_price
                 highest_price = current_price
             
-            # 检查回撤
-            # 注意: 只有当价格高于成本价(有盈利)一定幅度后才激活追踪止损，或者直接全程追踪
-            # 这里简化为：只要回撤达到比例就止损，不管是否盈利（保护利润 + 限制亏损）
-            # 但通常追踪止损是为了锁住利润。如果为了限制亏损，已有 stop_loss_pct
-            # 改进：如果当前最高价 > 平均成本，才触发追踪逻辑，避免在水下波动时过早止损（水下由硬止损负责）
             if highest_price > avg_cost * 1.01: # 至少有1%利润后才开始追踪
                  drawdown = (highest_price - current_price) / highest_price
                  if drawdown >= trailing_stop_pct:
@@ -449,14 +443,11 @@ class A4PullbackStrategy(BaseStrategy):
                         'profit_pct': price_change_pct * 100
                     }
         else:
-            # 空头追踪止损
-            # 更新最低价 (初始化默认为无穷大)
             lowest_price = position.get('lowest_price', float('inf'))
             if current_price < lowest_price:
                 self.positions[symbol]['lowest_price'] = current_price
                 lowest_price = current_price
             
-            # 检查反弹
             if lowest_price < avg_cost * 0.99: # 至少有1%利润后才开始追踪
                 rebound = (current_price - lowest_price) / lowest_price
                 if rebound >= trailing_stop_pct:
@@ -470,4 +461,107 @@ class A4PullbackStrategy(BaseStrategy):
                         'profit_pct': price_change_pct * 100
                     }
         
+        # --- 新增主动平仓规则（基于 data） ---
+        if data is not None and len(data) >= 30:
+            try:
+                # 计算均线
+                ma_long = data['Close'].rolling(window=self.config['trend_ma_period']).mean().iloc[-1]
+                ma_short = data['Close'].rolling(window=20).mean().iloc[-1]
+                ma_short_prev = data['Close'].rolling(window=20).mean().iloc[-2]
+                ma_long_prev = data['Close'].rolling(window=self.config['trend_ma_period']).mean().iloc[-2]
+                
+                # 1) 均线死叉（短期下穿长期） => 平多；均线金叉 => 平空
+                # 检测最近一根是否发生下穿/上穿（更敏感主动平仓）
+                cross_down = (ma_short_prev >= ma_long_prev) and (ma_short < ma_long)
+                cross_up = (ma_short_prev <= ma_long_prev) and (ma_short > ma_long)
+                if position_size > 0 and cross_down:
+                    # 多头遇到短期均线下穿长期均线，视为趋势反转，主动平仓
+                    logger.info(f"{symbol} 检测到 MA 死叉，建议平多: MA20 {ma_short:.2f} MA{self.config['trend_ma_period']} {ma_long:.2f}")
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'MA_CROSS_EXIT',
+                        'action': 'SELL',
+                        'price': current_price,
+                        'reason': f"MA 死叉: MA20 {ma_short:.2f} 下穿 MA{self.config['trend_ma_period']} {ma_long:.2f}",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100
+                    }
+                if position_size < 0 and cross_up:
+                    # 空头遇到短期均线上穿长期均线，主动回补
+                    logger.info(f"{symbol} 检测到 MA 金叉，建议平空: MA20 {ma_short:.2f} MA{self.config['trend_ma_period']} {ma_long:.2f}")
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'MA_CROSS_EXIT',
+                        'action': 'BUY',
+                        'price': current_price,
+                        'reason': f"MA 金叉: MA20 {ma_short:.2f} 上穿 MA{self.config['trend_ma_period']} {ma_long:.2f}",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100
+                    }
+                
+                # 2) 跌破近期支撑（近N根K线最低）且跌穿幅度达到阈值 -> 平多
+                support_lookback = min(20, len(data)-1)
+                recent_support = data['Low'].iloc[-support_lookback:].min()
+                # 触发阈值 (例如跌破支撑 0.25% 或更多)
+                support_break_threshold = 0.0025
+                if position_size > 0 and current_price < recent_support * (1 - support_break_threshold):
+                    logger.info(f"{symbol} 跌破近期支撑 {recent_support:.2f} -> 当前 {current_price:.2f}")
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'SUPPORT_BREAK_EXIT',
+                        'action': 'SELL',
+                        'price': current_price,
+                        'reason': f"跌破支撑 {recent_support:.2f} -> {current_price:.2f}",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100
+                    }
+                if position_size < 0 and current_price > data['High'].iloc[-support_lookback:].max() * (1 + support_break_threshold):
+                    # 空头遇到突破阻力，主动回补
+                    top_resistance = data['High'].iloc[-support_lookback:].max()
+                    logger.info(f"{symbol} 突破近期阻力 {top_resistance:.2f} -> 当前 {current_price:.2f}")
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'RESISTANCE_BREAK_EXIT',
+                        'action': 'BUY',
+                        'price': current_price,
+                        'reason': f"突破阻力 {top_resistance:.2f} -> {current_price:.2f}",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100
+                    }
+                
+                # 3) 成交量放大 + 快速下跌 -> 平多（用前一根收盘与当前比较）
+                if len(data) >= 5:
+                    avg_volume = data['Volume'].iloc[-10:].mean() if len(data) >= 10 else data['Volume'].iloc[-(len(data)//2):].mean()
+                    current_volume = data['Volume'].iloc[-1]
+                    prev_close = data['Close'].iloc[-2]
+                    price_drop_from_prev = (prev_close - current_price) / prev_close if prev_close > 0 else 0
+                    volume_spike_ratio = (current_volume / avg_volume) if avg_volume > 0 else 0
+                    # 条件：成交量 > 1.5x 平均，且较上一根快速下跌超过 0.5%（可调）
+                    if position_size > 0 and volume_spike_ratio >= 1.5 and price_drop_from_prev >= 0.005:
+                        logger.info(f"{symbol} 成交量放大({volume_spike_ratio:.2f}x) 且快速下跌 ({price_drop_from_prev:.2%})，建议平多")
+                        return {
+                            'symbol': symbol,
+                            'signal_type': 'VOLUME_SPIKE_DROP_EXIT',
+                            'action': 'SELL',
+                            'price': current_price,
+                            'reason': f"成交量放大 {volume_spike_ratio:.2f}x 且下跌 {price_drop_from_prev:.2%}",
+                            'position_size': abs(position_size),
+                            'profit_pct': price_change_pct * 100
+                        }
+                    # 空头：成交量放大且快速上升 -> 平空
+                    if position_size < 0 and volume_spike_ratio >= 1.5 and (-price_drop_from_prev) >= 0.005:
+                        logger.info(f"{symbol} 成交量放大({volume_spike_ratio:.2f}x) 且快速上涨，建议平空")
+                        return {
+                            'symbol': symbol,
+                            'signal_type': 'VOLUME_SPIKE_RISE_EXIT',
+                            'action': 'BUY',
+                            'price': current_price,
+                            'reason': f"成交量放大 {volume_spike_ratio:.2f}x 且上涨 {(-price_drop_from_prev):.2%}",
+                            'position_size': abs(position_size),
+                            'profit_pct': price_change_pct * 100
+                        }
+            except Exception as e:
+                logger.exception(f"{symbol} 在主动平仓规则计算时发生错误: {e}")
+        
+        # 若没有触发任何平仓规则
         return None

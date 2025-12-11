@@ -125,7 +125,14 @@ class A5MultiFactorAI(BaseStrategy):
             # 成交量趋势
             recent_volumes = recent['Volume'].values if 'Volume' in data.columns else recent['volume'].values
             if len(recent_volumes) > 1:
-                volume_trend = (np.corrcoef(np.arange(len(recent_volumes)), recent_volumes)[0, 1] + 1.0) / 2.0
+                try:
+                    corr = np.corrcoef(np.arange(len(recent_volumes)), recent_volumes)[0, 1]
+                    if np.isnan(corr) or np.isinf(corr):
+                        volume_trend = 0.5  # 当成交量为0或无变化时，设为中性
+                    else:
+                        volume_trend = (corr + 1.0) / 2.0
+                except (ValueError, RuntimeWarning):
+                    volume_trend = 0.5  # 处理计算异常
             else:
                 volume_trend = 0.5
             
@@ -287,8 +294,6 @@ class A5MultiFactorAI(BaseStrategy):
             logger.warning(f"A5动量计算出错: {e}")
             return 0.5
 
-
-
     def _calculate_composite_ai_score(self, liquidity_score: float, 
                                      fundamental_score: float,
                                      sentiment_score: float,
@@ -341,6 +346,9 @@ class A5MultiFactorAI(BaseStrategy):
             
             current_price = data[close_col].iloc[-1]
             current_volume = data[vol_col].iloc[-1]
+            
+            # 计算 MA20 供后续趋势判断使用
+            ma20 = data[close_col].tail(20).mean() if len(data) >= 20 else current_price
             
             # 预过滤 - 价格和成交量
             if current_price < self.min_price:
@@ -434,15 +442,18 @@ class A5MultiFactorAI(BaseStrategy):
                 f"[{symbol}] 综合因子分析: 流动性={liquidity_score:.3f}, "
                 f"基本面={fundamental_score:.3f}, 情绪={sentiment_score:.3f}, "
                 f"动量={momentum_score:.3f} | 复合得分={composite_score:.3f} | "
-                f"价格=${current_price:.2f}, 成交量={current_volume:.0f}"
+                f"价格=${current_price:.2f}, MA20=${ma20:.2f}"
             )
             
             # 进场信号
             if current_position == 0:  # 无持仓
                 # 严格的买入条件：复合得分 + 流动性 + 动量都必须强劲
+                # 增强过滤：股价需在 MA20 之上才做多 (趋势过滤)
                 if (composite_score >= self.buy_threshold and 
                     liquidity_score >= 0.65 and 
-                    momentum_score >= 0.65):
+                    momentum_score >= 0.65 and
+                    current_price >= ma20):
+                    
                     confidence = min(composite_score, 1.0)
                     
                     # 再次检查最小信心度
@@ -455,8 +466,8 @@ class A5MultiFactorAI(BaseStrategy):
                             'quantity': 0,  # 执行时计算
                             'confidence': confidence,
                             'reason': f'A5 AI复合得分={composite_score:.3f}; '
-                                     f'流动性={liquidity_score:.2f}, 基本面={fundamental_score:.2f}, '
-                                     f'情绪={sentiment_score:.2f}, 动量={momentum_score:.2f}',
+                                     f'流动性={liquidity_score:.2f}, 动量={momentum_score:.2f}, '
+                                     f'Price>MA20',
                             'timestamp': datetime.now()
                         }
                         
@@ -465,26 +476,54 @@ class A5MultiFactorAI(BaseStrategy):
                             signals.append(signal)
                             self._add_signal_to_cache(signal_hash)
                             logger.info(
-                                f"[{symbol}] ✅ 生成BUY信号: 复合得分={composite_score:.3f} >= {self.buy_threshold}, "
-                                f"信心度={confidence:.3f}"
+                                f"[{symbol}] ✅ 生成BUY信号: 复合得分={composite_score:.3f} >= {self.buy_threshold}"
                             )
-                    else:
-                        logger.info(f"[{symbol}] 无 BUY 信号: 信心度 {confidence:.3f} < 最小值 {self.min_confidence}")
                 else:
-                    logger.info(f"[{symbol}] 无 BUY 信号: 复合得分={composite_score:.3f} < {self.buy_threshold}")
+                    logger.info(f"[{symbol}] 无 BUY 信号: 复合得分={composite_score:.3f} 或 技术面偏弱")
             
-            elif current_position > 0:  # 多头持仓
+            elif current_position > 0:  # 多头持仓 - 增强卖出逻辑
+                should_sell = False
+                sell_reason = ""
+                sell_confidence = 0.5
+                
+                # 1. 硬性止损/极低分 (Panic Exit)
                 if composite_score <= self.exit_threshold:
-                    confidence = 1.0 - composite_score
-                    
+                    should_sell = True
+                    sell_reason = f'评分过低 (Score {composite_score:.3f} <= Exit {self.exit_threshold})'
+                    sell_confidence = 1.0 - composite_score
+                
+                # 2. 趋势破坏或动量衰竭 (Weakness Exit)
+                # 使用 sell_threshold (通常0.45-0.55) 作为软性警戒线
+                elif composite_score <= self.sell_threshold:
+                    # 如果分数一般，且动量已经不行了 (<0.4)，卖出
+                    if momentum_score < 0.4:
+                        should_sell = True
+                        sell_reason = f'动量衰竭 (Score {composite_score:.3f}, Mom {momentum_score:.2f})'
+                        sell_confidence = 0.8
+                    # 如果分数一般，且价格跌破 MA20 (趋势破坏)，卖出
+                    elif current_price < ma20:
+                        should_sell = True
+                        sell_reason = f'趋势破坏 (Score {composite_score:.3f}, Price < MA20)'
+                        sell_confidence = 0.75
+                
+                # 3. 高位风险管理 (Technical Breakdown at Highs)
+                # 计算 RSI (简单重算或从momentum_score推断，这里假设momentum_score包含RSI成分)
+                # 如果动量分极高但开始背离，或者简单地：价格在高位但分数开始下滑
+                elif composite_score < 0.70 and momentum_score < 0.5:
+                     # 高位分数下滑
+                     should_sell = True
+                     sell_reason = f'高位转弱 (Score {composite_score:.3f} < 0.7, Mom {momentum_score:.2f} < 0.5)'
+                     sell_confidence = 0.6
+                
+                if should_sell:
                     signal = {
                         'symbol': symbol,
                         'signal_type': 'MULTIFACTOR_AI_EXIT_LONG',
                         'action': 'SELL',
                         'price': current_price,
                         'quantity': current_position,
-                        'confidence': confidence,
-                        'reason': f'A5 AI复合得分={composite_score:.3f} <= 平仓阈值 {self.exit_threshold:.3f}; 平多头仓位',
+                        'confidence': sell_confidence,
+                        'reason': f'A5 卖出触发: {sell_reason}',
                         'timestamp': datetime.now()
                     }
                     
@@ -493,16 +532,31 @@ class A5MultiFactorAI(BaseStrategy):
                         signals.append(signal)
                         self._add_signal_to_cache(signal_hash)
                         logger.info(
-                            f"[{symbol}] ✅ 生成 SELL 信号(平多): 复合得分={composite_score:.3f} <= {self.exit_threshold}, "
-                            f"数量={current_position}"
+                            f"[{symbol}] ✅ 生成 SELL 信号: {sell_reason}"
                         )
                 else:
-                    logger.info(f"[{symbol}] 持有多头: 复合得分={composite_score:.3f} > {self.exit_threshold}")
+                    logger.info(f"[{symbol}] 持有多头: 状态良好 (Score={composite_score:.3f}, Price>MA20 or Mom>0.4)")
             
-            elif current_position < 0:  # 空头持仓
-                if composite_score >= (1.0 - self.exit_threshold):
+            elif current_position < 0:  # 空头持仓 (保持原有逻辑，稍作对称调整)
+                exit_short_threshold = 1.0 - self.exit_threshold
+                sell_short_threshold = 1.0 - self.sell_threshold
+                
+                should_cover = False
+                cover_reason = ""
+                
+                # 硬性离场
+                if composite_score >= exit_short_threshold:
+                    should_cover = True
+                    cover_reason = f"评分过高 (Score {composite_score:.3f} >= {exit_short_threshold})"
+                
+                # 软性离场 (分数开始变好 + 价格站上均线)
+                elif composite_score >= sell_short_threshold:
+                    if current_price > ma20:
+                        should_cover = True
+                        cover_reason = f"趋势转强 (Score {composite_score:.3f}, Price > MA20)"
+                
+                if should_cover:
                     confidence = composite_score
-                    
                     signal = {
                         'symbol': symbol,
                         'signal_type': 'MULTIFACTOR_AI_EXIT_SHORT',
@@ -510,7 +564,7 @@ class A5MultiFactorAI(BaseStrategy):
                         'price': current_price,
                         'quantity': abs(current_position),
                         'confidence': confidence,
-                        'reason': f'A5 AI复合得分={composite_score:.3f} >= {1.0 - self.exit_threshold:.3f}; 平空头仓位',
+                        'reason': f'A5 平空触发: {cover_reason}',
                         'timestamp': datetime.now()
                     }
                     
@@ -519,11 +573,8 @@ class A5MultiFactorAI(BaseStrategy):
                         signals.append(signal)
                         self._add_signal_to_cache(signal_hash)
                         logger.info(
-                            f"[{symbol}] ✅ 生成 BUY 信号(平空): 复合得分={composite_score:.3f} >= {1.0 - self.exit_threshold}, "
-                            f"数量={abs(current_position)}"
+                            f"[{symbol}] ✅ 生成 BUY 信号(平空): {cover_reason}"
                         )
-                else:
-                    logger.info(f"[{symbol}] 持有空头: 复合得分={composite_score:.3f} < {1.0 - self.exit_threshold}")
         
         except Exception as e:
             logger.error(f"[{symbol}] A5 信号生成异常: {e}", exc_info=True)
