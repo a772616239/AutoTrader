@@ -113,6 +113,7 @@ CONFIG = {
         'max_symbols_per_cycle': 50,
         'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
+        'sell_exempt_from_cap': False   ,  # 卖出是否不受per_trade_notional_cap单笔限额限制
     },
     'logging': {
         'debug_mode': False,  # 调试模式：每次运行生成新日志文件

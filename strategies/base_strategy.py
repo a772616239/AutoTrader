@@ -470,6 +470,21 @@ class BaseStrategy:
             elif signal['position_size'] > current_pos:
                 signal['position_size'] = current_pos
 
+            # 检查卖出名义价值上限（如果开关开启）
+            if not CONFIG['trading'].get('sell_exempt_from_cap', True):
+                per_trade_cap = float(self.config.get('per_trade_notional_cap', 10000.0))
+                notional_value = signal['position_size'] * current_price
+                if notional_value > per_trade_cap:
+                    max_qty = int(per_trade_cap / current_price)
+                    if max_qty > 0:
+                        logger.info(f"💰 卖出名义价值超过上限 (${notional_value:.2f} > ${per_trade_cap:.2f})，"
+                                    f"调整仓位: {signal['position_size']} -> {max_qty} 股")
+                        signal['position_size'] = max_qty
+                    else:
+                        msg = f"卖出名义价值超过上限 (${notional_value:.2f} > ${per_trade_cap:.2f})，无法卖出"
+                        logger.info(f"⚠️ {msg}")
+                        return {'status': 'REJECTED', 'reason': msg}
+
         # 创建交易记录
         trade = {
             'symbol': signal['symbol'],
