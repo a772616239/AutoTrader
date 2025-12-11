@@ -175,8 +175,8 @@ class BaseStrategy:
             price_change_pct = (avg_cost - current_price) / avg_cost
         
         # 简单的退出条件 - 使用配置或默认值
-        stop_loss_pct = -abs(self.config.get('stop_loss_pct', 0.02))  # 确保为负值
-        take_profit_pct = abs(self.config.get('take_profit_pct', 0.03))  # 确保为正值
+        stop_loss_pct = -abs(self.config.get('stop_loss_pct', 0.015))  # 确保为负值，降低限制
+        take_profit_pct = abs(self.config.get('take_profit_pct', 0.025))  # 确保为正值，降低限制
         
         # 检查最大持有时间（优先检查分钟级别，适用于日内交易）
         max_holding_minutes = self.config.get('max_holding_minutes', None)
@@ -267,7 +267,7 @@ class BaseStrategy:
                     position_value = abs(position_size) * current_price
                     if position_value > 0:
                         pnl_pct = (unrealized_pnl / position_value) * 100
-                        take_profit_pnl_threshold = self.config.get('take_profit_pnl_threshold', 500.0)  # 默认$500未实现盈利
+                        take_profit_pnl_threshold = self.config.get('take_profit_pnl_threshold', 300.0)  # 默认$300未实现盈利，降低限制
                         logger.debug(f"📊 {symbol} IB未实现盈利检查: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%), 阈值: ${take_profit_pnl_threshold:.2f}, 持仓价值: ${position_value:.2f}")
                         if unrealized_pnl >= take_profit_pnl_threshold:
                             logger.info(f"✅ {symbol} 触发IB未实现盈利止盈: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%) >= ${take_profit_pnl_threshold:.2f}")

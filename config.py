@@ -127,11 +127,11 @@ CONFIG = {
         'rsi_overbought': 72,
         'rsi_oversold': 28,
         'stop_loss_atr_multiple': 1.5,      # ATR止损倍数（用于仓位计算）
-        'stop_loss_pct': 0.025,             # 止损百分比（2.5%，优先使用）
+        'stop_loss_pct': 0.02,              # 止损百分比（2%，降低限制）
         'take_profit_atr_multiple': 3.0,    # ATR止盈倍数（用于仓位计算）
-        'take_profit_pct': 0.045,           # 止盈百分比（4.5%，基于ATR 3.0倍估算，优先使用）
- 'take_profit_pnl_threshold': 200.0, # IB未实现盈利止盈阈值（美元，默认$500）
-        'max_holding_minutes': 120,         # 最大持有时间（120分钟，日内交易）
+        'take_profit_pct': 0.03,            # 止盈百分比（3%，降低限制）
+ 'take_profit_pnl_threshold': 100.0, # IB未实现盈利止盈阈值（美元，降低限制）
+        'max_holding_minutes': 180,         # 最大持有时间（180分钟，延长）
         'quick_loss_cutoff': -0.03,         # 快速止损阈值（-3%）
         'force_close_time': '15:45',        # 收盘前强制平仓时间
         'ib_order_type': 'LMT',
@@ -150,9 +150,9 @@ CONFIG = {
         'zscore_lookback': 20,
         'zscore_entry_threshold': 2.0,
         'zscore_exit_threshold': 0.5,
-        'stop_loss_pct': 0.03,              # 止损百分比（3%）
-        'take_profit_pct': 0.05,             # 止盈百分比（5%）
-        'max_holding_days': 5,               # 最大持有天数
+        'stop_loss_pct': 0.025,             # 止损百分比（2.5%，降低限制）
+        'take_profit_pct': 0.04,             # 止盈百分比（4%，降低限制）
+        'max_holding_days': 7,               # 最大持有天数（延长）
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.005,
         'trading_start_time': '09:30',
@@ -178,10 +178,10 @@ CONFIG = {
         'volume_sma_period': 20,
         'volume_surge_ratio': 1.5,
         'min_volume_threshold': 500000,
-        'stop_loss_pct': 0.025,            # 止损百分比（2.5%，日内交易）
-        'take_profit_pct': 0.03,           # 止盈百分比（3%）
+        'stop_loss_pct': 0.02,             # 止损百分比（2%，降低限制）
+        'take_profit_pct': 0.025,          # 止盈百分比（2.5%，降低限制）
         'take_profit_atr_multiple': 2.0,   # 基于ATR的止盈倍数
-        'max_holding_minutes': 60,         # 最大持有时间（60分钟，日内交易）
+        'max_holding_minutes': 90,         # 最大持有时间（90分钟，延长）
         'force_close_time': '15:30',       # 收盘前强制平仓时间
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
@@ -204,9 +204,9 @@ CONFIG = {
         'pullback_sell_ratio': [0.08, 0.7],  # 反弹卖出位置
         'volume_confirmation': True,
         'min_volume_ratio': 0.6,          # 最小成交量相对历史平均值的比例（0.5=50%，基于历史对比）
-        'stop_loss_pct': 0.03,
-        'take_profit_pct': 0.05,
-        'max_holding_days': 5,
+        'stop_loss_pct': 0.025,  # 降低限制
+        'take_profit_pct': 0.04,   # 降低限制
+        'max_holding_days': 7,     # 延长
         'trading_start_time': '10:00',  # 避开开盘波动
         'trading_end_time': '15:30',
         'avoid_open_hour': True,
@@ -233,9 +233,9 @@ CONFIG = {
         'buy_threshold': 0.68,                 # 买入复合得分阈值（严格）
         'sell_threshold': 0.55,                # 卖出复合得分阈值（严格）
         'exit_threshold': 0.25,                # 平仓复合得分阈值（更低，快速止损）
-        'stop_loss_pct': 0.02,                 # 止损百分比（2%，重要！）
-        'take_profit_pct': 0.035,              # 止盈百分比（3.5%，优化后）
-        'max_holding_days': 5,                 # 最大持有天数（强制平仓）
+        'stop_loss_pct': 0.015,               # 止损百分比（1.5%，降低限制）
+        'take_profit_pct': 0.03,               # 止盈百分比（3%，降低限制）
+        'max_holding_days': 7,                 # 最大持有天数（延长）
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.01,
         'trading_start_time': '09:45',
@@ -259,9 +259,9 @@ CONFIG = {
         'min_news_relevance': 0.7,             # 最小新闻相关性评分
         'max_news_age_hours': 4,               # 最大新闻年龄（小时）
         'cooldown_after_news_trade': 60,       # 新闻交易后冷却期（分钟）
-        'stop_loss_pct': 0.02,                 # 止损百分比（2%，新闻交易风险大）
-        'take_profit_pct': 0.025,              # 止盈百分比（2.5%，快速锁定利润）
-        'max_holding_minutes': 60,            # 最大持有时间（60分钟，日内交易）
+        'stop_loss_pct': 0.015,               # 止损百分比（1.5%，降低限制）
+        'take_profit_pct': 0.02,               # 止盈百分比（2%，降低限制）
+        'max_holding_minutes': 90,            # 最大持有时间（90分钟，延长）
         'force_close_time': '15:30',          # 收盘前强制平仓时间
         'ib_order_type': 'LMT',
         'ib_limit_offset': 0.005,
@@ -281,16 +281,93 @@ CONFIG = {
         'trend_filter_sma_period': 200, # 慢速趋势线 (MA200)
         'trend_filter_fast_sma_period': 50, # 快速趋势线 (MA50) - 新增：要求 MA50 > MA200
         'stop_loss_atr_multiple': 2.0,  # ATR止损倍数
-        'stop_loss_pct': 0.03,           # 止损百分比（3%，作为ATR止损的后备）
-        'take_profit_pct': 0.04,         # 止盈百分比（4%，趋势跟踪可以稍高）
+        'stop_loss_pct': 0.025,         # 止损百分比（2.5%，降低限制）
+        'take_profit_pct': 0.035,        # 止盈百分比（3.5%，降低限制）
         'take_profit_atr_multiple': 2.5, # 或使用ATR止盈（2.5倍ATR）
-        'max_holding_days': 10,          # 最大持有天数（趋势跟踪可能较长）
+        'max_holding_days': 14,          # 最大持有天数（延长）
         'ib_order_type': 'LMT', # 使用限价单 (无行情权限需用LMT)
         'ib_limit_offset': -0.003, # 激进单 (Marketable Limit)
         'trading_start_time': '09:45',
         'trading_end_time': '16:00',
         'avoid_open_hour': True,
         'avoid_close_hour': True,
+    },
+    'strategy_a8': {  # A8 RSI震荡策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'rsi_period': 14,
+        'rsi_oversold': 30,
+        'rsi_overbought': 70,
+        'rsi_signal_threshold': 5,
+        'stop_loss_pct': 0.015,         # 止损百分比（1.5%，降低限制）
+        'take_profit_pct': 0.025,        # 止盈百分比（2.5%，降低限制）
+        'max_holding_minutes': 90,       # 最大持有时间（90分钟，延长）
+        'trailing_stop_activation': 0.02,
+        'trailing_stop_distance': 0.015,
+        'signal_cooldown_minutes': 10,
+        'min_volume': 10000,
+        'min_data_points': 20,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a9': {  # A9 MACD交叉策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'macd_fast': 12,
+        'macd_slow': 26,
+        'macd_signal': 9,
+        'histogram_threshold': 0.1,
+        'stop_loss_pct': 0.02,          # 止损百分比（2%，降低限制）
+        'take_profit_pct': 0.04,         # 止盈百分比（4%，降低限制）
+        'max_holding_minutes': 180,      # 最大持有时间（180分钟，延长）
+        'trailing_stop_activation': 0.03,
+        'trailing_stop_distance': 0.02,
+        'signal_cooldown_minutes': 15,
+        'min_volume': 10000,
+        'min_data_points': 35,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a10': {  # A10 布林带策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'bollinger_period': 20,
+        'bollinger_std': 2.0,
+        'stop_loss_pct': 0.02,          # 止损百分比（2%，降低限制）
+        'take_profit_pct': 0.04,         # 止盈百分比（4%，降低限制）
+        'max_holding_minutes': 120,      # 最大持有时间（120分钟，延长）
+        'signal_cooldown_minutes': 10,
+        'min_volume': 10000,
+        'min_data_points': 25,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a11': {  # A11 移动平均交叉策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'fast_ma_period': 9,
+        'slow_ma_period': 21,
+        'ma_type': 'SMA',
+        'stop_loss_pct': 0.02,          # 止损百分比（2%，降低限制）
+        'take_profit_pct': 0.04,         # 止盈百分比（4%，降低限制）
+        'max_holding_minutes': 120,      # 最大持有时间（120分钟，延长）
+        'signal_cooldown_minutes': 15,
+        'min_volume': 10000,
+        'min_data_points': 25,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
     }
 }
 
@@ -303,6 +380,10 @@ STRATEGY_CONFIG_MAP = {
     'a5': 'strategy_a5',
     'a6': 'strategy_a6',
     'a7': 'strategy_a7',
+    'a8': 'strategy_a8',
+    'a9': 'strategy_a9',
+    'a10': 'strategy_a10',
+    'a11': 'strategy_a11',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a8/a9/a10

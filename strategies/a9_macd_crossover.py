@@ -17,39 +17,45 @@ class A9MACDCrossoverStrategy(BaseStrategy):
     """MACD交叉策略 - A9"""
 
     def _default_config(self) -> Dict:
-        """默认配置"""
-        return {
-            # 资金管理
-            'initial_capital': 40000.0,
-            'risk_per_trade': 0.02,
-            'max_position_size': 0.1,
-            'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
-            'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+        """默认配置 - 从config.py读取"""
+        from config import CONFIG
+        strategy_key = 'strategy_a9'
+        if strategy_key in CONFIG:
+            return CONFIG[strategy_key]
+        else:
+            # 降级到硬编码默认值
+            return {
+                # 资金管理
+                'initial_capital': 40000.0,
+                'risk_per_trade': 0.02,
+                'max_position_size': 0.1,
+                'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
+                'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
 
-            # MACD参数
-            'macd_fast': 12,
-            'macd_slow': 26,
-            'macd_signal': 9,
-            'histogram_threshold': 0.1,  # 直方图阈值
+                # MACD参数
+                'macd_fast': 12,
+                'macd_slow': 26,
+                'macd_signal': 9,
+                'histogram_threshold': 0.1,  # 直方图阈值
 
-            # 风险管理
-            'stop_loss_pct': 0.025,
-            'take_profit_pct': 0.05,
-            'max_holding_minutes': 120,
-            'trailing_stop_activation': 0.03,
-            'trailing_stop_distance': 0.02,
+                # 风险管理
+                'stop_loss_pct': 0.02,  # 降低限制
+                'take_profit_pct': 0.04,  # 降低限制
+                'max_holding_minutes': 180,  # 延长
+                'trailing_stop_activation': 0.03,
+                'trailing_stop_distance': 0.02,
 
-            # 防重复交易
-            'signal_cooldown_minutes': 15,
+                # 防重复交易
+                'signal_cooldown_minutes': 15,
 
-            # 交易参数
-            'min_volume': 10000,
-            'min_data_points': 35,  # 需要足够数据计算MACD
+                # 交易参数
+                'min_volume': 10000,
+                'min_data_points': 35,  # 需要足够数据计算MACD
 
-            # IB交易参数
-            'ib_order_type': 'MKT',
-            'ib_limit_offset': 0.01,
-        }
+                # IB交易参数
+                'ib_order_type': 'MKT',
+                'ib_limit_offset': 0.01,
+            }
 
     def generate_signals(self, symbol: str, data: pd.DataFrame,
                         indicators: Dict) -> List[Dict]:

@@ -17,38 +17,44 @@ class A11MovingAverageCrossoverStrategy(BaseStrategy):
     """均线交叉策略 - A11"""
 
     def _default_config(self) -> Dict:
-        """默认配置"""
-        return {
-            # 资金管理
-            'initial_capital': 40000.0,
-            'risk_per_trade': 0.02,
-            'max_position_size': 0.1,
-            'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
-            'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+        """默认配置 - 从config.py读取"""
+        from config import CONFIG
+        strategy_key = 'strategy_a11'
+        if strategy_key in CONFIG:
+            return CONFIG[strategy_key]
+        else:
+            # 降级到硬编码默认值
+            return {
+                # 资金管理
+                'initial_capital': 40000.0,
+                'risk_per_trade': 0.02,
+                'max_position_size': 0.1,
+                'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
+                'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
 
-            # 均线参数
-            'fast_ma_period': 5,
-            'slow_ma_period': 20,
-            'ma_type': 'SMA',  # 'SMA' 或 'EMA'
+                # 均线参数
+                'fast_ma_period': 9,
+                'slow_ma_period': 21,
+                'ma_type': 'SMA',  # 'SMA' 或 'EMA'
 
-            # 风险管理
-            'stop_loss_pct': 0.025,
-            'take_profit_pct': 0.05,
-            'max_holding_minutes': 180,
-            'trailing_stop_activation': 0.035,
-            'trailing_stop_distance': 0.02,
+                # 风险管理
+                'stop_loss_pct': 0.02,  # 降低限制
+                'take_profit_pct': 0.04,  # 降低限制
+                'max_holding_minutes': 120,  # 延长
+                'trailing_stop_activation': 0.035,
+                'trailing_stop_distance': 0.02,
 
-            # 防重复交易
-            'signal_cooldown_minutes': 30,
+                # 防重复交易
+                'signal_cooldown_minutes': 30,
 
-            # 交易参数
-            'min_volume': 10000,
-            'min_data_points': 25,  # 需要足够数据计算慢速均线
+                # 交易参数
+                'min_volume': 10000,
+                'min_data_points': 25,  # 需要足够数据计算慢速均线
 
-            # IB交易参数
-            'ib_order_type': 'MKT',
-            'ib_limit_offset': 0.01,
-        }
+                # IB交易参数
+                'ib_order_type': 'MKT',
+                'ib_limit_offset': 0.01,
+            }
 
     def generate_signals(self, symbol: str, data: pd.DataFrame,
                         indicators: Dict) -> List[Dict]:

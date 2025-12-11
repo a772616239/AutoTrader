@@ -17,39 +17,45 @@ class A8RSIOscillatorStrategy(BaseStrategy):
     """RSI震荡策略 - A8"""
 
     def _default_config(self) -> Dict:
-        """默认配置"""
-        return {
-            # 资金管理
-            'initial_capital': 40000.0,
-            'risk_per_trade': 0.02,
-            'max_position_size': 0.1,
-            'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
-            'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+        """默认配置 - 从config.py读取"""
+        from config import CONFIG
+        strategy_key = 'strategy_a8'
+        if strategy_key in CONFIG:
+            return CONFIG[strategy_key]
+        else:
+            # 降级到硬编码默认值
+            return {
+                # 资金管理
+                'initial_capital': 40000.0,
+                'risk_per_trade': 0.02,
+                'max_position_size': 0.1,
+                'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
+                'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
 
-            # RSI参数
-            'rsi_period': 14,
-            'rsi_oversold': 30,
-            'rsi_overbought': 70,
-            'rsi_signal_threshold': 5,  # RSI距离阈值的距离
+                # RSI参数
+                'rsi_period': 14,
+                'rsi_oversold': 30,
+                'rsi_overbought': 70,
+                'rsi_signal_threshold': 5,  # RSI距离阈值的距离
 
-            # 风险管理
-            'stop_loss_pct': 0.02,
-            'take_profit_pct': 0.04,
-            'max_holding_minutes': 60,
-            'trailing_stop_activation': 0.02,
-            'trailing_stop_distance': 0.015,
+                # 风险管理
+                'stop_loss_pct': 0.015,  # 降低限制
+                'take_profit_pct': 0.025,  # 降低限制
+                'max_holding_minutes': 90,  # 延长
+                'trailing_stop_activation': 0.02,
+                'trailing_stop_distance': 0.015,
 
-            # 防重复交易
-            'signal_cooldown_minutes': 10,
+                # 防重复交易
+                'signal_cooldown_minutes': 10,
 
-            # 交易参数
-            'min_volume': 10000,
-            'min_data_points': 20,
+                # 交易参数
+                'min_volume': 10000,
+                'min_data_points': 20,
 
-            # IB交易参数
-            'ib_order_type': 'MKT',
-            'ib_limit_offset': 0.01,
-        }
+                # IB交易参数
+                'ib_order_type': 'MKT',
+                'ib_limit_offset': 0.01,
+            }
 
     def generate_signals(self, symbol: str, data: pd.DataFrame,
                         indicators: Dict) -> List[Dict]:

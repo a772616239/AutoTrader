@@ -17,38 +17,44 @@ class A10BollingerBandsStrategy(BaseStrategy):
     """布林带策略 - A10"""
 
     def _default_config(self) -> Dict:
-        """默认配置"""
-        return {
-            # 资金管理
-            'initial_capital': 40000.0,
-            'risk_per_trade': 0.02,
-            'max_position_size': 0.1,
-            'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
-            'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
+        """默认配置 - 从config.py读取"""
+        from config import CONFIG
+        strategy_key = 'strategy_a10'
+        if strategy_key in CONFIG:
+            return CONFIG[strategy_key]
+        else:
+            # 降级到硬编码默认值
+            return {
+                # 资金管理
+                'initial_capital': 40000.0,
+                'risk_per_trade': 0.02,
+                'max_position_size': 0.1,
+                'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
+                'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
 
-            # 布林带参数
-            'bb_window': 20,
-            'bb_std_dev': 2.0,
-            'breakout_threshold': 0.1,  # 突破百分比阈值
+                # 布林带参数
+                'bollinger_period': 20,
+                'bollinger_std': 2.0,
+                'breakout_threshold': 0.1,  # 突破百分比阈值
 
-            # 风险管理
-            'stop_loss_pct': 0.03,
-            'take_profit_pct': 0.06,
-            'max_holding_minutes': 90,
-            'trailing_stop_activation': 0.04,
-            'trailing_stop_distance': 0.025,
+                # 风险管理
+                'stop_loss_pct': 0.02,  # 降低限制
+                'take_profit_pct': 0.04,  # 降低限制
+                'max_holding_minutes': 120,  # 延长
+                'trailing_stop_activation': 0.04,
+                'trailing_stop_distance': 0.025,
 
-            # 防重复交易
-            'signal_cooldown_minutes': 20,
+                # 防重复交易
+                'signal_cooldown_minutes': 20,
 
-            # 交易参数
-            'min_volume': 10000,
-            'min_data_points': 25,  # 需要足够数据计算布林带
+                # 交易参数
+                'min_volume': 10000,
+                'min_data_points': 25,  # 需要足够数据计算布林带
 
-            # IB交易参数
-            'ib_order_type': 'MKT',
-            'ib_limit_offset': 0.01,
-        }
+                # IB交易参数
+                'ib_order_type': 'MKT',
+                'ib_limit_offset': 0.01,
+            }
 
     def generate_signals(self, symbol: str, data: pd.DataFrame,
                         indicators: Dict) -> List[Dict]:

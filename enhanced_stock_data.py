@@ -24,11 +24,11 @@ class EnhancedStockData:
             #     print("⚠️ Warning: No HTTPS_PROXY detected. Yahoo Finance might be blocked.")
 
             ticker = yf.Ticker(symbol)
-            hist = ticker.history(period=period, interval=interval)
-            
+            hist = ticker.history(period=period, interval=interval, prepost=True)
+
             if hist.empty:
                 return {"error": "No data available"}
-            
+
             # 2. 基本信息
             info = ticker.info
             company_info = {
@@ -42,7 +42,15 @@ class EnhancedStockData:
                 'beta': info.get('beta', 0),
                 '52WeekHigh': info.get('fiftyTwoWeekHigh', 0),
                 '52WeekLow': info.get('fiftyTwoWeekLow', 0),
-                'avgVolume': info.get('averageVolume', 0)
+                'avgVolume': info.get('averageVolume', 0),
+                'currentPrice': info.get('currentPrice', info.get('regularMarketPrice', 0)),
+                'previousClose': info.get('previousClose', 0),
+                'regularMarketPrice': info.get('regularMarketPrice', 0),
+                'preMarketPrice': info.get('preMarketPrice', None),
+                'postMarketPrice': info.get('postMarketPrice', None),
+                'regularMarketTime': info.get('regularMarketTime', None),
+                'preMarketTime': info.get('preMarketTime', None),
+                'postMarketTime': info.get('postMarketTime', None)
             }
             
             # 3. 技术指标计算 (单点，用于摘要)

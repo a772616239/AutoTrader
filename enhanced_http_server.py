@@ -14,6 +14,7 @@ import enhanced_stock_data as esd
 from datetime import datetime
 import math
 import numpy as np
+import yfinance as yf
 
 class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -99,12 +100,15 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         symbol = params.get('symbol', ['AAPL'])[0]
         period = params.get('period', ['1y'])[0]
         interval = params.get('interval', ['1d'])[0]
-        
+
+        print(f"[LOG] 获取历史数据 - 符号: {symbol}, 周期: {period}, 间隔: {interval}")
+
         # 使用 EnhancedStockData (yfinance) 获取历史数据
         # Lightweight Charts 需要 UNIX Timestamp (seconds) for intraday or 'YYYY-MM-DD' for daily
         data = self.data_provider.get_enhanced_data(symbol, period, interval)
-        
+
         if 'error' in data:
+            print(f"[ERROR] 获取历史数据失败 - 符号: {symbol}, 错误: {data.get('error')}")
             self._send_json_response(data)
             return
             
@@ -178,7 +182,49 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             'signals': data.get('trading_signals', []),
             'risk': data.get('risk_metrics', {})
         }
-        
+
+        print(f"[LOG] 历史数据获取成功 - 符号: {symbol}, 数据点数: {len(formatted_data)}, 信号数: {len(response_data['signals'])}, 风险指标: {len(response_data['risk'])}")
+        # 输出股价信息
+        company_info = response_data['info']
+        current_price = company_info.get('currentPrice', 'N/A')
+        post_market_price = company_info.get('postMarketPrice', 'N/A')
+        pre_market_price = company_info.get('preMarketPrice', 'N/A')
+        previous_close = company_info.get('previousClose', 'N/A')
+        print(f"[PRICE LOG] 当前股价: {current_price}, 前收盘价: {previous_close}, 盘前价: {pre_market_price}, 盘后价: {post_market_price}")
+
+        # 尝试从历史数据中提取夜盘价格（最新的盘后交易数据）
+        after_hours_prices = []
+        for item in reversed(raw_data):  # 从最新数据开始检查
+            ts_str = item['time']
+            try:
+                if 'T' in ts_str:
+                    dt = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.strptime(ts_str.split(' ')[0], '%Y-%m-%d')
+
+                # 检查是否为盘后时间（美东时间16:00后）
+                if hasattr(dt, 'hour') and dt.hour >= 16:
+                    after_hours_prices.append({
+                        'time': ts_str,
+                        'close': item.get('close'),
+                        'volume': item.get('volume')
+                    })
+                    if len(after_hours_prices) >= 3:  # 只取最近3个夜盘价格
+                        break
+            except:
+                continue
+
+        if after_hours_prices:
+            latest_after_hours = after_hours_prices[0]
+            print(f"[NIGHT SESSION LOG] 最新夜盘价格 - 时间: {latest_after_hours['time']}, 收盘价: {latest_after_hours['close']}, 成交量: {latest_after_hours['volume']}")
+            if len(after_hours_prices) > 1:
+                print(f"[NIGHT SESSION LOG] 最近夜盘价格历史: {after_hours_prices}")
+
+        # 输出最后几个数据点的详细信息
+        if formatted_data:
+            last_candle = formatted_data[-1]
+            print(f"[HISTORY LOG] 最新数据点 - 时间: {last_candle.get('time')}, 开盘: {last_candle.get('open')}, 收盘: {last_candle.get('close')}, 成交量: {last_candle.get('volume')}")
+
         self._send_json_response(response_data)
 
     def _handle_indicators_api(self, parsed):
@@ -302,22 +348,47 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
     def _handle_trades_api(self, parsed):
         params = parse_qs(parsed.query)
         symbol = params.get('symbol', [None])[0]
-        
+
         try:
             file_path = os.path.join(os.getcwd(), 'data', 'trades.json')
             if not os.path.exists(file_path):
+                print(f"[LOG] 交易数据文件不存在: {file_path}")
                 self._send_json_response([])
                 return
-                
+
             with open(file_path, 'r') as f:
                 trades = json.load(f)
-            
+
+            # 获取股价信息
+            if symbol:
+                try:
+                    ticker = yf.Ticker(symbol)
+                    info = ticker.info
+                    current_price = info.get('currentPrice', info.get('regularMarketPrice', 'N/A'))
+                    post_market_price = info.get('postMarketPrice', 'N/A')
+                    pre_market_price = info.get('preMarketPrice', 'N/A')
+                    previous_close = info.get('previousClose', 'N/A')
+                    print(f"[PRICE LOG] 符号: {symbol} - 当前股价: {current_price}, 前收盘价: {previous_close}, 盘前价: {pre_market_price}, 盘后价: {post_market_price}")
+                except Exception as e:
+                    print(f"[PRICE LOG] 获取股价信息失败: {str(e)}")
+
             # 过滤
             if symbol:
-                trades = [t for t in trades if t.get('symbol') == symbol]
-                
+                filtered_trades = [t for t in trades if t.get('symbol') == symbol]
+                print(f"[LOG] 获取交易数据 - 符号: {symbol}, 总交易数: {len(trades)}, 过滤后: {len(filtered_trades)}")
+                # 输出每个交易的详细信息
+                for trade in filtered_trades:
+                    print(f"[TRADE LOG] 符号: {trade.get('symbol')}, 类型: {trade.get('type')}, 价格: {trade.get('price')}, 数量: {trade.get('quantity')}, 时间: {trade.get('timestamp')}")
+                trades = filtered_trades
+            else:
+                print(f"[LOG] 获取所有交易数据 - 总交易数: {len(trades)}")
+                # 输出所有交易的详细信息
+                for trade in trades:
+                    print(f"[TRADE LOG] 符号: {trade.get('symbol')}, 类型: {trade.get('type')}, 价格: {trade.get('price')}, 数量: {trade.get('quantity')}, 时间: {trade.get('timestamp')}")
+
             self._send_json_response(trades)
         except Exception as e:
+            print(f"[ERROR] 获取交易数据时出错: {str(e)}")
             self._send_json_response([])
 
     def _handle_update_strategy_api(self, parsed):
