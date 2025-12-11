@@ -20,6 +20,7 @@ CONFIG = {
         'max_retries': 3,
     },
     'trading': {
+'enable_trading': False,  # 是否启用交易（False时仅测算，不提交订单）
 'allow_short_selling': False,  # 是否允许无持仓卖出（空头交易）
  'same_day_sell_only': False,  # 是否限制当日不能买入
 'symbols': [

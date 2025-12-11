@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from ib_insync import *
+from config import CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,11 @@ class IBTrader:
         通用订单提交函数
         """
         logger.info(f"准备提交订单->ib: {action} {quantity} 股 {symbol} ")
+
+        # 检查交易开关
+        if not CONFIG.get('trading', {}).get('enable_trading', True):
+            logger.info(f"交易开关已关闭，仅测算模式: {action} {quantity} 股 {symbol}")
+            return None
 
         # 检查当天交易规则：通过trades.json检查当天是否已有Filled交易
         today = datetime.now().date()
