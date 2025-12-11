@@ -17,6 +17,31 @@ import numpy as np
 import yfinance as yf
 
 class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
+    # 类级别变量，用于重用IB连接（确保在主线程中）
+    _shared_ib_trader = None
+
+    @classmethod
+    def get_shared_ib_trader(cls):
+        """获取共享的IB交易接口，确保在主线程中初始化"""
+        if cls._shared_ib_trader is None or not cls._shared_ib_trader.is_connection_healthy():
+            try:
+                # 动态导入IBTrader
+                import sys
+                if os.getcwd() not in sys.path:
+                    sys.path.append(os.getcwd())
+                from trading.ib_trader import IBTrader
+
+                # 创建或重新连接IB连接
+                cls._shared_ib_trader = IBTrader( port=7496, client_id=1)
+                if not cls._shared_ib_trader.connect():
+                    print("[ERROR] 无法连接到IB")
+                    return None
+                print("[LOG] IB连接已初始化并在主线程中共享")
+            except Exception as e:
+                print(f"[ERROR] 初始化IB连接失败: {str(e)}")
+                return None
+        return cls._shared_ib_trader
+
     def __init__(self, *args, **kwargs):
         self.data_provider = esd.EnhancedStockData()
         self.web_dir = os.path.join(os.getcwd(), 'web')
@@ -571,17 +596,11 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             self._send_json_response({'error': f'Price update failed: {str(e)}'})
 
     def _handle_account_api(self):
-        """处理IB账户信息API"""
+        """处理IB账户信息API（使用共享的IB连接，确保在主线程中执行）"""
         try:
-            # 动态导入IBTrader
-            import sys
-            if os.getcwd() not in sys.path:
-                sys.path.append(os.getcwd())
-            from trading.ib_trader import IBTrader
-
-            # 创建IB连接
-            trader = IBTrader()
-            if not trader.connect():
+            # 获取共享的IB连接（在主线程中）
+            trader = self.get_shared_ib_trader()
+            if not trader:
                 self._send_json_response({'error': '无法连接到IB'})
                 return
 
@@ -618,8 +637,7 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
                     'currentPrice': current_price
                 })
 
-            # 断开连接
-            trader.disconnect()
+            # 注意：不再断开连接，保持连接活跃以供后续使用
 
             # 返回数据
             account_data = {

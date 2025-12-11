@@ -38,7 +38,7 @@ class IBTrader:
                 return self.ib.isConnected()
             return self.connected
         except Exception as e:
-            logger.debug(f"检查IB连接健康状态时出错: {e}")
+            logger.info(f"检查IB连接健康状态时出错: {e}")
             return False
     
     def reconnect(self) -> bool:
@@ -55,9 +55,11 @@ class IBTrader:
     
     def connect(self) -> bool:
         """连接IB"""
+        print("测试连接")
+        print(f"isConnected{self.ib.isConnected()}")
         if self.connected and self.is_connection_healthy():
             return True
-            
+        print("测试连接2")
         # 如果已连接但健康检查失败，重置连接状态
         if self.connected:
             logger.warning("IB连接状态异常，将重新连接")
@@ -65,7 +67,8 @@ class IBTrader:
             
         for attempt in range(self.max_retries):
             try:
-                logger.info(f"尝试连接IB [尝试 {attempt+1}/{self.max_retries}]")
+                print(f"尝试连接IB [尝试 {attempt+1}/{self.max_retries}]")
+                print(f"测试连接3-host:{self.host}, port:{self.port}, clientId:{self.client_id}")
                 self.ib.connect(self.host, self.port, clientId=self.client_id)
                 
                 if self.ib.isConnected():
