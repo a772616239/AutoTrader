@@ -91,7 +91,11 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', mime_type)
             self.end_headers()
-            self.wfile.write(content)
+            try:
+                self.wfile.write(content)
+            except BrokenPipeError:
+                # 客户端已断开连接，忽略错误
+                pass
         except Exception as e:
             self.send_error(500, str(e))
 
@@ -294,7 +298,11 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         # 清理数据中的 NaN 和 Infinity
         cleaned_data = self._clean_data(data)
-        self.wfile.write(json.dumps(cleaned_data, ensure_ascii=False, indent=2).encode())
+        try:
+            self.wfile.write(json.dumps(cleaned_data, ensure_ascii=False, indent=2).encode())
+        except BrokenPipeError:
+            # 客户端已断开连接，忽略错误
+            pass
     
     def _clean_data(self, obj):
         """递归清理 NaN 和 Infinity"""
