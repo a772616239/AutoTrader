@@ -1,19 +1,5 @@
 [
   {
-    "symbol": "CVX",
-    "action": "BUY",
-    "entry_price": 150.72500610351562,
-    "price": 150.72500610351562,
-    "size": 26,
-    "timestamp": "2025-12-11T01:33:02.815003",
-    "signal_type": "MACD_GOLDEN_CROSS",
-    "confidence": 0.7,
-    "status": "CANCELLED",
-    "order_type": "MKT",
-    "order_id": 1390,
-    "order_status": "Cancelled"
-  },
-  {
     "symbol": "GOOGL",
     "action": "SELL",
     "entry_price": 316.59429931640625,
@@ -1341,5 +1327,19 @@
     "confidence": 0.8,
     "status": "PENDING",
     "order_type": "LMT"
+  },
+  {
+    "symbol": "SMCI",
+    "action": "SELL",
+    "entry_price": 32.935001373291016,
+    "price": 32.935001373291016,
+    "size": 9,
+    "timestamp": "2025-12-12T00:19:11.959013",
+    "signal_type": "CTA_BREAKDOWN_SHORT",
+    "confidence": 0.8,
+    "status": "EXECUTED",
+    "order_type": "LMT",
+    "order_id": 42,
+    "order_status": "Filled"
   }
 ]

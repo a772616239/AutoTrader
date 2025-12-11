@@ -86,7 +86,7 @@ CONFIG = {
     'MSTR',
     # A7 CTA 趋势（更新）
     # 'OKLO',
-    'SMCI',
+    # 'SMCI',
     'LEU',
     'TSM',
     'BA',
@@ -472,7 +472,7 @@ preselect_a2 = {
     'SLDP': 'a6',  # 新增 - 固态电池，新闻事件驱动
 
     # A7 CTA趋势跟踪策略 - 基于唐奇安通道突破
-    'SMCI': 'a7',
+    # 'SMCI': 'a7',
     'TSM':  'a7',
     'BA':   'a7',
     'ASML': 'a7',
