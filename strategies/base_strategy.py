@@ -167,12 +167,31 @@ class BaseStrategy:
         position_size = position['size']
         
         entry_time = position.get('entry_time', current_time - timedelta(minutes=60))
-        
-        # 计算盈亏
-        if position_size > 0:
-            price_change_pct = (current_price - avg_cost) / avg_cost
+
+        # 优先使用IB的实时持仓成本计算盈利百分比
+        ib_profit_pct = None
+        if self.ib_trader and self.ib_trader.connected:
+            try:
+                ib_holding = self.ib_trader.get_holding_for_symbol(symbol)
+                if ib_holding and 'avg_cost' in ib_holding and ib_holding['avg_cost'] > 0:
+                    ib_avg_cost = ib_holding['avg_cost']
+                    if position_size > 0:
+                        ib_profit_pct = (current_price - ib_avg_cost) / ib_avg_cost
+                    else:
+                        ib_profit_pct = (ib_avg_cost - current_price) / ib_avg_cost
+                    logger.debug(f"📊 {symbol} IB持仓成本: ${ib_avg_cost:.2f}, 当前价格: ${current_price:.2f}, 盈利百分比: {ib_profit_pct*100:.2f}%")
+            except Exception as e:
+                logger.debug(f"获取IB持仓成本失败: {e}")
+
+        # 计算盈亏（使用IB成本优先，否则使用本地成本）
+        if ib_profit_pct is not None:
+            price_change_pct = ib_profit_pct
+            avg_cost = ib_holding['avg_cost']  # 更新为IB成本用于后续计算
         else:
-            price_change_pct = (avg_cost - current_price) / avg_cost
+            if position_size > 0:
+                price_change_pct = (current_price - avg_cost) / avg_cost
+            else:
+                price_change_pct = (avg_cost - current_price) / avg_cost
         
         # 简单的退出条件 - 使用配置或默认值
         stop_loss_pct = -abs(self.config.get('stop_loss_pct', 0.015))  # 确保为负值，降低限制
@@ -244,7 +263,29 @@ class BaseStrategy:
                 'confidence': 1.0  # 止损信号置信度最高
             }
         
-        # 止盈检查
+        # 增强止盈检查 - 基于盈利百分比的多级判断
+        take_profit_levels = self.config.get('take_profit_levels', [
+            {'threshold': 0.02, 'confidence': 0.7, 'reason': '小幅盈利止盈'},
+            {'threshold': 0.05, 'confidence': 0.8, 'reason': '中幅盈利止盈'},
+            {'threshold': 0.10, 'confidence': 0.9, 'reason': '大幅盈利止盈'},
+            {'threshold': 0.20, 'confidence': 1.0, 'reason': '巨幅盈利止盈'}
+        ])
+
+        for level in take_profit_levels:
+            if price_change_pct >= level['threshold']:
+                logger.info(f"✅ {symbol} 触发{level['reason']}: 盈利{price_change_pct*100:.2f}% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
+                return {
+                    'symbol': symbol,
+                    'signal_type': 'TAKE_PROFIT',
+                    'action': 'SELL' if position_size > 0 else 'BUY',
+                    'price': current_price,
+                    'reason': f"{level['reason']}: 盈利{price_change_pct*100:.2f}% (阈值: {level['threshold']*100:.1f}%)",
+                    'position_size': abs(position_size),
+                    'profit_pct': price_change_pct * 100,
+                    'confidence': level['confidence']
+                }
+
+        # 兼容原有单一止盈阈值
         if price_change_pct >= take_profit_pct:
             logger.info(f"✅ {symbol} 触发止盈: 盈利{price_change_pct*100:.2f}% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
             return {
