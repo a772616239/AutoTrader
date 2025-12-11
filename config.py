@@ -77,7 +77,7 @@ CONFIG = {
     'MSFT',
     'ETN',
     'SNOW',
-    'AI',
+    # 'AI',
     'PLTR',
     'DDOG',
     'CRWD',

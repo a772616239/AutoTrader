@@ -81,7 +81,7 @@ class DataProvider:
             if cache_age < self.cache_duration:
                 cached_data = self.data_cache[cache_key]['data']
                 if len(cached_data) >= min(lookback, 10):
-                    logger.info(f"使用缓存数据: {symbol} ({len(cached_data)} 条)")
+                    # logger.info(f"使用缓存数据: {symbol} ({len(cached_data)} 条)")
                     return cached_data.copy()
         
         period = self._calculate_period(interval, lookback)
