@@ -64,6 +64,12 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         elif path == '/api/runtime-strategy':
             self._handle_runtime_strategy_api(parsed)
             return
+        elif path == '/api/price-update':
+            self._handle_price_update_api(parsed)
+            return
+        elif path == '/api/account':
+            self._handle_account_api()
+            return
             
         # 404
         self.send_error(404, "File not found")
@@ -504,6 +510,129 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             self._send_json_response({'success': True, 'symbol': symbol, 'strategy': strategy})
         except Exception as e:
             self._send_json_response({'success': False, 'error': str(e)})
+
+    def _handle_price_update_api(self, parsed):
+        """轻量级价格更新API，只返回最新价格和最近数据点"""
+        try:
+            params = parse_qs(parsed.query)
+            symbol = params.get('symbol', ['AAPL'])[0]
+            interval = params.get('interval', ['1d'])[0]
+
+            # 使用yfinance快速获取最新价格信息
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+
+            # 获取最近的几个数据点（用于更新图表）
+            # 对于实时更新，我们只需要最新的1-2个数据点
+            period = '1d' if interval in ['1m', '5m', '15m', '30m', '60m'] else '5d'
+            hist = ticker.history(period=period, interval=interval, prepost=True)
+
+            if hist.empty:
+                self._send_json_response({'error': 'No data available'})
+                return
+
+            # 只取最新的几个数据点
+            latest_count = 3 if interval in ['1m', '5m'] else 1
+            latest_data = hist.tail(latest_count)
+
+            # 格式化最新数据点
+            formatted_latest = []
+            for idx, row in latest_data.iterrows():
+                record = {
+                    'time': idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
+                    'open': float(row['Open']) if not np.isnan(row['Open']) else None,
+                    'high': float(row['High']) if not np.isnan(row['High']) else None,
+                    'low': float(row['Low']) if not np.isnan(row['Low']) else None,
+                    'close': float(row['Close']) if not np.isnan(row['Close']) else None,
+                    'volume': int(row['Volume']) if 'Volume' in row and not np.isnan(row['Volume']) else 0,
+                }
+                formatted_latest.append(record)
+
+            # 构建轻量级响应
+            price_update = {
+                'symbol': symbol,
+                'timestamp': datetime.now().isoformat(),
+                'company_info': {
+                    'currentPrice': info.get('currentPrice', info.get('regularMarketPrice', 0)),
+                    'previousClose': info.get('previousClose', 0),
+                    'regularMarketPrice': info.get('regularMarketPrice', 0),
+                    'preMarketPrice': info.get('preMarketPrice', None),
+                    'postMarketPrice': info.get('postMarketPrice', None),
+                    'regularMarketTime': info.get('regularMarketTime', None),
+                    'preMarketTime': info.get('preMarketTime', None),
+                    'postMarketTime': info.get('postMarketTime', None)
+                },
+                'latest_data': formatted_latest
+            }
+
+            self._send_json_response(price_update)
+
+        except Exception as e:
+            self._send_json_response({'error': f'Price update failed: {str(e)}'})
+
+    def _handle_account_api(self):
+        """处理IB账户信息API"""
+        try:
+            # 动态导入IBTrader
+            import sys
+            if os.getcwd() not in sys.path:
+                sys.path.append(os.getcwd())
+            from trading.ib_trader import IBTrader
+
+            # 创建IB连接
+            trader = IBTrader()
+            if not trader.connect():
+                self._send_json_response({'error': '无法连接到IB'})
+                return
+
+            # 获取可用资金
+            availableFunds = trader.get_available_funds()
+
+            # 获取净资产
+            netLiquidation = trader.get_net_liquidation()
+
+            # 获取持仓信息
+            holdings = trader.get_holdings()
+            positions = []
+
+            for pos in holdings:
+                # 获取当前市场价格（简化版，使用yfinance）
+                try:
+                    import yfinance as yf
+                    ticker = yf.Ticker(pos.contract.symbol)
+                    current_price = ticker.info.get('currentPrice', ticker.info.get('regularMarketPrice', pos.avgCost))
+                except:
+                    current_price = pos.avgCost  # 如果获取失败，使用平均成本
+
+                market_value = current_price * pos.position
+                total_cost = pos.avgCost * pos.position
+                unrealized_pnl = market_value - total_cost
+
+                positions.append({
+                    'symbol': pos.contract.symbol,
+                    'position': pos.position,
+                    'avgCost': pos.avgCost,
+                    'marketValue': market_value,
+                    'totalCost': total_cost,
+                    'unrealizedPnL': unrealized_pnl,
+                    'currentPrice': current_price
+                })
+
+            # 断开连接
+            trader.disconnect()
+
+            # 返回数据
+            account_data = {
+                'availableFunds': availableFunds,
+                'netLiquidation': netLiquidation,
+                'positions': positions
+            }
+
+            self._send_json_response(account_data)
+
+        except Exception as e:
+            print(f"[ERROR] 获取账户信息失败: {str(e)}")
+            self._send_json_response({'error': f'获取账户信息失败: {str(e)}'})
 
 def run_enhanced_server(port=8001):
     server_address = ('', port)

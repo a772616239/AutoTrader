@@ -20,9 +20,7 @@ CONFIG = {
         'max_retries': 3,
     },
     'trading': {
-'enable_trading': False,  # 是否启用交易（False时仅测算，不提交订单）
-'allow_short_selling': False,  # 是否允许无持仓卖出（空头交易）
- 'same_day_sell_only': False,  # 是否限制当日不能买入
+
 'symbols': [
     # A1 动量反转（更新）
     'AMD',
@@ -106,6 +104,10 @@ CONFIG = {
             'start': '09:30',
             'end': '16:00'
         },
+        'enable_trading': True,  # 是否启用交易（False时仅测算，不提交订单）
+        'allow_short_selling': False,  # 是否允许无持仓卖出（空头交易）
+        'same_day_sell_only': False,  # 是否限制当日不能买入
+        
         'allow_orders_outside_trading_hours': True,  # 是否允许在非交易时间提交委托单
         'auto_cancel_orders': False, # 每个周期开始时是否自动取消未完成订单
         'max_symbols_per_cycle': 50,
