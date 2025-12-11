@@ -20,7 +20,7 @@ class BaseStrategy:
         if config:
             self.config.update(config)
         
-        # 交易接口
+        # 交易接口 (可能是IBTrader或IBHTTPClient)
         self.ib_trader = ib_trader
         
         # 交易状态
@@ -126,21 +126,35 @@ class BaseStrategy:
             return False
         
         try:
-            if not self.ib_trader.connected:
+            if hasattr(self.ib_trader, 'connected') and not self.ib_trader.connected:
                 logger.info("IB未连接，跳过持仓同步")
+                return False
+            elif hasattr(self.ib_trader, 'is_connection_healthy') and not self.ib_trader.is_connection_healthy():
+                logger.info("IB连接不健康，跳过持仓同步")
                 return False
 
             holdings = self.ib_trader.get_holdings()
             self.positions.clear()
-            
+
             for pos in holdings:
-                symbol = pos.contract.symbol
-                self.positions[symbol] = {
-                    'size': pos.position,
-                    'avg_cost': pos.avgCost,
-                    'contract': pos.contract,
-                    'entry_time': datetime.now()  # 如果无法获取真实开仓时间，使用当前时间
-                }
+                # 检查是否是HTTP客户端返回的字典格式
+                if isinstance(pos, dict):
+                    symbol = pos['symbol']
+                    self.positions[symbol] = {
+                        'size': pos['position'],
+                        'avg_cost': pos['avgCost'],
+                        'contract': None,  # HTTP客户端不返回contract对象
+                        'entry_time': datetime.now()  # 如果无法获取真实开仓时间，使用当前时间
+                    }
+                else:
+                    # 原始IBTrader格式
+                    symbol = pos.contract.symbol
+                    self.positions[symbol] = {
+                        'size': pos.position,
+                        'avg_cost': pos.avgCost,
+                        'contract': pos.contract,
+                        'entry_time': datetime.now()  # 如果无法获取真实开仓时间，使用当前时间
+                    }
             
             # 同步净资产
             self.equity = self.ib_trader.get_net_liquidation()
@@ -259,11 +273,26 @@ class BaseStrategy:
             }
 
         # 基于IB未实现盈利的止盈检查
-        if self.ib_trader and self.ib_trader.connected:
+        if self.ib_trader:
             try:
-                ib_holding = self.ib_trader.get_holding_for_symbol(symbol)
-                if ib_holding and 'unrealized_pnl' in ib_holding:
-                    unrealized_pnl = ib_holding['unrealized_pnl']
+                # 检查是否是HTTP客户端
+                if hasattr(self.ib_trader, 'is_connection_healthy'):
+                    # HTTP客户端
+                    holdings = self.ib_trader.get_holdings()
+                    ib_holding = None
+                    for pos in holdings:
+                        if isinstance(pos, dict) and pos.get('symbol') == symbol:
+                            ib_holding = pos
+                            break
+                else:
+                    # 原始IBTrader
+                    if self.ib_trader.connected:
+                        ib_holding = self.ib_trader.get_holding_for_symbol(symbol)
+                    else:
+                        ib_holding = None
+
+                if ib_holding and 'unrealizedPnL' in ib_holding:
+                    unrealized_pnl = ib_holding['unrealizedPnL']
                     position_value = abs(position_size) * current_price
                     if position_value > 0:
                         pnl_pct = (unrealized_pnl / position_value) * 100
@@ -404,7 +433,8 @@ class BaseStrategy:
                 dedupe_price = current_price * (1 - self.config.get('ib_limit_offset', 0.01))
             else:
                 dedupe_price = current_price * (1 + self.config.get('ib_limit_offset', 0.01))
-        if self.ib_trader.has_active_order(signal['symbol'], signal['action'], signal['position_size'], dedupe_price):
+        # 检查是否存在未完成订单 (HTTP客户端不支持此检查，跳过)
+        if hasattr(self.ib_trader, 'has_active_order') and self.ib_trader.has_active_order(signal['symbol'], signal['action'], signal['position_size'], dedupe_price):
             logger.info(f"存在未完成订单，避免重复下单: {signal['symbol']}")
             return {'status': 'REJECTED', 'reason': '存在未完成订单，避免重复下单'}
 
@@ -457,51 +487,72 @@ class BaseStrategy:
 
             logger.info(f"order_type: {order_type} -- action: {signal['action']} current_price: {current_price} position_size: {signal['position_size']}")
 
-            if order_type == 'LMT' and signal['action'] == 'BUY':
-                limit_price = current_price * (1 - self.config.get('ib_limit_offset', 0.01))
-                logger.info(f"BUY {signal['symbol']} {signal['position_size']} 股，限价 {limit_price}--current_price {current_price}")
-                ib_trade = self.ib_trader.place_buy_order(
-                    signal['symbol'], signal['position_size'], 'LMT', current_price
-                )
-            elif order_type == 'LMT' and signal['action'] == 'SELL':
-                limit_price = current_price * (1 + self.config.get('ib_limit_offset', 0.01))
-
-                ib_trade = self.ib_trader.place_sell_order(
-                    signal['symbol'], signal['position_size'], 'LMT', current_price
-                )
-            elif signal['action'] == 'BUY':
-                ib_trade = self.ib_trader.place_buy_order(
-                    signal['symbol'], signal['position_size'], 'MKT'
-                )
+            # 检查是否是HTTP客户端
+            if hasattr(self.ib_trader, 'execute_signal'):
+                # HTTP客户端 - 使用execute_signal方法
+                ib_trade = self.ib_trader.execute_signal(signal, current_price, signal['symbol'], self.get_strategy_name())
+                # HTTP客户端返回的是字典，需要包装成对象格式
+                class MockTrade:
+                    def __init__(self, result_dict):
+                        self.result = result_dict
+                        self.order = None
+                        self.orderStatus = None
+                ib_trade = MockTrade(ib_trade) if ib_trade else None
             else:
-                ib_trade = self.ib_trader.place_sell_order(
-                    signal['symbol'], signal['position_size'], 'MKT'
-                )
+                # 原始IBTrader
+                if order_type == 'LMT' and signal['action'] == 'BUY':
+                    limit_price = current_price * (1 - self.config.get('ib_limit_offset', 0.01))
+                    logger.info(f"BUY {signal['symbol']} {signal['position_size']} 股，限价 {limit_price}--current_price {current_price}")
+                    ib_trade = self.ib_trader.place_buy_order(
+                        signal['symbol'], signal['position_size'], 'LMT', current_price
+                    )
+                elif order_type == 'LMT' and signal['action'] == 'SELL':
+                    limit_price = current_price * (1 + self.config.get('ib_limit_offset', 0.01))
+
+                    ib_trade = self.ib_trader.place_sell_order(
+                        signal['symbol'], signal['position_size'], 'LMT', current_price
+                    )
+                elif signal['action'] == 'BUY':
+                    ib_trade = self.ib_trader.place_buy_order(
+                        signal['symbol'], signal['position_size'], 'MKT'
+                    )
+                else:
+                    ib_trade = self.ib_trader.place_sell_order(
+                        signal['symbol'], signal['position_size'], 'MKT'
+                    )
             
             if ib_trade:
-                # 读取 IB 返回的订单状态并映射到内部状态
-                ib_status = None
-                try:
-                    ib_status = getattr(ib_trade, 'orderStatus', None)
-                    ib_status_str = ib_status.status if ib_status else None
-                except Exception:
-                    ib_status_str = None
+                # 检查是否是HTTP客户端返回的结果
+                if hasattr(ib_trade, 'result'):
+                    # HTTP客户端结果
+                    result = ib_trade.result
+                    trade['status'] = result.get('status', 'PENDING').upper()
+                    trade['order_id'] = result.get('order_id')
+                    trade['order_status'] = result.get('status')
+                else:
+                    # 读取 IB 返回的订单状态并映射到内部状态
+                    ib_status = None
+                    try:
+                        ib_status = getattr(ib_trade, 'orderStatus', None)
+                        ib_status_str = ib_status.status if ib_status else None
+                    except Exception:
+                        ib_status_str = None
 
-                trade['order_id'] = getattr(getattr(ib_trade, 'order', None), 'orderId', None)
-                trade['order_status'] = ib_status_str
+                    trade['order_id'] = getattr(getattr(ib_trade, 'order', None), 'orderId', None)
+                    trade['order_status'] = ib_status_str
 
-                # 映射 IB 的 orderStatus 到内部 status
-                status_map = {
-                    'PendingSubmit': 'PENDING',
-                    'PreSubmitted': 'PENDING',
-                    'Submitted': 'PENDING',
-                    'ApiPending': 'PENDING',
-                    'Filled': 'EXECUTED',
-                    'Cancelled': 'CANCELLED',
-                    'Inactive': 'FAILED'
-                }
-                mapped = status_map.get(ib_status_str, 'PENDING')
-                trade['status'] = mapped
+                    # 映射 IB 的 orderStatus 到内部 status
+                    status_map = {
+                        'PendingSubmit': 'PENDING',
+                        'PreSubmitted': 'PENDING',
+                        'Submitted': 'PENDING',
+                        'ApiPending': 'PENDING',
+                        'Filled': 'EXECUTED',
+                        'Cancelled': 'CANCELLED',
+                        'Inactive': 'FAILED'
+                    }
+                    mapped = status_map.get(ib_status_str, 'PENDING')
+                    trade['status'] = mapped
 
                 # 如果已执行（Filled），则更新持仓并将信号加入缓存
                 if mapped == 'EXECUTED':
@@ -662,22 +713,23 @@ class BaseStrategy:
                     # 获取当前价格数据
                     df = data_provider.get_intraday_data(symbol, interval='5m', lookback=50)
                     if df.empty or len(df) < 5:
-                        # 如果无法获取数据，尝试使用IB获取价格
-                        if self.ib_trader and self.ib_trader.connected:
+                        # 如果无法获取数据，尝试使用IB获取价格 (HTTP客户端不支持实时价格获取)
+                        if self.ib_trader and not hasattr(self.ib_trader, 'execute_signal'):
                             try:
-                                contract = self.ib_trader.get_contract(symbol)
-                                ticker = self.ib_trader.ib.reqMktData(contract, '', False, False)
-                                self.ib_trader.ib.sleep(0.3)
-                                current_price = ticker.last if ticker.last > 0 else ticker.close
-                                self.ib_trader.ib.cancelMktData(contract)
-                                
-                                if current_price > 0:
-                                    exit_signal = self.check_exit_conditions(symbol, current_price)
-                                    if exit_signal:
-                                        if symbol not in all_signals:
-                                            all_signals[symbol] = []
-                                        all_signals[symbol].append(exit_signal)
-                                        logger.info(f"  ✅ {symbol} 触发退出条件: {exit_signal.get('reason', '')}")
+                                if self.ib_trader.connected:
+                                    contract = self.ib_trader.get_contract(symbol)
+                                    ticker = self.ib_trader.ib.reqMktData(contract, '', False, False)
+                                    self.ib_trader.ib.sleep(0.3)
+                                    current_price = ticker.last if ticker.last > 0 else ticker.close
+                                    self.ib_trader.ib.cancelMktData(contract)
+
+                                    if current_price > 0:
+                                        exit_signal = self.check_exit_conditions(symbol, current_price)
+                                        if exit_signal:
+                                            if symbol not in all_signals:
+                                                all_signals[symbol] = []
+                                            all_signals[symbol].append(exit_signal)
+                                            logger.info(f"  ✅ {symbol} 触发退出条件: {exit_signal.get('reason', '')}")
                             except Exception as e:
                                 logger.debug(f"  无法获取 {symbol} 实时价格: {e}")
                         continue
@@ -842,7 +894,7 @@ class BaseStrategy:
             'positions_open': len(self.positions),
             'open_positions': list(self.positions.keys()),
             'signal_cache_size': len(self.signal_cache),
-            'ib_connected': self.ib_trader.connected if self.ib_trader else False,
+            'ib_connected': (self.ib_trader.connected if hasattr(self.ib_trader, 'connected') and self.ib_trader else False) or (hasattr(self.ib_trader, 'is_connection_healthy') and self.ib_trader.is_connection_healthy() if self.ib_trader else False),
         }
         
         logger.info(f"📋 {self.get_strategy_name()} 报告 - 净资产: ${self.equity:,.2f}, "

@@ -11,6 +11,7 @@ import warnings
 import logging
 import importlib
 import re
+import requests
 from datetime import datetime, timedelta
 from typing import Dict, List
 try:
@@ -23,7 +24,6 @@ except ImportError:
 # 添加模块路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from trading.ib_trader import IBTrader
 from data.data_provider import DataProvider
 from strategies.a1_momentum_reversal import A1MomentumReversalStrategy
 from strategies.a2_zscore import A2ZScoreStrategy
@@ -128,6 +128,103 @@ cleanup_old_logs(log_dir)
 
 logger.info(f"日志文件保存在: {os.path.abspath(log_file)}")
 
+# ==================== HTTP客户端 ====================
+class IBHTTPClient:
+    """通过HTTP与enhanced_http_server通信的IB客户端"""
+
+    def __init__(self, base_url: str = 'http://localhost:8001'):
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.session.timeout = 10
+
+    def _get(self, endpoint: str, params: Dict = None) -> Dict:
+        """GET请求"""
+        try:
+            url = f"{self.base_url}{endpoint}"
+            response = self.session.get(url, params=params)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.warning(f"HTTP GET请求失败 {endpoint}: {e}")
+            return {'error': str(e)}
+
+    def _post(self, endpoint: str, data: Dict = None) -> Dict:
+        """POST请求"""
+        try:
+            url = f"{self.base_url}{endpoint}"
+            response = self.session.post(url, json=data)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.warning(f"HTTP POST请求失败 {endpoint}: {e}")
+            return {'error': str(e)}
+
+    def connect(self) -> bool:
+        """连接IB"""
+        result = self._get('/api/ib/connect')
+        return result.get('success', False)
+
+    def disconnect(self) -> bool:
+        """断开IB连接"""
+        result = self._get('/api/ib/disconnect')
+        return result.get('success', False)
+
+    def is_connection_healthy(self) -> bool:
+        """检查连接健康状态"""
+        result = self._get('/api/ib/status')
+        return result.get('connected', False) and result.get('healthy', False)
+
+    def reconnect(self) -> bool:
+        """重连IB"""
+        result = self._get('/api/ib/reconnect')
+        return result.get('success', False)
+
+    def get_net_liquidation(self) -> float:
+        """获取净资产"""
+        result = self._get('/api/account')
+        return result.get('netLiquidation', 0.0)
+
+    def get_available_funds(self) -> float:
+        """获取可用资金"""
+        result = self._get('/api/account')
+        return result.get('availableFunds', 0.0)
+
+    def get_account_summary(self) -> Dict:
+        """获取账户摘要"""
+        result = self._get('/api/account')
+        return result
+
+    def get_holdings(self) -> List:
+        """获取持仓信息"""
+        result = self._get('/api/ib/holdings')
+        return result.get('positions', [])
+
+    def cancel_all_orders_global(self) -> int:
+        """取消所有未完成订单"""
+        result = self._get('/api/ib/cancel-orders')
+        return result.get('cancelled_orders', 0)
+
+    def cancel_open_orders(self) -> int:
+        """取消未完成订单"""
+        result = self._get('/api/ib/cancel-orders')
+        return result.get('cancelled_orders', 0)
+
+    def update_pending_trade_statuses(self) -> int:
+        """更新待处理交易状态"""
+        result = self._get('/api/ib/update-trades')
+        return result.get('updated_trades', 0)
+
+    def execute_signal(self, signal: Dict, current_price: float, symbol: str, strategy_name: str) -> Dict:
+        """执行交易信号"""
+        data = {
+            'symbol': symbol,
+            'signal': signal,
+            'strategy': strategy_name,
+            'current_price': current_price
+        }
+        result = self._post('/api/trading/execute-signal', data)
+        return result.get('result', {'status': 'failed', 'reason': 'HTTP request failed'})
+
 # ==================== 策略工厂 ====================
 class StrategyFactory:
     """策略工厂，用于创建和切换策略"""
@@ -198,7 +295,7 @@ class TradingSystem:
 
         # 初始化组件
         self.data_provider = None
-        self.ib_trader = None
+        self.ib_client = None
         self.strategy = None
         self.current_strategy_name = strategy_name
         
@@ -328,26 +425,21 @@ class TradingSystem:
             max_retries=data_config.get('retry_attempts', 3)
         )
         
-        # 2. 初始化IB交易接口
-        ib_config = self.config['ib_server']
-        self.ib_trader = IBTrader(
-            host=ib_config['host'],
-            port=ib_config['port'],
-            client_id=ib_config['client_id'],
-            manual_available_funds=ib_config.get('manual_available_funds')
-        )
-        
-        # 连接IB
-        if not self.ib_trader.connect():
+        # 2. 初始化IB HTTP客户端
+        data_config = self.config['data_server']
+        self.ib_client = IBHTTPClient(base_url=data_config['base_url'])
+
+        # 连接IB（通过HTTP）
+        if not self.ib_client.connect():
             logger.warning("⚠️  IB连接失败，将使用模拟交易模式")
-            self.ib_trader = None
+            self.ib_client = None
         
         # 3. 初始化策略
         strategy_config = self.config['strategy']
         self.strategy = StrategyFactory.create_strategy(
-            self.current_strategy_name, 
-            strategy_config, 
-            self.ib_trader
+            self.current_strategy_name,
+            strategy_config,
+            self.ib_client
         )
         
         logger.info(f"\n✅ 系统初始化完成")
@@ -356,20 +448,20 @@ class TradingSystem:
         logger.info(f"扫描间隔: {self.config['trading']['scan_interval_minutes']} 分钟")
         logger.info(f"交易时间: {self.config['trading']['trading_hours']['start']} - "
                    f"{self.config['trading']['trading_hours']['end']}")
-        logger.info(f"IB连接: {'✅ 成功' if self.ib_trader and self.ib_trader.connected else '❌ 失败/模拟'}")
+        logger.info(f"IB连接: {'✅ 成功' if self.ib_client else '❌ 失败/模拟'}")
 
         # 输出IB账户资产信息
-        if self.ib_trader and self.ib_trader.connected:
+        if self.ib_client:
             try:
                 logger.info("\n💰 IB账户资产信息:")
-                net_liq = self.ib_trader.get_net_liquidation()
-                available = self.ib_trader.get_available_funds()
+                net_liq = self.ib_client.get_net_liquidation()
+                available = self.ib_client.get_available_funds()
                 logger.info(f"  净资产 (Net Liquidation): ${net_liq:,.2f}")
                 logger.info(f"  可用资金 (Available Funds): ${available:,.2f}")
 
                 # 获取并显示更多账户信息
-                account_summary = self.ib_trader.get_account_summary()
-                if account_summary:
+                account_summary = self.ib_client.get_account_summary()
+                if account_summary and 'error' not in account_summary:
                     logger.info("  详细账户信息:")
                     key_fields = ['TotalCashValue', 'BuyingPower', 'TotalCashBalance', 'GrossPositionValue', 'UnrealizedPnL']
                     for field in key_fields:
@@ -411,9 +503,9 @@ class TradingSystem:
         self.current_strategy_name = new_strategy_name
         strategy_config = self.config['strategy']
         self.strategy = StrategyFactory.create_strategy(
-            new_strategy_name, 
-            strategy_config, 
-            self.ib_trader
+            new_strategy_name,
+            strategy_config,
+            self.ib_client
         )
         
         logger.info(f"✅ 策略切换完成")
@@ -444,21 +536,21 @@ class TradingSystem:
     
     def _check_and_reconnect_ib(self) -> bool:
         """检查IB连接状态，如果断开则尝试重连"""
-        if not self.ib_trader:
-            logger.debug("IB交易接口未初始化")
+        if not self.ib_client:
+            logger.debug("IB HTTP客户端未初始化")
             return False
-        
+
         # 检查连接健康状态
-        if self.ib_trader.is_connection_healthy():
+        if self.ib_client.is_connection_healthy():
             return True
-        
+
         # 连接异常，尝试重连
         logger.warning("⚠️  IB连接异常，尝试重连...")
-        if self.ib_trader.reconnect():
+        if self.ib_client.reconnect():
             logger.info("✅ IB重连成功")
-            # 更新策略中的ib_trader引用
+            # 更新策略中的ib_client引用
             if self.strategy:
-                self.strategy.ib_trader = self.ib_trader
+                self.strategy.ib_trader = self.ib_client
             return True
         else:
             logger.error("❌ IB重连失败，本周期将跳过需要IB的操作")
@@ -535,26 +627,26 @@ class TradingSystem:
                             import config as global_config
                             symbol_map = global_config.CONFIG.get('symbol_strategy_map')
                             
-                            if symbol_map and self.ib_trader:
+                            if symbol_map and self.ib_client:
                                 # 多策略模式：从IB获取所有持仓，按策略分组清仓
                                 try:
-                                    all_holdings = self.ib_trader.get_holdings()
+                                    all_holdings = self.ib_client.get_holdings()
                                     if all_holdings:
                                         # 按策略分组持仓
                                         strategy_positions = {}
                                         for pos in all_holdings:
-                                            symbol = pos.contract.symbol
+                                            symbol = pos['symbol']
                                             strat_name = symbol_map.get(symbol, self.current_strategy_name)
                                             if strat_name not in strategy_positions:
                                                 strategy_positions[strat_name] = []
                                             strategy_positions[strat_name].append(symbol)
-                                        
+
                                         # 为每个策略清仓
                                         for strat_name, symbols in strategy_positions.items():
                                             try:
                                                 cfg_key = global_config.STRATEGY_CONFIG_MAP.get(strat_name)
                                                 strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
-                                                strat_instance = StrategyFactory.create_strategy(strat_name, config=strat_cfg, ib_trader=self.ib_trader)
+                                                strat_instance = StrategyFactory.create_strategy(strat_name, config=strat_cfg, ib_trader=self.ib_client)
                                                 strat_instance.close_all_positions(reason=f"收盘前清仓 ({close_time_str})")
                                             except Exception as e:
                                                 logger.error(f"清仓策略 {strat_name} 时出错: {e}")
@@ -597,17 +689,16 @@ class TradingSystem:
         
         # 周期开始前取消所有未完成委托 (如果配置启用)
         if self.config['trading'].get('auto_cancel_orders', True):
-            if self.ib_trader and self.ib_trader.connected:
+            if self.ib_client:
                 try:
                     # 先查询并更新订单状态到 trades.json
                     logger.info("查询订单状态并更新交易记录...")
-                    updated = self.ib_trader.update_pending_trade_statuses()
+                    updated = self.ib_client.update_pending_trade_statuses()
                     if updated > 0:
                         logger.info(f"✅ 已更新 {updated} 个订单状态")
-                    
+
                     # 然后取消所有未完成订单
-                    self.ib_trader.cancel_all_orders_global()
-                    cancelled = self.ib_trader.cancel_open_orders()
+                    cancelled = self.ib_client.cancel_all_orders_global()
                     if cancelled:
                         logger.info(f"本周期开始已取消 {cancelled} 个未完成委托")
                 except Exception as e:
@@ -625,15 +716,16 @@ class TradingSystem:
                    f"可用标的: {len(market_status['symbols_available'])}")
         
         # 打印IB账户信息
-        if self.ib_trader and self.ib_trader.connected:
-            net_liq = self.ib_trader.get_net_liquidation()
-            available = self.ib_trader.get_available_funds()
+        if self.ib_client:
+            net_liq = self.ib_client.get_net_liquidation()
+            available = self.ib_client.get_available_funds()
             logger.info(f"IB账户 - 净资产: ${net_liq:,.2f}, 可用资金: ${available:,.2f}")
 
             # 打印完整账户摘要用于调试
             if available == 0:
                 logger.info("检测到可用资金为0，打印完整账户摘要进行诊断...")
-                self.ib_trader.print_account_summary()
+                account_summary = self.ib_client.get_account_summary()
+                logger.info(f"账户摘要: {account_summary}")
         
         # 运行策略分析
         symbols = self.config['trading']['symbols']
@@ -647,7 +739,7 @@ class TradingSystem:
 
         if symbol_map:
             from queue import Queue, Empty
-            mgr = StrategyManager(self.data_provider, self.ib_trader, config=global_config.CONFIG)
+            mgr = StrategyManager(self.data_provider, self.ib_client, config=global_config.CONFIG)
             signal_queue = Queue()
             # 启动流式运行，工作线程会把信号放入 signal_queue，主线程可即时消费
             executor, futures = mgr.stream_run(symbols, signal_queue)
@@ -657,7 +749,7 @@ class TradingSystem:
             signals = self.strategy.run_analysis_cycle(self.data_provider, symbols)
         
         # 处理信号：流式模式下主线程即时消费 signal_queue 并执行下单
-        if symbol_map and self.ib_trader:
+        if symbol_map and self.ib_client:
             # 多策略模式已在上面处理
             from queue import Empty
             logger.info("开始在主线程即时消费信号队列并下单")
@@ -685,9 +777,9 @@ class TradingSystem:
                         strat_cfg = {}
 
                     try:
-                        exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_trader)
+                        exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_client)
                     except Exception:
-                        exec_strategy = self.strategy if self.strategy else StrategyFactory.create_strategy(self.current_strategy_name, config=strat_cfg, ib_trader=self.ib_trader)
+                        exec_strategy = self.strategy if self.strategy else StrategyFactory.create_strategy(self.current_strategy_name, config=strat_cfg, ib_trader=self.ib_client)
 
                     try:
                         exec_strategy.sync_positions_from_ib()
@@ -721,7 +813,8 @@ class TradingSystem:
                         logger.warning(f"重新计算仓位失败 ({sym}): {e}")
 
                     try:
-                        result = exec_strategy.execute_signal(sig, current_price)
+                        # 通过HTTP客户端执行信号
+                        result = self.ib_client.execute_signal(sig, current_price, sym, origin)
                         logger.info(f"执行信号结果: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
                     except Exception as e:
                         logger.error(f"执行信号出错 {sym}: {e}")
@@ -736,14 +829,14 @@ class TradingSystem:
                         origin = sig.get('origin_strategy') or symbol_map.get(sym) or self.current_strategy_name
                         cfg_key = global_config.STRATEGY_CONFIG_MAP.get(origin)
                         strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
-                        exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_trader)
+                        exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_client)
                         exec_strategy.force_market_orders = force_market_orders
                         exec_strategy.sync_positions_from_ib()
                         current_price = sig.get('price') or 0
                         atr = None
                         new_size = exec_strategy.calculate_position_size(sig, atr)
                         sig['position_size'] = new_size
-                        result = exec_strategy.execute_signal(sig, current_price)
+                        result = self.ib_client.execute_signal(sig, current_price, sym, origin)
                         logger.info(f"执行信号结果: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
                     except Exception as e:
                         logger.error(f"处理残留信号出错 {sym}: {e}")
@@ -850,8 +943,8 @@ class TradingSystem:
         logger.info(f"最终策略: {self.strategy.get_strategy_name() if self.strategy else '无'}")
         
         # 断开IB连接
-        if self.ib_trader:
-            self.ib_trader.disconnect()
+        if self.ib_client:
+            self.ib_client.disconnect()
         
         logger.info("系统已安全停止")
 

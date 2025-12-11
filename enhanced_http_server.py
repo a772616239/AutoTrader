@@ -95,7 +95,31 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
         elif path == '/api/account':
             self._handle_account_api()
             return
-            
+        elif path == '/api/ib/connect':
+            self._handle_ib_connect_api()
+            return
+        elif path == '/api/ib/disconnect':
+            self._handle_ib_disconnect_api()
+            return
+        elif path == '/api/ib/status':
+            self._handle_ib_status_api()
+            return
+        elif path == '/api/ib/reconnect':
+            self._handle_ib_reconnect_api()
+            return
+        elif path == '/api/ib/holdings':
+            self._handle_ib_holdings_api()
+            return
+        elif path == '/api/ib/cancel-orders':
+            self._handle_ib_cancel_orders_api()
+            return
+        elif path == '/api/ib/update-trades':
+            self._handle_ib_update_trades_api()
+            return
+        elif path == '/api/trading/execute-signal':
+            self._handle_execute_signal_api()
+            return
+
         # 404
         self.send_error(404, "File not found")
 
@@ -652,7 +676,213 @@ class EnhancedStockAPIHandler(BaseHTTPRequestHandler):
             print(f"[ERROR] 获取账户信息失败: {str(e)}")
             self._send_json_response({'error': f'获取账户信息失败: {str(e)}'})
 
+    def _handle_ib_connect_api(self):
+        """连接IB API"""
+        try:
+            trader = self.get_shared_ib_trader()
+            if trader and trader.connected:
+                self._send_json_response({'success': True, 'message': 'IB已连接'})
+            else:
+                self._send_json_response({'success': False, 'error': 'IB连接失败'})
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
+
+    def _handle_ib_disconnect_api(self):
+        """断开IB连接"""
+        try:
+            trader = self._shared_ib_trader
+            if trader:
+                trader.disconnect()
+                self._shared_ib_trader = None
+            self._send_json_response({'success': True, 'message': 'IB连接已断开'})
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
+
+    def _handle_ib_status_api(self):
+        """检查IB连接状态"""
+        try:
+            trader = self._shared_ib_trader
+            if trader and trader.is_connection_healthy():
+                self._send_json_response({'connected': True, 'healthy': True})
+            else:
+                self._send_json_response({'connected': False, 'healthy': False})
+        except Exception as e:
+            self._send_json_response({'connected': False, 'healthy': False, 'error': str(e)})
+
+    def _handle_ib_reconnect_api(self):
+        """重连IB"""
+        try:
+            trader = self.get_shared_ib_trader()
+            if trader and trader.connected:
+                self._send_json_response({'success': True, 'message': 'IB已连接'})
+            else:
+                self._send_json_response({'success': False, 'error': 'IB重连失败'})
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
+
+    def _handle_ib_holdings_api(self):
+        """获取IB持仓信息"""
+        try:
+            trader = self.get_shared_ib_trader()
+            if not trader:
+                self._send_json_response({'error': '无法连接到IB'})
+                return
+
+            holdings = trader.get_holdings()
+            positions = []
+
+            for pos in holdings:
+                try:
+                    import yfinance as yf
+                    ticker = yf.Ticker(pos.contract.symbol)
+                    current_price = ticker.info.get('currentPrice', ticker.info.get('regularMarketPrice', pos.avgCost))
+                except:
+                    current_price = pos.avgCost
+
+                market_value = current_price * pos.position
+                total_cost = pos.avgCost * pos.position
+                unrealized_pnl = market_value - total_cost
+
+                positions.append({
+                    'symbol': pos.contract.symbol,
+                    'position': pos.position,
+                    'avgCost': pos.avgCost,
+                    'marketValue': market_value,
+                    'totalCost': total_cost,
+                    'unrealizedPnL': unrealized_pnl,
+                    'currentPrice': current_price
+                })
+
+            self._send_json_response({'positions': positions})
+        except Exception as e:
+            self._send_json_response({'error': str(e)})
+
+    def _handle_ib_cancel_orders_api(self):
+        """取消所有未完成订单"""
+        try:
+            trader = self.get_shared_ib_trader()
+            if not trader:
+                self._send_json_response({'error': '无法连接到IB'})
+                return
+
+            # 更新订单状态
+            updated = trader.update_pending_trade_statuses()
+            # 取消未完成订单
+            cancelled = trader.cancel_open_orders()
+
+            self._send_json_response({
+                'success': True,
+                'updated_trades': updated,
+                'cancelled_orders': cancelled
+            })
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
+
+    def _handle_ib_update_trades_api(self):
+        """更新待处理交易状态"""
+        try:
+            trader = self.get_shared_ib_trader()
+            if not trader:
+                self._send_json_response({'error': '无法连接到IB'})
+                return
+
+            updated = trader.update_pending_trade_statuses()
+            self._send_json_response({'success': True, 'updated_trades': updated})
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
+
+    def _handle_execute_signal_api(self):
+        """执行交易信号"""
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(post_data)
+
+            symbol = data.get('symbol')
+            signal = data.get('signal')
+            strategy_name = data.get('strategy', 'a1')
+            current_price = data.get('current_price')
+
+            if not symbol or not signal:
+                self._send_json_response({'success': False, 'error': '缺少symbol或signal参数'})
+                return
+
+            # 动态导入策略
+            import sys
+            if os.getcwd() not in sys.path:
+                sys.path.append(os.getcwd())
+
+            from strategies.base_strategy import BaseStrategy
+            from strategy_manager import StrategyManager
+
+            # 获取IB trader
+            trader = self.get_shared_ib_trader()
+            if not trader:
+                self._send_json_response({'success': False, 'error': '无法连接到IB'})
+                return
+
+            # 创建策略实例
+            strategy_class_map = {
+                'a1': 'strategies.a1_momentum_reversal.A1MomentumReversalStrategy',
+                'a2': 'strategies.a2_zscore.A2ZScoreStrategy',
+                'a3': 'strategies.a3_dual_ma_volume.A3DualMAVolumeStrategy',
+                'a4': 'strategies.a4_pullback.A4PullbackStrategy',
+                'a5': 'strategies.a5_multifactor_ai.A5MultiFactorAI',
+                'a6': 'strategies.a6_news_trading.A6NewsTrading',
+                'a7': 'strategies.a7_cta_trend.A7CTATrendStrategy',
+                'a8': 'strategies.a8_rsi_oscillator.A8RSIOscillatorStrategy',
+                'a9': 'strategies.a9_macd_crossover.A9MACDCrossoverStrategy',
+                'a10': 'strategies.a10_bollinger_bands.A10BollingerBandsStrategy',
+                'a11': 'strategies.a11_moving_average_crossover.A11MovingAverageCrossoverStrategy'
+            }
+
+            if strategy_name not in strategy_class_map:
+                self._send_json_response({'success': False, 'error': f'未知策略: {strategy_name}'})
+                return
+
+            # 动态导入策略类
+            module_name, class_name = strategy_class_map[strategy_name].rsplit('.', 1)
+            module = __import__(module_name, fromlist=[class_name])
+            strategy_class = getattr(module, class_name)
+
+            # 创建策略实例
+            strategy = strategy_class(config={}, ib_trader=trader)
+
+            # 执行信号
+            result = strategy.execute_signal(signal, current_price)
+
+            self._send_json_response({'success': True, 'result': result})
+
+        except Exception as e:
+            self._send_json_response({'success': False, 'error': str(e)})
+
 def run_enhanced_server(port=8001):
+    # 在服务器启动前初始化IB连接
+    print("正在初始化IB连接...")
+    trader = EnhancedStockAPIHandler.get_shared_ib_trader()
+    if trader:
+        print("✅ IB连接初始化成功")
+
+        # 获取并打印账户信息
+        try:
+            available_funds = trader.get_available_funds()
+            net_liquidation = trader.get_net_liquidation()
+            holdings = trader.get_holdings()
+
+            print("📊 账户信息:")
+            print(f"   可用资金: ${available_funds:,.2f}")
+            print(f"   净资产: ${net_liquidation:,.2f}")
+            print(f"   持仓数量: {len(holdings)} 个股票")
+
+            if holdings:
+                print("   持仓详情:")
+                for pos in holdings:
+                    print(f"     {pos.contract.symbol}: {pos.position} 股 @ ${pos.avgCost:.2f}")
+        except Exception as e:
+            print(f"⚠️ 获取账户信息失败: {str(e)}")
+    else:
+        print("❌ IB连接初始化失败，但服务器将继续启动")
+
     server_address = ('', port)
     httpd = HTTPServer(server_address, EnhancedStockAPIHandler)
     print(f'🚀 增强版数据服务器启动成功，端口 {port}')
