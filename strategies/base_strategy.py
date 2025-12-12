@@ -56,6 +56,9 @@ class BaseStrategy:
         self.portfolio_drawdown = 0.0
         self.risk_management_paused = False
 
+        # 日内交易限制（内存中）
+        self.daily_actions = {}  # {symbol: {'BUY': count, 'SELL': count, 'last_action': action, 'last_time': datetime}}
+
     def _default_config(self) -> Dict:
         """默认配置 - 子类应该重写此方法"""
         return {
@@ -735,7 +738,13 @@ class BaseStrategy:
         
         # 动态资金检查 (仅针对买入)
         if signal['action'] == 'BUY':
-            # 检查当日卖出限制
+            # 检查内存中的日内交易限制
+            symbol_actions = self.daily_actions.get(signal['symbol'], {})
+            if symbol_actions.get('SELL', 0) > 0:
+                logger.info(f"日内交易限制: {signal['symbol']} 今日已卖出，禁止买入")
+                return {'status': 'REJECTED', 'reason': f"日内交易限制 {signal['symbol']}"}
+
+            # 检查当日卖出限制（文件）
             if self._has_sold_today(signal['symbol']):
                 logger.info(f"当日卖出限制: {signal['symbol']} 今日已卖出，禁止再次买入")
                 return {'status': 'REJECTED', 'reason': f"当日卖出限制 {signal['symbol']}"}
@@ -795,6 +804,12 @@ class BaseStrategy:
             return {'status': 'REJECTED', 'reason': '存在未完成订单，避免重复下单'}
 
         if signal['action'] == 'SELL':
+            # 检查内存中的日内交易限制
+            symbol_actions = self.daily_actions.get(signal['symbol'], {})
+            if symbol_actions.get('BUY', 0) > 0:
+                logger.info(f"日内交易限制: {signal['symbol']} 今日已买入，禁止卖出")
+                return {'status': 'REJECTED', 'reason': f"日内交易限制 {signal['symbol']}"}
+
             current_pos = 0
             if signal['symbol'] in self.positions:
                 try:
@@ -925,6 +940,15 @@ class BaseStrategy:
                     if 'signal_hash' in signal:
                         self._add_signal_to_cache(signal['signal_hash'])
 
+                    # 更新日内交易记录
+                    symbol = signal['symbol']
+                    action = signal['action']
+                    if symbol not in self.daily_actions:
+                        self.daily_actions[symbol] = {'BUY': 0, 'SELL': 0, 'last_action': None, 'last_time': None}
+                    self.daily_actions[symbol][action] += 1
+                    self.daily_actions[symbol]['last_action'] = action
+                    self.daily_actions[symbol]['last_time'] = datetime.now()
+
                     if signal['action'] == 'BUY':
                         if signal['symbol'] not in self.positions:
                             self.positions[signal['symbol']] = {
@@ -953,6 +977,15 @@ class BaseStrategy:
                 return trade
             else:
                 logger.info(f"DEBUG: 模拟交易模式 - 更新本地持仓，信号: {signal['symbol']} {signal['action']} {signal['position_size']}")
+
+                # 更新日内交易记录
+                symbol = signal['symbol']
+                action = signal['action']
+                if symbol not in self.daily_actions:
+                    self.daily_actions[symbol] = {'BUY': 0, 'SELL': 0, 'last_action': None, 'last_time': None}
+                self.daily_actions[symbol][action] += 1
+                self.daily_actions[symbol]['last_action'] = action
+                self.daily_actions[symbol]['last_time'] = datetime.now()
 
                 if signal['action'] == 'BUY':
                     # 买入操作：增加持仓
