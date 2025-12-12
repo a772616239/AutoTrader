@@ -715,10 +715,10 @@ class A1MomentumReversalStrategy(BaseStrategy):
         if symbol not in self.positions:
             current_time = datetime.now()
             
-            # 避免在接近收盘时开新仓
-            if self.is_late_session(current_time):
-                logger.info(f"⏰ {symbol} 接近收盘，避免开新仓")
-                return signals
+            # 移除接近收盘时间检查，允许任何时间开新仓
+            # if self.is_late_session(current_time):
+            #     logger.info(f"⏰ {symbol} 接近收盘，避免开新仓")
+            #     return signals
             
             # 早盘动量信号
             morning_signal = self.detect_morning_momentum(symbol, data, indicators)
