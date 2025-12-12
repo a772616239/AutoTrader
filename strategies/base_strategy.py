@@ -284,6 +284,103 @@ class BaseStrategy:
             logger.error(f"检查当天卖出记录失败: {e}")
             return False
 
+    def _sync_ib_order_history(self):
+        """同步IB订单历史到trades.json"""
+        try:
+            if not self.ib_trader or not self.ib_trader.connected:
+                return
+
+            logger.info("🔄 开始同步IB订单历史...")
+
+            # 假设ib_trader有get_order_history方法
+            if hasattr(self.ib_trader, 'get_order_history'):
+                ib_orders = self.ib_trader.get_order_history()
+                if not ib_orders:
+                    logger.info("ℹ️ IB无订单历史")
+                    return
+
+                import json
+                import os
+                data_dir = os.path.join(os.getcwd(), 'data')
+                if not os.path.exists(data_dir):
+                    os.makedirs(data_dir)
+
+                file_path = os.path.join(data_dir, 'trades.json')
+
+                # 读取现有trades
+                existing_trades = []
+                if os.path.exists(file_path):
+                    with open(file_path, 'r') as f:
+                        try:
+                            existing_trades = json.load(f)
+                        except:
+                            pass
+
+                # 转换为集合用于快速查找
+                existing_order_ids = {trade.get('order_id') for trade in existing_trades if trade.get('order_id')}
+
+                new_trades = []
+                for order in ib_orders:
+                    try:
+                        order_id = getattr(order, 'orderId', None) or getattr(order, 'permId', None)
+                        if not order_id or order_id in existing_order_ids:
+                            continue
+
+                        # 转换IB订单为trade格式
+                        status = getattr(order, 'status', 'UNKNOWN')
+                        if status not in ['Filled', 'EXECUTED']:
+                            continue  # 只处理已执行订单
+
+                        # 获取合约信息
+                        contract = getattr(order, 'contract', None)
+                        if not contract:
+                            continue
+
+                        symbol = getattr(contract, 'symbol', 'UNKNOWN')
+
+                        # 确定action
+                        action = 'BUY' if getattr(order, 'action', '').upper() == 'BUY' else 'SELL'
+
+                        # 获取执行信息
+                        filled_qty = getattr(order, 'filled', 0) or getattr(order, 'cumQty', 0)
+                        avg_fill_price = getattr(order, 'avgFillPrice', 0) or getattr(order, 'lmtPrice', 0)
+
+                        if filled_qty <= 0 or avg_fill_price <= 0:
+                            continue
+
+                        # 创建trade记录
+                        trade = {
+                            'symbol': symbol,
+                            'action': action,
+                            'entry_price': avg_fill_price,
+                            'price': avg_fill_price,
+                            'size': filled_qty,
+                            'timestamp': datetime.now().isoformat(),
+                            'signal_type': 'IB_SYNC',
+                            'confidence': 1.0,
+                            'status': 'EXECUTED',
+                            'order_id': str(order_id),
+                            'order_type': getattr(order, 'orderType', 'UNKNOWN')
+                        }
+
+                        new_trades.append(trade)
+                        logger.info(f"📝 补全IB订单: {symbol} {action} {filled_qty}股 @ ${avg_fill_price:.2f}")
+
+                    except Exception as e:
+                        logger.warning(f"处理IB订单时出错: {e}")
+                        continue
+
+                if new_trades:
+                    existing_trades.extend(new_trades)
+                    with open(file_path, 'w') as f:
+                        json.dump(existing_trades[-200:], f, indent=2)  # 保留最近200条
+                    logger.info(f"✅ 补全了 {len(new_trades)} 个IB订单到trades.json")
+                else:
+                    logger.info("ℹ️ 无需补全IB订单")
+
+        except Exception as e:
+            logger.error(f"同步IB订单历史失败: {e}")
+
     def _generate_signal_hash(self, signal: Dict) -> str:
         """生成信号唯一哈希"""
         signal_str = f"{signal['symbol']}_{signal['signal_type']}_{signal['action']}_{signal.get('reason', '')}"
@@ -356,6 +453,10 @@ class BaseStrategy:
             # 同步净资产
             self.equity = self.ib_trader.get_net_liquidation()
             logger.info(f"✅ 持仓同步完成: {len(self.positions)} 个持仓, 净资产: ${self.equity:,.2f}")
+
+            # 同步IB订单历史到trades.json
+            self._sync_ib_order_history()
+
             return True
 
         except Exception as e:
