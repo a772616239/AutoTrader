@@ -11,8 +11,10 @@ import warnings
 import logging
 import importlib
 import re
+import json
 from datetime import datetime, timedelta
 from typing import Dict, List
+from collections import defaultdict
 try:
     import pytz
     HAS_PYTZ = True
@@ -127,6 +129,401 @@ logger = logging.getLogger(__name__)
 cleanup_old_logs(log_dir)
 
 logger.info(f"日志文件保存在: {os.path.abspath(log_file)}")
+
+def generate_end_of_day_profit_report(target_date=None):
+    """
+    生成尾盘利润统计报告
+    统计各量化策略的买入卖出股票及利润百分比
+    计算买入价格vs当前价格 和 卖出价格vs当前价格的利润率
+
+    参数:
+        target_date: 指定日期 (datetime.date对象)，如果为None则使用今天
+    """
+    try:
+        # 读取交易记录
+        trades_file = 'data/trades.json'
+        if not os.path.exists(trades_file):
+            logger.warning("交易记录文件不存在")
+            return
+
+        with open(trades_file, 'r', encoding='utf-8') as f:
+            all_trades = json.load(f)
+
+        # 获取目标日期
+        from datetime import datetime, timezone
+        if target_date is None:
+            target_date = datetime.now(timezone.utc).date()
+
+        # 过滤指定日期的交易
+        trades = []
+        for trade in all_trades:
+            try:
+                # 解析交易时间戳
+                trade_time = datetime.fromisoformat(trade['timestamp'].replace('Z', '+00:00'))
+                if trade_time.date() == target_date:
+                    trades.append(trade)
+            except (ValueError, KeyError):
+                # 如果时间戳格式错误，跳过这条记录
+                continue
+
+        logger.info(f"✅ 日期过滤完成: 只统计 {target_date.strftime('%Y-%m-%d')} 当天的交易记录")
+        logger.info(f"   找到 {len(trades)} 条当日交易 (总历史记录: {len(all_trades)} 条)")
+
+        # 读取策略映射
+        symbol_strategy_map = config_module.CONFIG.get('symbol_strategy_map', {})
+
+        # 初始化数据提供器获取当前价格
+        data_provider = None
+        try:
+            data_provider = DataProvider(
+                base_url=config_module.CONFIG.get('data_server', {}).get('base_url', 'http://localhost:8001'),
+                max_retries=3
+            )
+        except Exception as e:
+            logger.warning(f"初始化数据提供器失败: {e}，将使用交易记录中的价格作为当前价格")
+
+        # 获取所有涉及的股票列表
+        all_symbols = set()
+        for trade in trades:
+            if trade['status'] == 'EXECUTED':
+                all_symbols.add(trade['symbol'])
+
+        # 获取当前价格
+        current_prices = {}
+        if data_provider and all_symbols:
+            try:
+                logger.info(f"正在获取 {len(all_symbols)} 个股票的当前价格...")
+                for symbol in all_symbols:
+                    try:
+                        # 获取最近5分钟的数据来获取当前价格
+                        df = data_provider.get_intraday_data(symbol, interval='5m', lookback=1)
+                        if df is not None and not df.empty:
+                            current_prices[symbol] = df['Close'].iloc[-1]
+                            logger.debug(f"获取到 {symbol} 当前价格: ${current_prices[symbol]:.2f}")
+                        else:
+                            logger.warning(f"无法获取 {symbol} 的当前价格")
+                    except Exception as e:
+                        logger.warning(f"获取 {symbol} 当前价格失败: {e}")
+            except Exception as e:
+                logger.warning(f"批量获取当前价格失败: {e}")
+
+        logger.info(f"成功获取 {len(current_prices)} 个股票的当前价格")
+
+        # 信号类型到策略的映射
+        signal_to_strategy = {
+            # A1 动量反转策略
+            'MORNING_MOMENTUM': 'a1',
+            'AFTERNOON_REVERSAL': 'a1',
+            'TECHNICAL_SELL': 'a1',
+            'STRONG_TECHNICAL_SELL': 'a1',
+            'DYNAMIC_STOP_LOSS': 'a1',
+            'FULL_TAKE_PROFIT': 'a1',
+            'PARTIAL_TAKE_PROFIT': 'a1',
+            'QUICK_LOSS': 'a1',
+            'MAX_HOLDING': 'a1',
+            'VOLATILITY_EXIT': 'a1',
+            'RESISTANCE_SELL': 'a1',
+            'MOMENTUM_DECAY': 'a1',
+
+            # A3 双均线成交量突破策略
+            'BB_LOWER_BREAKOUT': 'a3',
+            'MA_DEATH_CROSS': 'a3',
+
+            # A4 回调交易策略
+            'PULLBACK_BUY_UPTREND': 'a4',
+            'PULLBACK_SELL_DOWNTREND': 'a4',
+
+            # A5 多因子AI策略
+            'MULTIFACTOR_AI_BUY': 'a5',
+            'MULTIFACTOR_AI_SELL': 'a5',
+
+            # A7 CTA趋势策略
+            'CTA_BREAKOUT_LONG': 'a7',
+            'CTA_BREAKDOWN_SHORT': 'a7',
+
+            # A8 RSI震荡策略
+            'RSI_OVERSOLD': 'a8',
+            'RSI_OVERBOUGHT': 'a8',
+
+            # A9 MACD交叉策略
+            'MACD_GOLDEN_CROSS': 'a9',
+            'MACD_DEATH_CROSS': 'a9',
+
+            # A10 布林带策略
+            'BB_UPPER_BREAKOUT': 'a10',
+            'BB_MIDDLE_CROSS': 'a10',
+
+            # A11 移动平均交叉策略
+            'MA_GOLDEN_CROSS': 'a11',
+            'MA_DEATH_CROSS': 'a11',
+        }
+
+        # 策略统计数据 - 按策略->股票分组，存储交易详情
+        strategy_stats = defaultdict(lambda: defaultdict(lambda: {
+            'buy_trades': [],  # 存储买入交易详情
+            'sell_trades': [], # 存储卖出交易详情
+            'executed_trades': 0,
+            'failed_trades': 0
+        }))
+
+        # 处理每笔交易
+        for trade in trades:
+            symbol = trade['symbol']
+            action = trade['action']
+            price = trade['price']
+            size = trade['size']
+            signal_type = trade['signal_type']
+            status = trade['status']
+
+            # 确定策略
+            strategy = symbol_strategy_map.get(symbol)
+            if not strategy:
+                # 尝试从信号类型推断策略
+                strategy = signal_to_strategy.get(signal_type)
+            if not strategy:
+                continue
+
+            if status == 'EXECUTED':
+                strategy_stats[strategy][symbol]['executed_trades'] += 1
+
+                # 存储交易详情
+                trade_detail = {
+                    'price': price,
+                    'size': size,
+                    'amount': price * size,
+                    'timestamp': trade['timestamp']
+                }
+
+                if action == 'BUY':
+                    strategy_stats[strategy][symbol]['buy_trades'].append(trade_detail)
+                elif action == 'SELL':
+                    strategy_stats[strategy][symbol]['sell_trades'].append(trade_detail)
+            else:
+                strategy_stats[strategy][symbol]['failed_trades'] += 1
+
+        # 生成报告
+        logger.info("\n" + "="*80)
+        logger.info("📊 尾盘量化策略利润统计报告")
+        logger.info("="*80)
+        logger.info(f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"统计日期: {target_date.strftime('%Y-%m-%d')}")
+        logger.info(f"总交易记录数: {len(trades)}")
+        logger.info("")
+
+        total_all_buy = 0.0
+        total_all_sell = 0.0
+        total_all_profit = 0.0
+
+        # 策略名称映射
+        strategy_names = {
+            'a1': '动量反转策略',
+            'a2': 'Z-Score均值回归',
+            'a3': '双均线成交量突破',
+            'a4': '回调交易策略',
+            'a5': '多因子AI融合',
+            'a6': '新闻交易策略',
+            'a7': 'CTA趋势跟踪',
+            'a8': 'RSI震荡策略',
+            'a9': 'MACD交叉策略',
+            'a10': '布林带策略',
+            'a11': '移动平均交叉'
+        }
+
+        for strategy_code, symbol_stats in strategy_stats.items():
+            strategy_name = strategy_names.get(strategy_code, f'策略{strategy_code}')
+            strategy_total_buy = 0.0
+            strategy_total_sell = 0.0
+            strategy_total_profit = 0.0
+            strategy_symbols = set()
+
+            logger.info(f"🎯 {strategy_name} ({strategy_code})")
+            logger.info(f"   标的数量: {len(symbol_stats)}")
+
+            # 显示每个股票的统计
+            for symbol, stats in symbol_stats.items():
+                current_price = current_prices.get(symbol, 0)
+
+                # 计算每笔交易的利润（差额 × 数量）
+                buy_profit_info = []
+                total_buy_profit = 0.0
+                total_buy_amount = 0.0
+                for i, trade in enumerate(stats['buy_trades']):
+                    total_buy_amount += trade['amount']
+                    if current_price > 0:
+                        # 买入利润 = (当前价格 - 买入价格) × 数量
+                        profit_per_share = current_price - trade['price']
+                        total_profit = profit_per_share * trade['size']
+                        total_buy_profit += total_profit
+                        profit_pct = (current_price - trade['price']) / trade['price'] * 100
+                        # 提取交易时间 (HH:MM格式)
+                        trade_time = trade['timestamp'][11:16]  # HH:MM格式
+                        buy_profit_info.append(f"{trade_time} {trade['price']:.2f}→{current_price:.2f} (${total_profit:+.2f}, {profit_pct:+.2f}%)")
+                    else:
+                        trade_date = trade['timestamp'][:10]
+                        buy_profit_info.append(f"{trade_date} {trade['price']:.2f} (无当前价)")
+
+                # 计算卖出交易的利润
+                sell_profit_info = []
+                total_sell_profit = 0.0
+                total_sell_amount = 0.0
+                for i, trade in enumerate(stats['sell_trades']):
+                    total_sell_amount += trade['amount']
+                    if current_price > 0:
+                        # 卖出利润 = (卖出价格 - 当前价格) × 数量
+                        profit_per_share = trade['price'] - current_price
+                        total_profit = profit_per_share * trade['size']
+                        total_sell_profit += total_profit
+                        profit_pct = (current_price - trade['price']) / trade['price'] * 100
+                        trade_time = trade['timestamp'][11:16]
+                        sell_profit_info.append(f"{trade_time} {trade['price']:.2f}→{current_price:.2f} (${total_profit:+.2f}, {profit_pct:+.2f}%)")
+                    else:
+                        trade_date = trade['timestamp'][:10]
+                        sell_profit_info.append(f"{trade_date} {trade['price']:.2f} (无当前价)")
+
+                # 股票总利润 = 买入利润 + 卖出利润
+                stock_total_profit = total_buy_profit + total_sell_profit
+
+                strategy_total_buy += total_buy_amount
+                strategy_total_sell += total_sell_amount
+                strategy_total_profit += stock_total_profit
+                strategy_symbols.add(symbol)
+
+                # 计算总股数
+                total_buy_shares = sum(trade['size'] for trade in stats['buy_trades'])
+                total_sell_shares = sum(trade['size'] for trade in stats['sell_trades'])
+
+                logger.info(f"   📈 {symbol} (当前价: ${current_price:.2f}):")
+                if stats['buy_trades']:
+                    logger.info(f"      买入: {len(stats['buy_trades'])}笔 {total_buy_shares}股 总额${total_buy_amount:,.2f}")
+                    for info in buy_profit_info:
+                        logger.info(f"         {info}")
+                if stats['sell_trades']:
+                    logger.info(f"      卖出: {len(stats['sell_trades'])}笔 {total_sell_shares}股 总额${total_sell_amount:,.2f}")
+                    for info in sell_profit_info:
+                        logger.info(f"         {info}")
+
+                logger.info(f"      总利润: ${stock_total_profit:,.2f}")
+
+            # 策略汇总
+            strategy_profit_pct = (strategy_total_profit / strategy_total_buy * 100) if strategy_total_buy > 0 else 0.0
+            total_executed = sum(stats['executed_trades'] for stats in symbol_stats.values())
+            total_failed = sum(stats['failed_trades'] for stats in symbol_stats.values())
+
+            logger.info(f"   📊 策略汇总:")
+            logger.info(f"      总买入: ${strategy_total_buy:,.2f}")
+            logger.info(f"      总卖出: ${strategy_total_sell:,.2f}")
+            logger.info(f"      总利润: ${strategy_total_profit:,.2f} ({strategy_profit_pct:+.2f}%)")
+            logger.info(f"      执行成功: {total_executed}笔, 失败: {total_failed}笔")
+            logger.info("")
+
+            total_all_buy += strategy_total_buy
+            total_all_sell += strategy_total_sell
+            total_all_profit += strategy_total_profit
+
+        # 总计
+        total_profit_pct = (total_all_profit / total_all_buy * 100) if total_all_buy > 0 else 0.0
+
+        logger.info("="*80)
+        logger.info("📈 全策略汇总")
+        logger.info(f"   总买入金额: ${total_all_buy:,.2f}")
+        logger.info(f"   总卖出金额: ${total_all_sell:,.2f}")
+        logger.info(f"   总利润: ${total_all_profit:,.2f} ({total_profit_pct:+.2f}%)")
+        logger.info(f"   参与策略数: {len(strategy_stats)}")
+        logger.info("="*80)
+
+        # 保存报告到文件
+        report_file = f"logs/profit_report_{target_date.strftime('%Y%m%d')}_{datetime.now().strftime('%H%M%S')}.txt"
+        with open(report_file, 'w', encoding='utf-8') as f:
+            f.write("尾盘量化策略利润统计报告\n")
+            f.write(f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"统计日期: {target_date.strftime('%Y-%m-%d')}\n\n")
+
+            for strategy_code, symbol_stats in strategy_stats.items():
+                strategy_name = strategy_names.get(strategy_code, f'策略{strategy_code}')
+                f.write(f"{strategy_name} ({strategy_code}):\n")
+
+                strategy_total_buy = 0.0
+                strategy_total_sell = 0.0
+                strategy_total_profit = 0.0
+
+                # 显示每个股票的统计
+                for symbol, stats in symbol_stats.items():
+                    current_price = current_prices.get(symbol, 0)
+
+                    # 计算每笔交易的利润（差额 × 数量）
+                    buy_profit_info = []
+                    total_buy_profit = 0.0
+                    total_buy_amount = 0.0
+                    for trade in stats['buy_trades']:
+                        total_buy_amount += trade['amount']
+                        if current_price > 0:
+                            profit_per_share = current_price - trade['price']
+                            total_profit = profit_per_share * trade['size']
+                            total_buy_profit += total_profit
+                            profit_pct = (current_price - trade['price']) / trade['price'] * 100
+                            trade_time = trade['timestamp'][11:16]
+                            buy_profit_info.append(f"{trade_time} {trade['price']:.2f}→{current_price:.2f} (${total_profit:+.2f}, {profit_pct:+.2f}%)")
+                        else:
+                            trade_date = trade['timestamp'][:10]
+                            buy_profit_info.append(f"{trade_date} {trade['price']:.2f} (无当前价)")
+
+                    # 计算卖出交易的利润
+                    sell_profit_info = []
+                    total_sell_profit = 0.0
+                    total_sell_amount = 0.0
+                    for trade in stats['sell_trades']:
+                        total_sell_amount += trade['amount']
+                        if current_price > 0:
+                            profit_per_share = trade['price'] - current_price
+                            total_profit = profit_per_share * trade['size']
+                            total_sell_profit += total_profit
+                            profit_pct = (current_price - trade['price']) / trade['price'] * 100
+                            trade_time = trade['timestamp'][11:16]
+                            sell_profit_info.append(f"{trade_time} {trade['price']:.2f}→{current_price:.2f} (${total_profit:+.2f}, {profit_pct:+.2f}%)")
+                        else:
+                            trade_date = trade['timestamp'][:10]
+                            sell_profit_info.append(f"{trade_date} {trade['price']:.2f} (无当前价)")
+
+                    stock_total_profit = total_buy_profit + total_sell_profit
+
+                    strategy_total_buy += total_buy_amount
+                    strategy_total_sell += total_sell_amount
+                    strategy_total_profit += stock_total_profit
+
+                    # 计算总股数
+                    total_buy_shares = sum(trade['size'] for trade in stats['buy_trades'])
+                    total_sell_shares = sum(trade['size'] for trade in stats['sell_trades'])
+
+                    f.write(f"  {symbol} (当前价: ${current_price:.2f}):\n")
+                    if stats['buy_trades']:
+                        f.write(f"    买入: {len(stats['buy_trades'])}笔 {total_buy_shares}股 总额${total_buy_amount:,.2f}\n")
+                        for info in buy_profit_info:
+                            f.write(f"      {info}\n")
+                    if stats['sell_trades']:
+                        f.write(f"    卖出: {len(stats['sell_trades'])}笔 {total_sell_shares}股 总额${total_sell_amount:,.2f}\n")
+                        for info in sell_profit_info:
+                            f.write(f"      {info}\n")
+
+                    f.write(f"    总利润: ${stock_total_profit:,.2f}\n")
+
+                # 策略汇总
+                strategy_profit_pct = (strategy_total_profit / strategy_total_buy * 100) if strategy_total_buy > 0 else 0.0
+                f.write(f"  策略汇总:\n")
+                f.write(f"    总买入: ${strategy_total_buy:,.2f}\n")
+                f.write(f"    总卖出: ${strategy_total_sell:,.2f}\n")
+                f.write(f"    总利润: ${strategy_total_profit:,.2f} ({strategy_profit_pct:+.2f}%)\n\n")
+
+            f.write("汇总:\n")
+            f.write(f"  总买入: ${total_all_buy:,.2f}\n")
+            f.write(f"  总卖出: ${total_all_sell:,.2f}\n")
+            f.write(f"  总利润: ${total_all_profit:,.2f} ({total_profit_pct:+.2f}%)\n")
+
+        logger.info(f"✅ 利润报告已保存到: {report_file}")
+
+    except Exception as e:
+        logger.error(f"生成利润报告时出错: {e}")
+        import traceback
+        logger.debug(traceback.format_exc())
 
 # ==================== 策略工厂 ====================
 class StrategyFactory:
@@ -573,6 +970,9 @@ class TradingSystem:
                         
                         # 清仓后，本周期不再执行其他交易逻辑
                         logger.info("✅ 清仓完成，本周期结束")
+
+                        # 生成尾盘利润统计报告
+                        generate_end_of_day_profit_report()
                         return
                 else:
                     time_diff = (datetime.combine(datetime.today(), close_time) - 
@@ -952,5 +1352,34 @@ def main():
         import traceback
         traceback.print_exc()
 
+def generate_profit_report_for_date(date_str=None):
+    """
+    为指定日期生成利润报告
+
+    参数:
+        date_str: 日期字符串，格式为 YYYY-MM-DD，如果为None则使用今天
+    """
+    from datetime import datetime
+    target_date = None
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            logger.error(f"日期格式错误，请使用 YYYY-MM-DD 格式: {date_str}")
+            return
+
+    generate_end_of_day_profit_report(target_date)
+
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description='量化策略利润报告生成器')
+    parser.add_argument('--date', '-d', help='指定统计日期 (YYYY-MM-DD格式)，默认今天')
+    parser.add_argument('--report', action='store_true', help='生成利润报告')
+
+    args = parser.parse_args()
+
+    if args.report:
+        generate_profit_report_for_date(args.date)
+    else:
+        main()

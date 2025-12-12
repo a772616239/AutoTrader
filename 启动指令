@@ -1,3 +1,11 @@
 pkill -9 -f "python.*enhanced_http_server"; cd /Users/wangxufeng/AutoTrader && python3 enhanced_http_server.py
 
 pkill -9 -f "python.*main.py"; python '/Users/wangxufeng/AutoTrader/main.py'
+
+//输出报告
+python3 -c "
+import sys
+sys.path.append('.')
+from main import generate_end_of_day_profit_report
+generate_end_of_day_profit_report()
+"
