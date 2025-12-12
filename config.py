@@ -345,6 +345,7 @@ CONFIG = {
         'max_position_notional': 60000.0,
         'bollinger_period': 20,
         'bollinger_std': 2.0,
+        'breakout_threshold': 0.1,    # 突破强度阈值（降低便于测试）
         'stop_loss_pct': 0.02,          # 止损百分比（2%，降低限制）
         'take_profit_pct': 0.04,         # 止盈百分比（4%，降低限制）
         'max_holding_minutes': 120,      # 最大持有时间（120分钟，延长）

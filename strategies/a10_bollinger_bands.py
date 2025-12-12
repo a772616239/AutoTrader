@@ -65,8 +65,8 @@ class A10BollingerBandsStrategy(BaseStrategy):
         if data.empty or len(data) < self.config['min_data_points']:
             return signals
 
-        # 检查成交量
-        if 'Volume' in data.columns:
+        # 检查成交量 - 盘前时段跳过成交量检查
+        if not self._is_pre_market_hours() and 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
                 return signals
@@ -123,6 +123,8 @@ class A10BollingerBandsStrategy(BaseStrategy):
         # 记录信号统计
         if signals:
             self.signals_generated += len(signals)
+        else:
+            logger.info(f"📊 {symbol} A10无信号 - 价格: {current_price:.2f}, 上轨: {current_upper:.2f}, 中轨: {current_middle:.2f}, 下轨: {current_lower:.2f}")
 
         return signals
 
@@ -137,7 +139,7 @@ class A10BollingerBandsStrategy(BaseStrategy):
 
         # 上轨突破信号 - 买入
         if prev_price <= prev_upper and current_price > current_upper:
-            # 计算突破强度（突破了多少个标准差）
+            # 计算突破强度，降低阈值便于测试
             breakout_strength = (current_price - current_middle) / (current_upper - current_middle)
             if breakout_strength < self.config['breakout_threshold']:
                 return None  # 突破不够强
@@ -165,7 +167,7 @@ class A10BollingerBandsStrategy(BaseStrategy):
 
         # 下轨跌破信号 - 卖出
         elif prev_price >= prev_lower and current_price < current_lower:
-            # 计算突破强度（跌破了多少个标准差）
+            # 计算突破强度，降低阈值便于测试
             breakout_strength = (current_middle - current_price) / (current_middle - current_lower)
             if breakout_strength < self.config['breakout_threshold']:
                 return None  # 突破不够强

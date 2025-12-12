@@ -44,15 +44,23 @@ def create_signal_triggering_data(symbol, strategy_name, periods=250):
         shocks[extreme_indices] = np.random.choice([-0.25, 0.25], len(extreme_indices))  # 更大的偏离
 
     elif strategy_name == 'A3 Dual MA + Volume':
-        # 创建突破条件 - 更强的突破模式
-        trend = np.linspace(0, 0.004, periods)  # 更强的趋势
-        oscillation = 0.04 * np.sin(np.linspace(0, 4*np.pi, periods))
-        cycle = 0.03 * np.sin(np.linspace(0, 2*np.pi, periods))
+        # 创建均线交叉条件 - 确保快线(9)和慢线(21)的金叉
+        # 使用确定性的模式：前半部分下降，后半部分上升
+        trend = np.zeros(periods)
+        mid_point = periods // 2
 
-        # 添加更强的突破事件
+        # 前半部分：轻微下降，让快线在慢线下方
+        trend[:mid_point] = np.linspace(0, -0.01, mid_point)
+
+        # 后半部分：温和上升，形成金叉
+        trend[mid_point:] = np.linspace(-0.01, 0.03, periods - mid_point)
+
+        oscillation = 0.015 * np.sin(np.linspace(0, 6*np.pi, periods))
+        cycle = 0.01 * np.sin(np.linspace(0, 2.5*np.pi, periods))
+
+        # 在后半部分添加成交量放大
         shocks = np.zeros(periods)
-        breakout_indices = np.random.choice(range(periods//2, periods), size=4, replace=False)
-        shocks[breakout_indices] = np.random.uniform(0.08, 0.12, len(breakout_indices))
+        shocks[mid_point:] = np.linspace(0.02, 0.06, periods - mid_point)  # 逐渐放大
 
     elif strategy_name == 'A4 Pullback':
         # 创建更强的回撤条件
@@ -99,37 +107,67 @@ def create_signal_triggering_data(symbol, strategy_name, periods=250):
         shocks[extreme_rsi_indices] = np.random.choice([-0.12, 0.12], len(extreme_rsi_indices))
 
     elif strategy_name == 'A9 MACD Crossover':
-        # 创建MACD交叉条件 - 更强的动量变化
-        trend = np.linspace(0, 0.004, periods)  # 更强的趋势
-        oscillation = 0.06 * np.sin(np.linspace(0, 6*np.pi, periods))  # 更大的震荡
-        cycle = 0.04 * np.sin(np.linspace(0, 3*np.pi, periods))
+        # 创建MACD交叉条件 - 产生金叉信号
+        # 前半部分震荡，后半部分上涨形成金叉
+        trend = np.zeros(periods)
+        mid_point = periods // 2
 
-        # 添加更强的动量变化事件
+        # 前半部分：震荡
+        trend[:mid_point] = np.random.normal(0, 0.001, mid_point)
+
+        # 后半部分：上涨趋势，制造MACD金叉
+        trend[mid_point:] = np.linspace(0, 0.01, periods - mid_point)
+
+        oscillation = 0.04 * np.sin(np.linspace(0, 8*np.pi, periods))
+        cycle = 0.03 * np.sin(np.linspace(0, 4*np.pi, periods))
+
+        # 添加动量事件
         shocks = np.zeros(periods)
-        momentum_indices = np.random.choice(range(periods//2, periods), size=6, replace=False)
-        shocks[momentum_indices] = np.random.choice([-0.08, 0.08], len(momentum_indices))
+        momentum_indices = np.random.choice(range(mid_point, periods), size=8, replace=False)
+        shocks[momentum_indices] = np.random.uniform(0.02, 0.06, len(momentum_indices))
 
     elif strategy_name == 'A10 Bollinger Bands':
-        # 创建布林带条件 - 更极端的震荡
-        trend = np.linspace(0, 0.002, periods)
-        oscillation = 0.08 * np.sin(np.linspace(0, 8*np.pi, periods))  # 更强的震荡
-        cycle = 0.05 * np.sin(np.linspace(0, 4*np.pi, periods))
+        # 创建布林带条件 - 产生上轨突破
+        # 稳定的趋势 + 强震荡 + 明确的突破事件
+        trend = np.linspace(0, 0.002, periods)  # 稳定上涨趋势
+        oscillation = 0.08 * np.sin(np.linspace(0, 12*np.pi, periods))  # 更强震荡
+        cycle = 0.05 * np.sin(np.linspace(0, 6*np.pi, periods))
 
-        # 添加突破布林带事件
+        # 添加突破布林带上轨的事件 - 在最后几根K线，确保突破发生
         shocks = np.zeros(periods)
-        bb_breakout_indices = np.random.choice(range(periods//4, periods), size=8, replace=False)
-        shocks[bb_breakout_indices] = np.random.choice([-0.12, 0.12], len(bb_breakout_indices))  # 更大的突破
+        # 在最后8根K线中添加逐渐增大的突破事件，确保突破上轨
+        shocks[periods-8] = 0.08  # 第243根K线
+        shocks[periods-7] = 0.12  # 第244根K线
+        shocks[periods-6] = 0.16  # 第245根K线
+        shocks[periods-5] = 0.20  # 第246根K线
+        shocks[periods-4] = 0.25  # 第247根K线
+        shocks[periods-3] = 0.30  # 第248根K线
+        shocks[periods-2] = 0.35  # 第249根K线
+        shocks[periods-1] = 0.40  # 第250根K线（最后1根）
 
     elif strategy_name == 'A11 Moving Average Crossover':
-        # 创建均线交叉条件 - 更明显的交叉模式
-        trend = np.linspace(0, 0.005, periods)  # 更强的趋势
-        oscillation = 0.05 * np.sin(np.linspace(0, 5*np.pi, periods))
-        cycle = 0.035 * np.sin(np.linspace(0, 2.8*np.pi, periods))
+        # 创建均线交叉条件 - 产生金叉信号
+        # 前半部分震荡，后半部分快速上涨形成均线金叉
+        trend = np.zeros(periods)
+        mid_point = periods // 2
 
-        # 添加更明显的交叉事件
+        # 前半部分：轻微震荡，让快线在慢线下方
+        trend[:mid_point] = np.random.normal(0, 0.0005, mid_point)
+
+        # 后半部分：快速上涨，形成均线金叉
+        trend[mid_point:] = np.linspace(0, 0.012, periods - mid_point)
+
+        oscillation = 0.03 * np.sin(np.linspace(0, 8*np.pi, periods))
+        cycle = 0.025 * np.sin(np.linspace(0, 4*np.pi, periods))
+
+        # 添加更强的交叉事件，确保最后几根K线产生金叉
         shocks = np.zeros(periods)
-        crossover_indices = np.random.choice(range(2*periods//3, periods), size=5, replace=False)
-        shocks[crossover_indices] = np.random.choice([-0.06, 0.06], len(crossover_indices))
+        # 在最后几根K线添加更强的上涨事件，确保快线上穿慢线
+        shocks[periods-5] = 0.10  # 第246根K线
+        shocks[periods-4] = 0.15  # 第247根K线
+        shocks[periods-3] = 0.20  # 第248根K线
+        shocks[periods-2] = 0.25  # 第249根K线
+        shocks[periods-1] = 0.30  # 第250根K线（最后1根）
 
     else:
         # 默认数据生成
@@ -152,10 +190,16 @@ def create_signal_triggering_data(symbol, strategy_name, periods=250):
     price_volatility = np.abs(np.diff(prices, prepend=prices[0]))
     volume_multiplier = 1 + price_volatility / np.std(price_volatility) * 1.5
 
-    # 添加成交量高峰
+    # 添加成交量高峰 - 特别在金叉点放大成交量
     volume_spikes = np.zeros(periods)
     spike_indices = np.random.choice(periods, size=int(periods*0.08), replace=False)
     volume_spikes[spike_indices] = np.random.uniform(3, 6, len(spike_indices))
+
+    # 为A3策略特别添加金叉点成交量突破
+    if strategy_name == 'A3 Dual MA + Volume':
+        cross_point = periods - 5
+        volume_spikes[cross_point:] = np.random.uniform(8, 12, 5)  # 金叉点大幅放大成交量
+
     volume_multiplier += volume_spikes
 
     data = pd.DataFrame({
@@ -179,7 +223,11 @@ def test_strategy_comprehensive(strategy_name, strategy_class, symbol):
         print(f"\n🔬 全面测试 {strategy_name} 对 {symbol}")
 
         # 创建策略实例
-        strategy = strategy_class()
+        try:
+            strategy = strategy_class()
+        except Exception as e:
+            print(f"❌ 策略实例化失败: {e}")
+            return False
 
         # 为特定策略创建触发信号的数据
         data = create_signal_triggering_data(symbol, strategy_name)

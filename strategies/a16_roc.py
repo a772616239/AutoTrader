@@ -64,8 +64,8 @@ class A16ROCStrategy(BaseStrategy):
             logger.info(f"❌ {symbol} 数据不足，跳过信号生成 - 数据点: {len(data)}, 需要: {self.config['min_data_points']}")
             return signals
 
-        # 检查成交量
-        if 'Volume' in data.columns:
+        # 检查成交量 - 盘前时段跳过成交量检查
+        if not self._is_pre_market_hours() and 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
                 current_volume = data['Volume'].iloc[-1] if not pd.isna(data['Volume'].iloc[-1]) else 0

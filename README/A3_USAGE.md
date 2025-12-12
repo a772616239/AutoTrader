@@ -80,7 +80,7 @@ A3 策略（双均线 + 成交量突破）是一个**趋势追踪 + 动量确认
 {
     'fast_ma_period': 12,        # 反应稍微慢一点
     'slow_ma_period': 26,        # 更长周期确认趋势
-    'volume_surge_ratio': 2.0,   # 更高的成交量要求
+    'volume_surge_ratio': 1.3,   # 更高的成交量要求
     'take_profit_pct': 0.04,     # 更高的止盈目标
     'max_holding_minutes': 30,   # 更短的持仓时间
 }

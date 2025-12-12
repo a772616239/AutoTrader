@@ -93,7 +93,13 @@ class BaseStrategy:
             current = datetime.now().time()  # 假设本地时间就是美东时间
 
         return start <= current <= end
-    
+
+    def _is_pre_market_hours(self) -> bool:
+        """检查是否在盘前时段（北京时间16:00-21:30）"""
+        from datetime import time as dt_time
+        current_time = datetime.now()
+        return current_time.time() >= dt_time(16, 0) and current_time.time() <= dt_time(21, 30)
+
     def _generate_signal_hash(self, signal: Dict) -> str:
         """生成信号唯一哈希"""
         signal_str = f"{signal['symbol']}_{signal['signal_type']}_{signal['action']}_{signal.get('reason', '')}"
