@@ -116,8 +116,8 @@ CONFIG = {
         'sell_exempt_from_cap': False   ,  # 卖出是否不受per_trade_notional_cap单笔限额限制
     },
     'logging': {
-        'debug_mode': False,  # 调试模式：每次运行生成新日志文件
-        'level': 'INFO',
+        'debug_mode': True,  # 调试模式：每次运行生成新日志文件，启用DEBUG级别日志
+        'level': 'DEBUG',
         'file': os.path.join('logs', f'trading_{datetime.now():%Y%m%d_%H%M%S}.log'),
         'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     },
@@ -371,6 +371,136 @@ CONFIG = {
         'min_data_points': 25,
         'ib_order_type': 'MKT',
         'ib_limit_offset': 0.01,
+    },
+    'strategy_a12': {  # A12 Stochastic RSI策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'rsi_period': 14,
+        'stoch_period': 14,
+        'oversold_level': 0.2,
+        'overbought_level': 0.8,
+        'stop_loss_pct': 0.02,          # 止损百分比（2%，降低限制）
+        'take_profit_pct': 0.04,         # 止盈百分比（4%，降低限制）
+        'max_holding_minutes': 120,      # 最大持有时间（120分钟，延长）
+        'signal_cooldown_minutes': 15,
+        'min_volume': 10000,
+        'min_data_points': 30,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a13': {  # A13 EMA交叉策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'short_ema_period': 20,
+        'long_ema_period': 100,
+        'position_size_fraction': 0.33,
+        'stop_loss_pct': 0.05,          # 较宽松的止损
+        'take_profit_pct': 0.10,         # 较宽松的止盈
+        'max_holding_minutes': 1440,     # 24小时
+        'signal_cooldown_minutes': 60,
+        'min_volume': 10000,
+        'min_data_points': 110,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a14': {  # A14 RSI趋势线策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'rsi_period': 14,
+        'rsi_oversold_threshold': 33,
+        'rsi_lookback_days': 2,
+        'trend_ma_period': 200,
+        'trend_ma_type': 'SMA',
+        'stop_loss_pct': 0.03,          # 适中止损
+        'take_profit_pct': 0.06,         # 适中止盈
+        'max_holding_minutes': 480,      # 8小时
+        'signal_cooldown_minutes': 30,
+        'min_volume': 10000,
+        'min_data_points': 220,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a15': {  # A15 配对交易策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.05,
+        'per_trade_notional_cap': 500.0,
+        'max_position_notional': 30000.0,
+        'pair_symbol': 'SPY',
+        'lookback_period': 60,
+        'entry_threshold': 2.0,
+        'exit_threshold': 0.5,
+        'stop_loss_pct': 0.05,
+        'take_profit_pct': 0.08,
+        'max_holding_minutes': 240,
+        'signal_cooldown_minutes': 30,
+        'min_volume': 10000,
+        'min_data_points': 70,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a16': {  # A16 ROC策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'roc_period': 12,
+        'bullish_threshold': 10,
+        'bearish_threshold': -10,
+        'stop_loss_pct': 0.03,
+        'take_profit_pct': 0.06,
+        'max_holding_minutes': 120,
+        'signal_cooldown_minutes': 15,
+        'min_volume': 10000,
+        'min_data_points': 25,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a17': {  # A17 CCI策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'cci_period': 20,
+        'overbought_level': 100,
+        'oversold_level': -100,
+        'stop_loss_pct': 0.03,
+        'take_profit_pct': 0.06,
+        'max_holding_minutes': 120,
+        'signal_cooldown_minutes': 15,
+        'min_volume': 10000,
+        'min_data_points': 25,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a18': {  # A18 IsolationForest异常检测策略配置
+        'initial_capital': 50000,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+        'contamination': 0.001,        # 异常值比例
+        'cooldown_days': 7,            # 交易冷却期（天）
+        'min_data_points': 50,          # 最小数据点数量
+        'model_retrain_days': 30,       # 模型重训练间隔（天）
+        'stop_loss_pct': 0.02,          # 止损百分比
+        'take_profit_pct': 0.05,        # 止盈百分比
+        'max_holding_days': 3,          # 最大持有天数
+        'signal_cooldown_minutes': 60,  # 信号冷却时间
+        'min_volume': 10000,
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
     }
 }
 
@@ -387,6 +517,13 @@ STRATEGY_CONFIG_MAP = {
     'a9': 'strategy_a9',
     'a10': 'strategy_a10',
     'a11': 'strategy_a11',
+    'a12': 'strategy_a12',
+    'a13': 'strategy_a13',
+    'a14': 'strategy_a14',
+    'a15': 'strategy_a15',
+    'a16': 'strategy_a16',
+    'a17': 'strategy_a17',
+    'a18': 'strategy_a18',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a8/a9/a10
