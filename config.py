@@ -976,9 +976,9 @@ preselect_a2 = {
 
     # A3 双均线成交量突破策略 - 基于趋势突破
     'TEAM': 'a18',
-    'GOOGL':'a19',
-    'CRM':  'a20',
-    'AVGO': 'a21',
+    'GOOGL':'a4',
+    'CRM':  'a4',
+    'AVGO': 'a4',
     'IBM':  'a22',
     'NOW':  'a23',
     'AAPL': 'a24',  # 趋势清晰，成交量稳定

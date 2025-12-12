@@ -30,6 +30,9 @@ from strategies.a15_pairs_trading import A15PairsTradingStrategy
 from strategies.a16_roc import A16ROCStrategy
 from strategies.a17_cci import A17CCIStrategy
 from strategies.a18_isolation_forest import A18IsolationForestStrategy
+# from strategies.a19_adx_trend import A19ADXTrendStrategy    
+# from strategies.a20_volume_spike import A20VolumeSpikeStrategy
+# from strategies.a21_fibonacci_retracement import A21FibonacciRetracementStrategy
 from strategies.a22_super_trend import A22SuperTrendStrategy
 from strategies.a23_aroon_oscillator import A23AroonOscillatorStrategy
 from strategies.a24_ultimate_oscillator import A24UltimateOscillatorStrategy
@@ -116,8 +119,11 @@ class StrategyManager:
         def _run_for_strategy(strategy_name: str, syms: List[str]):
             cls = STRATEGY_CLASSES.get(strategy_name)
             if not cls:
-                logger.error(f"未知策略名称: {strategy_name}")
-                return {}
+                logger.warning(f"未知策略名称: {strategy_name}，使用默认策略a1")
+                cls = STRATEGY_CLASSES.get('a4')
+                if not cls:
+                    logger.error(f"默认策略a1也不存在")
+                    return {}
 
             # 获取该策略在全局配置中的配置节名（如果存在）
             cfg_key = global_config.STRATEGY_CONFIG_MAP.get(strategy_name)
@@ -188,8 +194,11 @@ class StrategyManager:
         def _run_for_strategy_stream(strategy_name: str, syms: List[str]):
             cls = STRATEGY_CLASSES.get(strategy_name)
             if not cls:
-                logger.error(f"未知策略名称: {strategy_name}")
-                return {}
+                logger.warning(f"未知策略名称: {strategy_name}，使用默认策略a1")
+                cls = STRATEGY_CLASSES.get('a4')
+                if not cls:
+                    logger.error(f"默认策略a1也不存在")
+                    return {}
 
             cfg_key = global_config.STRATEGY_CONFIG_MAP.get(strategy_name)
             strat_cfg = {}

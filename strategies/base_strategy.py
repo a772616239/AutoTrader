@@ -56,6 +56,9 @@ class BaseStrategy:
         self.portfolio_drawdown = 0.0
         self.risk_management_paused = False
 
+        # 日内交易限制
+        self.daily_sell_tracker = set()  # 当天卖出的股票
+
     def _default_config(self) -> Dict:
         """默认配置 - 子类应该重写此方法"""
         return {
@@ -352,8 +355,13 @@ class BaseStrategy:
         position = self.positions[symbol]
         avg_cost = position['avg_cost']
         position_size = position['size']
-        
+
         entry_time = position.get('entry_time', current_time - timedelta(minutes=60))
+
+        # 增强日内买入不能再卖出的功能：当日买入的持仓，当天不触发卖出条件
+        if entry_time.date() == current_time.date():
+            logger.info(f"日内买入限制: {symbol} 今日买入 ({entry_time.strftime('%H:%M')})，当天不触发卖出条件")
+            return None
 
         # 优先使用IB的实时持仓成本计算盈利百分比
         ib_profit_pct = None
@@ -603,6 +611,11 @@ class BaseStrategy:
         
         # 动态资金检查 (仅针对买入)
         if signal['action'] == 'BUY':
+            # 检查当日卖出限制
+            if signal['symbol'] in self.daily_sell_tracker:
+                logger.info(f"当日卖出限制: {signal['symbol']} 今日已卖出，禁止再次买入")
+                return {'status': 'REJECTED', 'reason': f"当日卖出限制 {signal['symbol']}"}
+
             # 检查当日不能重复买入限制
             # if CONFIG['trading'].get('same_day_sell_only', False):
                 if signal['symbol'] in self.positions:
@@ -658,6 +671,9 @@ class BaseStrategy:
             return {'status': 'REJECTED', 'reason': '存在未完成订单，避免重复下单'}
 
         if signal['action'] == 'SELL':
+            # 记录当日卖出
+            self.daily_sell_tracker.add(signal['symbol'])
+
             current_pos = 0
             if signal['symbol'] in self.positions:
                 try:
