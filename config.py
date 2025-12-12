@@ -42,10 +42,10 @@ CONFIG = {
     'PFE',
     'JNJ',
     'BAC',
-    'GS',
+    # 'GS',
     'PEP',
     'CSCO',
-    'TXN',
+    # 'TXN',
     'COMM',
     'UNH',
     'DINO',
@@ -94,7 +94,7 @@ CONFIG = {
     'LLY',
     'RTX',
     'AMAT',
-    'AZN',
+    # 'AZN',
     'STX',
 ]
 
