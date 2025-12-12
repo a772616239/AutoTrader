@@ -735,7 +735,12 @@ class BaseStrategy:
             return {'status': 'REJECTED', 'reason': 'IB接口未初始化'}
         
         logger.info(f"✅执行交易信号: {signal['symbol']}, {signal['action']} {signal['position_size']} shares")
-        
+
+        # 检查sell_only_mode开关
+        if CONFIG['trading'].get('sell_only_mode', False) and signal['action'] == 'BUY':
+            logger.info(f"⚠️ sell_only_mode启用，禁止买入: {signal['symbol']}")
+            return {'status': 'REJECTED', 'reason': 'sell_only_mode启用，禁止买入'}
+
         # 动态资金检查 (仅针对买入)
         if signal['action'] == 'BUY':
             # 检查内存中的日内交易限制
