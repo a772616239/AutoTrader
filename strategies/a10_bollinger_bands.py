@@ -63,12 +63,14 @@ class A10BollingerBandsStrategy(BaseStrategy):
 
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
+            logger.debug(f"Generated signals for {symbol}: {signals}")
             return signals
 
         # 检查成交量 - 盘前时段跳过成交量检查
         if not self._is_pre_market_hours() and 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+                logger.debug(f"Generated signals for {symbol}: {signals}")
                 return signals
 
         # 计算布林带
@@ -80,6 +82,7 @@ class A10BollingerBandsStrategy(BaseStrategy):
         )
 
         if upper_band.empty or middle_band.empty or lower_band.empty:
+            logger.debug(f"Generated signals for {symbol}: {signals}")
             return signals
 
         current_price = data['Close'].iloc[-1]
@@ -93,6 +96,7 @@ class A10BollingerBandsStrategy(BaseStrategy):
             prev_upper = upper_band.iloc[-2]
             prev_lower = lower_band.iloc[-2]
         else:
+            logger.debug(f"Generated signals for {symbol}: {signals}")
             return signals
 
         atr = indicators.get('ATR', abs(current_price * 0.02))  # 默认2%的ATR
@@ -126,6 +130,7 @@ class A10BollingerBandsStrategy(BaseStrategy):
         else:
             logger.info(f"📊 {symbol} A10无信号 - 价格: {current_price:.2f}, 上轨: {current_upper:.2f}, 中轨: {current_middle:.2f}, 下轨: {current_lower:.2f}")
 
+        logger.debug(f"Generated signals for {symbol}: {signals}")
         return signals
 
     def _detect_bollinger_signal(self, symbol: str, data: pd.DataFrame,

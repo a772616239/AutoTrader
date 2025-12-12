@@ -63,12 +63,14 @@ class A11MovingAverageCrossoverStrategy(BaseStrategy):
 
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
+            logger.debug(f"Generated signals for {symbol}: {signals}")
             return signals
 
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+                logger.debug(f"Generated signals for {symbol}: {signals}")
                 return signals
 
         # 计算移动平均线
@@ -85,6 +87,7 @@ class A11MovingAverageCrossoverStrategy(BaseStrategy):
         )
 
         if fast_ma.empty or slow_ma.empty:
+            logger.debug(f"Generated signals for {symbol}: {signals}")
             return signals
 
         current_price = data['Close'].iloc[-1]
@@ -96,6 +99,7 @@ class A11MovingAverageCrossoverStrategy(BaseStrategy):
             prev_fast = fast_ma.iloc[-2]
             prev_slow = slow_ma.iloc[-2]
         else:
+            logger.debug(f"Generated signals for {symbol}: {signals}")
             return signals
 
         atr = indicators.get('ATR', abs(current_price * 0.02))  # 默认2%的ATR
@@ -126,6 +130,7 @@ class A11MovingAverageCrossoverStrategy(BaseStrategy):
         if signals:
             self.signals_generated += len(signals)
 
+        logger.debug(f"Generated signals for {symbol}: {signals}")
         return signals
 
     def _detect_ma_crossover_signal(self, symbol: str, data: pd.DataFrame,
