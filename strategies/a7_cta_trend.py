@@ -180,12 +180,12 @@ class A7CTATrendStrategy(BaseStrategy):
         # ---------------- 入场逻辑 (Entry) - 强化过滤 ----------------
         if current_pos == 0:
             
-            # 多头严格条件：
-            long_cond_1 = current_price > prev_upper_entry              # 突破20日高点
+            # 多头条件放宽便于测试：
+            long_cond_1 = current_price > prev_upper_entry * 0.995      # 接近突破20日高点 (放宽5点)
             long_cond_2 = current_price > current_trend_ma              # 位于MA200之上
-            long_cond_3 = current_fast_ma > current_trend_ma            # 均线多头排列 (MA50 > MA200)
-            # 🆕 优化点：双通道过滤 - 价格必须高于10日低点，避免短期趋势反转时入场
-            long_cond_4 = current_price > prev_lower_exit               
+            long_cond_3 = current_fast_ma > current_trend_ma * 0.995    # 均线接近多头排列 (放宽)
+            # 放宽10日通道过滤
+            long_cond_4 = current_price > prev_lower_exit * 0.98               
 
             if long_cond_1 and long_cond_2 and long_cond_3 and long_cond_4:
                 return [{
@@ -203,12 +203,12 @@ class A7CTATrendStrategy(BaseStrategy):
                     'reason': f"新高({prev_upper_entry:.2f}) + MA多头排列 + 10日低点过滤"
                 }]
             
-            # 空头严格条件：
-            short_cond_1 = current_price < prev_lower_entry             # 跌破20日低点
+            # 空头条件放宽便于测试：
+            short_cond_1 = current_price < prev_lower_entry * 1.005     # 接近跌破20日低点 (放宽5点)
             short_cond_2 = current_price < current_trend_ma             # 位于MA200之下
-            short_cond_3 = current_fast_ma < current_trend_ma           # 均线空头排列 (MA50 < MA200)
-            # 🆕 优化点：双通道过滤 - 价格必须低于10日高点，避免短期趋势反转时入场
-            short_cond_4 = current_price < prev_upper_exit              
+            short_cond_3 = current_fast_ma < current_trend_ma * 1.005   # 均线接近空头排列 (放宽)
+            # 放宽10日通道过滤
+            short_cond_4 = current_price < prev_upper_exit * 1.02              
 
             if short_cond_1 and short_cond_2 and short_cond_3 and short_cond_4:
                 return [{
