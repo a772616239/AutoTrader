@@ -29,7 +29,7 @@ CONFIG = {
     'RIVN',
     'COIN',
     # 'SQ',
-    'ZM',
+    # 'ZM',
     'UBER',
     'UPST',
     'DUOL',
@@ -963,10 +963,10 @@ preselect_a2 = {
 
         # A1 动量反转策略 - 基于早盘动量/午盘反转信号
     'AMD':  'a8',
-    'META': 'a9',
+    # 'META': 'a9',
     'RIVN': 'a10',
     'COIN': 'a11',
-    'ZM':   'a12',
+    # 'ZM':   'a12',
     'UBER': 'a13',
     'UPST': 'a14',  # 高波动金融科技，适合动量反转
     'DUOL': 'a15',  # 高波动成长股

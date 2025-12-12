@@ -56,9 +56,6 @@ class BaseStrategy:
         self.portfolio_drawdown = 0.0
         self.risk_management_paused = False
 
-        # 日内交易限制
-        self.daily_sell_tracker = set()  # 当天卖出的股票
-
     def _default_config(self) -> Dict:
         """默认配置 - 子类应该重写此方法"""
         return {
@@ -260,6 +257,32 @@ class BaseStrategy:
         from datetime import time as dt_time
         current_time = datetime.now()
         return current_time.time() >= dt_time(16, 0) and current_time.time() <= dt_time(21, 30)
+
+    def _has_sold_today(self, symbol: str) -> bool:
+        """检查当天是否卖出过该股票（从trades.json读取）"""
+        try:
+            import json
+            import os
+            data_dir = os.path.join(os.getcwd(), 'data')
+            file_path = os.path.join(data_dir, 'trades.json')
+            if not os.path.exists(file_path):
+                return False
+
+            with open(file_path, 'r') as f:
+                trades = json.load(f)
+
+            today = datetime.now().date()
+            for trade in trades:
+                if (trade.get('symbol') == symbol and
+                    trade.get('action') == 'SELL' and
+                    trade.get('status') == 'EXECUTED'):
+                    trade_date = datetime.fromisoformat(trade['timestamp']).date()
+                    if trade_date == today:
+                        return True
+            return False
+        except Exception as e:
+            logger.error(f"检查当天卖出记录失败: {e}")
+            return False
 
     def _generate_signal_hash(self, signal: Dict) -> str:
         """生成信号唯一哈希"""
@@ -612,7 +635,7 @@ class BaseStrategy:
         # 动态资金检查 (仅针对买入)
         if signal['action'] == 'BUY':
             # 检查当日卖出限制
-            if signal['symbol'] in self.daily_sell_tracker:
+            if self._has_sold_today(signal['symbol']):
                 logger.info(f"当日卖出限制: {signal['symbol']} 今日已卖出，禁止再次买入")
                 return {'status': 'REJECTED', 'reason': f"当日卖出限制 {signal['symbol']}"}
 
@@ -671,9 +694,6 @@ class BaseStrategy:
             return {'status': 'REJECTED', 'reason': '存在未完成订单，避免重复下单'}
 
         if signal['action'] == 'SELL':
-            # 记录当日卖出
-            self.daily_sell_tracker.add(signal['symbol'])
-
             current_pos = 0
             if signal['symbol'] in self.positions:
                 try:
