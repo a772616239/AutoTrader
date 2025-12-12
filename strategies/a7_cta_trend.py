@@ -10,17 +10,18 @@ logger = logging.getLogger(__name__)
 
 class A7CTATrendStrategy(BaseStrategy):
     """
-    A7 趋势跟踪/CTA策略 (Trend Following / CTA) - 增强卖出逻辑版
+    A7 趋势跟踪/CTA策略 (Trend Following / CTA) - 增强卖出逻辑版 & 增强买入过滤
     
     核心逻辑：
-    - 价格突破20日新高 -> 买入
-    - 价格跌破20日新低 -> 卖空
-    - 趋势过滤：只在价格位于200日均线之上做多，之下做空
+    - 价格突破20日新高/新低 -> 买入/卖空
+    - 趋势过滤：价格位于200日均线之上做多，之下做空
+    - 均线过滤：新增MA50/MA200多头/空头排列要求（提升入场质量）
+    - 增强过滤：新增10日通道过滤（降低假突破率）
     - 增强出场：价格反向突破10日极值 或 趋势均线被破坏
     """
     
     def get_strategy_name(self) -> str:
-        return "A7 CTA Trend Strategy Enhanced Exit"
+        return "A7 CTA Trend Strategy Enhanced Entry/Exit"
 
     def _default_config(self) -> Dict:
         # 使用现有的字段，并利用一个默认的 MA50 周期
@@ -32,8 +33,8 @@ class A7CTATrendStrategy(BaseStrategy):
             'max_position_notional': 60000.0,
             
             # 策略参数
-            'donchian_entry_period': 20,    # 入场通道周期
-            'donchian_exit_period': 10,     # 出场通道周期
+            'donchian_entry_period': 20,    # 入场通道周期 (20)
+            'donchian_exit_period': 10,     # 出场通道周期 (10)
             'trend_filter_sma_period': 200, # 慢速趋势过滤均线周期 (MA200)
             'stop_loss_atr_multiple': 2.0,  # ATR止损倍数
             
@@ -52,8 +53,8 @@ class A7CTATrendStrategy(BaseStrategy):
 
         current_price = data['Close'].iloc[-1]
         
-        # 0. 检查通用出场条件 (止损/止盈)
-        exit_signal = self.check_exit_conditions(symbol, current_price)
+        # 0. 检查通用出场条件 (止损/止盈) - 假设此方法已在 BaseStrategy 中定义
+        exit_signal = self.check_exit_conditions(symbol, current_price) 
         if exit_signal:
             return [exit_signal]
             
@@ -62,8 +63,7 @@ class A7CTATrendStrategy(BaseStrategy):
         lows = data['Low']
         closes = data['Close']
         
-        # 入场通道 (20)
-        # 简化调用，只计算出场所需的
+        # 入场通道 (20) - 仅为保证计算出场所需的指标
         _, _, _ = tech_indicators.calculate_donchian_channels(highs, lows, self.config['donchian_entry_period'])
         # 出场通道 (10)
         upper_exit, _, lower_exit = tech_indicators.calculate_donchian_channels(
@@ -79,8 +79,7 @@ class A7CTATrendStrategy(BaseStrategy):
             closes, FAST_MA_PERIOD, type='SMA'
         )
         
-        # ATR (用于风险计算) - 🚩 修复 ATR 调用错误
-        # 传入 High, Low, Close series
+        # ATR (用于风险计算)
         atr = tech_indicators.calculate_atr(highs, lows, closes, 14) 
         current_atr = atr.iloc[-1]
         
@@ -88,9 +87,9 @@ class A7CTATrendStrategy(BaseStrategy):
         prev_upper_entry = data['High'].iloc[:-1].rolling(self.config['donchian_entry_period']).max().iloc[-1]
         prev_lower_entry = data['Low'].iloc[:-1].rolling(self.config['donchian_entry_period']).min().iloc[-1]
         
-        # 出场通道值
-        prev_upper_exit = upper_exit.iloc[-2]
-        prev_lower_exit = lower_exit.iloc[-2]
+        # 出场通道值 (用于出场和**新的入场过滤**)
+        prev_upper_exit = upper_exit.iloc[-2] # 10日高点
+        prev_lower_exit = lower_exit.iloc[-2] # 10日低点
         
         current_trend_ma = sma_trend.iloc[-1]
         current_fast_ma = sma_fast.iloc[-1]
@@ -98,7 +97,6 @@ class A7CTATrendStrategy(BaseStrategy):
         # 2. 获取当前持仓
         current_pos = 0
         if symbol in self.positions:
-            # 假设 self.positions[symbol] 存储的是持仓数量
             current_pos = self.positions[symbol] if isinstance(self.positions[symbol], (int, float)) else self.positions[symbol].get('size', 0)
             
         logger.info(f"🔍 [A7 Debug] {symbol}: Price={current_price:.2f}, Pos={current_pos}, "
@@ -122,7 +120,6 @@ class A7CTATrendStrategy(BaseStrategy):
                 }]
                 
             # --- 逻辑 B: 趋势保护离场 (价格跌破关键均线) ---
-            # 跌破 MA50 或 MA200 视为趋势破坏
             if current_price < current_fast_ma or current_price < current_trend_ma:
                 return [{
                     'symbol': symbol,
@@ -134,7 +131,6 @@ class A7CTATrendStrategy(BaseStrategy):
                 }]
 
             # --- 逻辑 C: 均线交叉离场 (多头排列被破坏) ---
-            # 避免大幅回撤，当 MA50 跌破 MA200 时，立即离场
             if current_fast_ma < current_trend_ma:
                 return [{
                     'symbol': symbol,
@@ -159,7 +155,6 @@ class A7CTATrendStrategy(BaseStrategy):
                 }]
                 
             # --- 逻辑 B: 趋势保护离场 (价格突破关键均线) ---
-            # 突破 MA50 或 MA200 视为趋势反转
             if current_price > current_fast_ma or current_price > current_trend_ma:
                 return [{
                     'symbol': symbol,
@@ -171,7 +166,6 @@ class A7CTATrendStrategy(BaseStrategy):
                 }]
             
             # --- 逻辑 C: 均线交叉离场 (空头排列被破坏) ---
-            # 避免大幅回撤，当 MA50 站上 MA200 时，立即离场
             if current_fast_ma > current_trend_ma:
                 return [{
                     'symbol': symbol,
@@ -183,15 +177,17 @@ class A7CTATrendStrategy(BaseStrategy):
                 }]
 
                 
-        # ---------------- 入场逻辑 (Entry) ----------------
+        # ---------------- 入场逻辑 (Entry) - 强化过滤 ----------------
         if current_pos == 0:
             
             # 多头严格条件：
-            long_cond_1 = current_price > prev_upper_entry
-            long_cond_2 = current_price > current_trend_ma
-            long_cond_3 = current_fast_ma > current_trend_ma # 均线多头排列
-            
-            if long_cond_1 and long_cond_2 and long_cond_3:
+            long_cond_1 = current_price > prev_upper_entry              # 突破20日高点
+            long_cond_2 = current_price > current_trend_ma              # 位于MA200之上
+            long_cond_3 = current_fast_ma > current_trend_ma            # 均线多头排列 (MA50 > MA200)
+            # 🆕 优化点：双通道过滤 - 价格必须高于10日低点，避免短期趋势反转时入场
+            long_cond_4 = current_price > prev_lower_exit               
+
+            if long_cond_1 and long_cond_2 and long_cond_3 and long_cond_4:
                 return [{
                     'symbol': symbol,
                     'signal_type': 'CTA_BREAKOUT_LONG',
@@ -204,15 +200,17 @@ class A7CTATrendStrategy(BaseStrategy):
                         'TrendMA': current_trend_ma,
                         'FastMA': current_fast_ma
                     },
-                    'reason': f"新高({prev_upper_entry:.2f}) + MA多头排列(MA{FAST_MA_PERIOD}>MA{self.config['trend_filter_sma_period']})"
+                    'reason': f"新高({prev_upper_entry:.2f}) + MA多头排列 + 10日低点过滤"
                 }]
             
             # 空头严格条件：
-            short_cond_1 = current_price < prev_lower_entry
-            short_cond_2 = current_price < current_trend_ma
-            short_cond_3 = current_fast_ma < current_trend_ma # 均线空头排列
-            
-            if short_cond_1 and short_cond_2 and short_cond_3:
+            short_cond_1 = current_price < prev_lower_entry             # 跌破20日低点
+            short_cond_2 = current_price < current_trend_ma             # 位于MA200之下
+            short_cond_3 = current_fast_ma < current_trend_ma           # 均线空头排列 (MA50 < MA200)
+            # 🆕 优化点：双通道过滤 - 价格必须低于10日高点，避免短期趋势反转时入场
+            short_cond_4 = current_price < prev_upper_exit              
+
+            if short_cond_1 and short_cond_2 and short_cond_3 and short_cond_4:
                 return [{
                     'symbol': symbol,
                     'signal_type': 'CTA_BREAKDOWN_SHORT',
@@ -225,7 +223,7 @@ class A7CTATrendStrategy(BaseStrategy):
                         'TrendMA': current_trend_ma,
                         'FastMA': current_fast_ma
                     },
-                    'reason': f"新低({prev_lower_entry:.2f}) + MA空头排列(MA{FAST_MA_PERIOD}<MA{self.config['trend_filter_sma_period']})"
+                    'reason': f"新低({prev_lower_entry:.2f}) + MA空头排列 + 10日高点过滤"
                 }]
 
         return []

@@ -34,7 +34,7 @@ class A3DualMAVolumeStrategy(BaseStrategy):
             
             # 成交量参数
             'volume_sma_period': 20,
-            'volume_surge_ratio': 1.5,
+            'volume_surge_ratio': 1.3,
             'min_volume_threshold': 500000,
             
             # 入场条件

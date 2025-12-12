@@ -34,6 +34,8 @@ class A1MomentumReversalStrategy(BaseStrategy):
             'rsi_oversold': 28,
             'price_deviation_threshold': 2.5,
             'volume_surge_multiplier': 1.5,
+            'min_price_change_for_momentum': 0.005,  # 动量确认的最小价格变化
+            'strong_volume_threshold': 2.0,  # 强量能阈值
             
             # 风险管理
             'stop_loss_atr_multiple': 1.5,
@@ -60,6 +62,13 @@ class A1MomentumReversalStrategy(BaseStrategy):
             'market_regime_adjustment': True,  # 市场状态调整
             'trending_stop_multiplier': 1.2,   # 趋势市场止损倍数
             'ranging_take_profit_multiplier': 0.8,  # 震荡市场止盈倍数
+            
+            # 买入增强参数
+            'momentum_confirmation_periods': 3,  # 动量确认周期数
+            'multi_timeframe_confirmation': True,  # 多时间框架确认
+            'support_resistance_weight': 0.3,   # 支撑阻力位权重
+            'trend_alignment_bonus': 0.2,       # 趋势对齐奖励
+            'breakout_confirmation': True,      # 突破确认
             
             # 防重复交易
             'signal_cooldown_minutes': 5,
@@ -238,19 +247,35 @@ class A1MomentumReversalStrategy(BaseStrategy):
             market_regime = {"regime": "RANGING", "volatility": 0}
         
         # 1. 技术性卖出信号
-        if indicators and len(self.detect_technical_sell_signals(symbol, pd.DataFrame(), indicators)) >= 2:
+        if indicators:
             tech_signals = self.detect_technical_sell_signals(symbol, pd.DataFrame(), indicators)
-            if tech_signals and price_change_pct > self.config['min_profit_pct']:
-                logger.info(f"📉 {symbol} 技术卖出信号触发")
+            if len(tech_signals) >= 2:
+                if tech_signals and price_change_pct > self.config['min_profit_pct']:
+                    logger.info(f"📉 {symbol} 技术卖出信号触发")
+                    return {
+                        'symbol': symbol,
+                        'signal_type': 'TECHNICAL_SELL',
+                        'action': 'SELL' if position_size > 0 else 'BUY',
+                        'price': current_price,
+                        'reason': f"多重技术卖出信号: {', '.join([s['reason'] for s in tech_signals[:2]])}",
+                        'position_size': abs(position_size),
+                        'profit_pct': price_change_pct * 100,
+                        'confidence': 0.8
+                    }
+            
+            # 如果有强烈卖出信号（如RSI>80或MACD死叉），即使只有一个也卖出
+            strong_sell_signals = [s for s in tech_signals if s['strength'] > 0.7]
+            if strong_sell_signals and price_change_pct > 0:
+                logger.info(f"📉 {symbol} 强烈卖出信号触发")
                 return {
                     'symbol': symbol,
-                    'signal_type': 'TECHNICAL_SELL',
-                    'action': 'SELL' if position_size > 0 else 'BUY',
+                    'signal_type': 'STRONG_TECHNICAL_SELL',
+                    'action': 'SELL',
                     'price': current_price,
-                    'reason': f"多重技术卖出信号: {', '.join([s['reason'] for s in tech_signals[:2]])}",
+                    'reason': f"强烈卖出信号: {strong_sell_signals[0]['reason']}",
                     'position_size': abs(position_size),
                     'profit_pct': price_change_pct * 100,
-                    'confidence': 0.8
+                    'confidence': 0.9
                 }
         
         # 2. 动态止损
@@ -413,6 +438,239 @@ class A1MomentumReversalStrategy(BaseStrategy):
         
         return minutes_to_close <= avoid_minutes
     
+    def check_momentum_confirmation(self, data: pd.DataFrame, direction: str = 'up') -> float:
+        """检查动量确认"""
+        if len(data) < 5:
+            return 0.0
+        
+        periods = min(self.config['momentum_confirmation_periods'], len(data)-1)
+        momentum_score = 0.0
+        
+        if direction == 'up':
+            # 检查上涨动量
+            consecutive_ups = 0
+            for i in range(1, periods+1):
+                if data['Close'].iloc[-i] > data['Close'].iloc[-i-1]:
+                    consecutive_ups += 1
+                    momentum_score += 0.1 * (i)  # 越近的上涨权重越高
+            
+            if consecutive_ups == periods:
+                momentum_score += 0.3
+                
+        elif direction == 'down':
+            # 检查下跌动量
+            consecutive_downs = 0
+            for i in range(1, periods+1):
+                if data['Close'].iloc[-i] < data['Close'].iloc[-i-1]:
+                    consecutive_downs += 1
+                    momentum_score += 0.1 * (i)
+            
+            if consecutive_downs == periods:
+                momentum_score += 0.3
+        
+        return min(momentum_score, 0.5)
+    
+    def check_volume_confirmation(self, data: pd.DataFrame, recent_periods: int = 5) -> float:
+        """检查成交量确认"""
+        if len(data) < recent_periods + 1:
+            return 0.0
+        
+        recent_volume = data['Volume'].iloc[-recent_periods:].mean()
+        historical_volume = data['Volume'].iloc[-(recent_periods*3):].mean() if len(data) >= recent_periods*3 else recent_volume
+        
+        volume_ratio = recent_volume / historical_volume if historical_volume > 0 else 1.0
+        
+        if volume_ratio >= self.config['strong_volume_threshold']:
+            return 0.4
+        elif volume_ratio >= 1.2:
+            return 0.2
+        elif volume_ratio >= 1.0:
+            return 0.1
+        else:
+            return -0.1  # 成交量不足为负分
+    
+    def check_support_resistance(self, symbol: str, current_price: float, 
+                               indicators: Dict, data: pd.DataFrame) -> float:
+        """检查支撑阻力位"""
+        score = 0.0
+        
+        # 检查布林带位置
+        if 'BB_Lower' in indicators and 'BB_Upper' in indicators:
+            bb_lower = indicators['BB_Lower']
+            bb_upper = indicators['BB_Upper']
+            bb_middle = indicators.get('BB_Middle', (bb_lower + bb_upper) / 2)
+            
+            # 如果在布林带下轨附近，有支撑
+            if current_price <= bb_lower * 1.02:
+                score += 0.3
+            # 如果在布林带中轨附近，中性
+            elif abs(current_price - bb_middle) / bb_middle < 0.01:
+                score += 0.1
+            # 如果在布林带上轨附近，有阻力
+            elif current_price >= bb_upper * 0.98:
+                score -= 0.3
+        
+        # 检查近期高低点
+        if len(data) >= 10:
+            recent_low = data['Low'].iloc[-10:].min()
+            recent_high = data['High'].iloc[-10:].max()
+            
+            # 在近期低点附近有支撑
+            if current_price <= recent_low * 1.02:
+                score += 0.2
+            # 在近期高点附近有阻力
+            elif current_price >= recent_high * 0.98:
+                score -= 0.2
+        
+        return score * self.config['support_resistance_weight']
+    
+    def check_trend_alignment(self, indicators: Dict, direction: str = 'up') -> float:
+        """检查趋势对齐"""
+        score = 0.0
+        
+        # 检查均线排列
+        if 'MA_10' in indicators and 'MA_20' in indicators and 'MA_50' in indicators:
+            ma10 = indicators['MA_10']
+            ma20 = indicators['MA_20']
+            ma50 = indicators['MA_50']
+            
+            if direction == 'up':
+                # 多头排列：MA10 > MA20 > MA50
+                if ma10 > ma20 > ma50:
+                    score += 0.4
+                elif ma10 > ma20 and ma20 > ma50 * 0.99:
+                    score += 0.2
+            elif direction == 'down':
+                # 空头排列：MA10 < MA20 < MA50
+                if ma10 < ma20 < ma50:
+                    score -= 0.4
+                elif ma10 < ma20 and ma20 < ma50 * 1.01:
+                    score -= 0.2
+        
+        # 检查MACD趋势
+        if 'MACD' in indicators and 'MACD_Signal' in indicators:
+            macd = indicators['MACD']
+            signal = indicators['MACD_Signal']
+            
+            if direction == 'up' and macd > signal:
+                score += 0.2
+            elif direction == 'down' and macd < signal:
+                score -= 0.2
+        
+        return score * self.config['trend_alignment_bonus']
+    
+    def check_breakout_confirmation(self, symbol: str, current_price: float, 
+                                  data: pd.DataFrame, indicators: Dict) -> float:
+        """检查突破确认"""
+        if not self.config['breakout_confirmation']:
+            return 0.0
+        
+        if len(data) < 20:
+            return 0.0
+        
+        score = 0.0
+        
+        # 检查是否突破近期高点
+        recent_high = data['High'].iloc[-20:-1].max()
+        if current_price > recent_high and current_price > data['Close'].iloc[-2]:
+            score += 0.3
+            
+            # 如果有成交量配合，加分
+            if len(data) >= 5:
+                recent_volume = data['Volume'].iloc[-5:].mean()
+                current_volume = data['Volume'].iloc[-1]
+                if current_volume > recent_volume * 1.2:
+                    score += 0.2
+        
+        # 检查是否突破关键均线
+        ma_keys = ['MA_20', 'MA_50']
+        for ma_key in ma_keys:
+            if ma_key in indicators and indicators[ma_key] is not None:
+                ma_value = indicators[ma_key]
+                prev_close = data['Close'].iloc[-2]
+                
+                # 从下方突破上方
+                if prev_close < ma_value and current_price > ma_value:
+                    score += 0.1
+                # 从上方跌破下方
+                elif prev_close > ma_value and current_price < ma_value:
+                    score -= 0.1
+        
+        return score
+    
+    def enhance_buy_signal(self, original_signal: Dict, data: pd.DataFrame, 
+                         indicators: Dict, market_regime: Dict) -> Dict:
+        """增强买入信号"""
+        if original_signal['action'] != 'BUY':
+            return original_signal
+        
+        symbol = original_signal['symbol']
+        current_price = original_signal['price']
+        base_confidence = original_signal['confidence']
+        
+        # 初始化增强分数
+        enhancement_score = 0.0
+        
+        # 1. 动量确认
+        momentum_score = self.check_momentum_confirmation(data, direction='up')
+        enhancement_score += momentum_score
+        
+        # 2. 成交量确认
+        volume_score = self.check_volume_confirmation(data)
+        enhancement_score += volume_score
+        
+        # 3. 支撑阻力位检查
+        sr_score = self.check_support_resistance(symbol, current_price, indicators, data)
+        enhancement_score += sr_score
+        
+        # 4. 趋势对齐检查
+        trend_score = self.check_trend_alignment(indicators, direction='up')
+        enhancement_score += trend_score
+        
+        # 5. 突破确认
+        breakout_score = self.check_breakout_confirmation(symbol, current_price, data, indicators)
+        enhancement_score += breakout_score
+        
+        # 6. 市场状态调整
+        if market_regime['regime'] == 'TRENDING' and market_regime.get('trend', 0) > 1:
+            # 趋势市场中，顺势交易加分
+            if 'price_change' in market_regime and market_regime['price_change'] > 0:
+                enhancement_score += 0.15
+        elif market_regime['regime'] == 'HIGH_VOLATILITY':
+            # 高波动市场，保守一点
+            enhancement_score -= 0.1
+        
+        # 计算最终置信度
+        max_enhancement = 0.5  # 最大增强0.5
+        enhancement_factor = min(max(enhancement_score, -0.2), max_enhancement)
+        
+        # 增强后的置信度
+        enhanced_confidence = min(base_confidence + enhancement_factor, 0.95)
+        
+        # 更新信号
+        enhanced_signal = original_signal.copy()
+        enhanced_signal['confidence'] = enhanced_confidence
+        
+        # 添加增强信息
+        enhanced_signal['enhancement_info'] = {
+            'momentum_score': momentum_score,
+            'volume_score': volume_score,
+            'sr_score': sr_score,
+            'trend_score': trend_score,
+            'breakout_score': breakout_score,
+            'enhancement_factor': enhancement_factor,
+            'original_confidence': base_confidence
+        }
+        
+        # 更新原因
+        if enhancement_factor > 0.1:
+            enhanced_signal['reason'] += f" [增强: +{enhancement_factor*100:.0f}%]"
+        
+        logger.debug(f"📊 {symbol} 买入信号增强: {base_confidence:.2f} -> {enhanced_confidence:.2f} "
+                   f"(增强分数: {enhancement_score:.2f})")
+        
+        return enhanced_signal
+    
     def generate_signals(self, symbol: str, data: pd.DataFrame, 
                         indicators: Dict) -> List[Dict]:
         """生成交易信号"""
@@ -465,6 +723,10 @@ class A1MomentumReversalStrategy(BaseStrategy):
             # 早盘动量信号
             morning_signal = self.detect_morning_momentum(symbol, data, indicators)
             if morning_signal:
+                # 增强买入信号
+                if morning_signal['action'] == 'BUY':
+                    morning_signal = self.enhance_buy_signal(morning_signal, data, indicators, market_regime)
+                
                 signal_hash = self._generate_signal_hash(morning_signal)
                 if not self._is_signal_cooldown(signal_hash) and signal_hash not in self.executed_signals:
                     morning_signal['position_size'] = self.calculate_position_size(morning_signal, atr)
@@ -476,6 +738,10 @@ class A1MomentumReversalStrategy(BaseStrategy):
             # 午盘/尾盘反转信号
             reversal_signal = self.detect_afternoon_reversal(symbol, data, indicators)
             if reversal_signal:
+                # 增强买入信号（只增强BUY信号）
+                if reversal_signal['action'] == 'BUY':
+                    reversal_signal = self.enhance_buy_signal(reversal_signal, data, indicators, market_regime)
+                
                 signal_hash = self._generate_signal_hash(reversal_signal)
                 if not self._is_signal_cooldown(signal_hash) and signal_hash not in self.executed_signals:
                     reversal_signal['position_size'] = self.calculate_position_size(reversal_signal, atr)
@@ -494,9 +760,9 @@ class A1MomentumReversalStrategy(BaseStrategy):
         """根据风险计算仓位大小"""
         if atr is None:
             atr = signal.get('price', 100) * 0.02  # 默认2%波动
-        
+
         # 基础仓位计算
-        risk_amount = self.current_capital * self.config['risk_per_trade']
+        risk_amount = self.equity * self.config['risk_per_trade']
         
         # 根据信号类型和置信度调整
         confidence = signal.get('confidence', 0.5)
@@ -513,9 +779,16 @@ class A1MomentumReversalStrategy(BaseStrategy):
             base_position = risk_amount / (atr * self.config['stop_loss_atr_multiple'])
             adjusted_position = base_position * 0.7
         
+        # 根据增强后的置信度调整仓位
+        if signal.get('action') == 'BUY' and 'enhancement_info' in signal:
+            enhancement_factor = signal['enhancement_info'].get('enhancement_factor', 0)
+            if enhancement_factor > 0.2:
+                # 强增强信号，增加仓位
+                adjusted_position *= (1 + enhancement_factor * 0.5)
+        
         # 应用上限
         max_position = min(
-            self.current_capital * self.config['max_position_size'],
+            self.equity * self.config['max_position_size'],
             self.config['per_trade_notional_cap'] / signal['price']
         )
         
@@ -569,12 +842,18 @@ class A1MomentumReversalStrategy(BaseStrategy):
         if rsi > 55:
             confidence += 0.1
         
+        # 检查动量方向
+        if price_deviation > 0:
+            action = 'BUY'
+        else:
+            action = 'SELL'
+        
         logger.info(f"✅ {symbol} 早盘动量信号，置信度: {confidence:.2f}")
         
         signal = {
             'symbol': symbol,
             'signal_type': 'MORNING_MOMENTUM',
-            'action': 'BUY' if price_deviation > 0 else 'SELL',
+            'action': action,
             'price': latest['Close'],
             'confidence': min(confidence, 0.9),
             'reason': f"早盘动量: 价格偏离MA20 {price_deviation:.1f}%, RSI {rsi:.1f}",
