@@ -46,7 +46,7 @@ class A16ROCStrategy(BaseStrategy):
                 'signal_cooldown_minutes': 15,
 
                 # 交易参数
-                'min_volume': 10000,
+                'min_volume': 4000,
                 'min_data_points': 25,  # 需要足够数据计算ROC
 
                 # IB交易参数

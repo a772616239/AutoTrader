@@ -216,7 +216,7 @@ class A3DualMAVolumeStrategy(BaseStrategy):
         }
         
         # 计算仓位 (依赖ATR)
-        atr_val = indicators.calculate_atr(data, 14).iloc[-1] if len(data) > 15 else (data['High'] - data['Low']).mean()
+        atr_val = indicators.calculate_atr(data['High'], data['Low'], data['Close'], 14).iloc[-1] if len(data) > 15 else (data['High'] - data['Low']).mean()
         signal['position_size'] = self.calculate_position_size(signal, atr_val)
         
         if signal['position_size'] <= 0:
