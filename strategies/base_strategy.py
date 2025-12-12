@@ -315,7 +315,7 @@ class BaseStrategy:
                     position_size = pos.position
                     avg_cost = pos.avgCost
 
-                    logger.info(f"📈 同步持仓 - {symbol}: {position_size}股 @ ${avg_cost:.2f}")
+                    # logger.info(f"📈 同步持仓 - {symbol}: {position_size}股 @ ${avg_cost:.2f}")
 
                     self.positions[symbol] = {
                         'size': position_size,
@@ -587,7 +587,6 @@ class BaseStrategy:
     
     def execute_signal(self, signal: Dict, current_price: float, force_market_order: bool = False) -> Dict:
         """执行交易信号 - 子类可以重写此方法"""
-        logger.info(f"执行交易信号: {signal['symbol']}, {signal['action']} {signal['position_size']} shares")
         if signal['position_size'] <= 0:
             logger.info(f"无效仓位: {signal['position_size']}")
             return {'status': 'REJECTED', 'reason': '无效仓位'}
@@ -599,7 +598,9 @@ class BaseStrategy:
         if not self.ib_trader:
             logger.info("IB接口未初始化")
             return {'status': 'REJECTED', 'reason': 'IB接口未初始化'}
-            
+        
+        logger.info(f"✅执行交易信号: {signal['symbol']}, {signal['action']} {signal['position_size']} shares")
+        
         # 动态资金检查 (仅针对买入)
         if signal['action'] == 'BUY':
             # 检查当日不能重复买入限制

@@ -19,7 +19,7 @@ def test_http_server():
         if response.status_code == 200:
             data = response.json()
             if 'error' not in data:
-                print(f"✅ 成功获取 {data['symbol']} 数据")
+                # print(f"✅ 成功获取 {data['symbol']} 数据")
                 print(f"   数据点: {data['data_points']} 条")
                 print(f"   最新价格: ${data['latest_price']}")
                 
@@ -42,7 +42,7 @@ def test_http_server():
         if response.status_code == 200:
             data = response.json()
             if 'error' not in data:
-                print(f"✅ 成功获取 {data['symbol']} 数据")
+                # print(f"✅ 成功获取 {data['symbol']} 数据")
                 print(f"   数据点: {data['data_points']} 条")
                 print(f"   最新价格: ${data['latest_price']}")
     except Exception as e:

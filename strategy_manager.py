@@ -30,6 +30,20 @@ from strategies.a15_pairs_trading import A15PairsTradingStrategy
 from strategies.a16_roc import A16ROCStrategy
 from strategies.a17_cci import A17CCIStrategy
 from strategies.a18_isolation_forest import A18IsolationForestStrategy
+from strategies.a22_super_trend import A22SuperTrendStrategy
+from strategies.a23_aroon_oscillator import A23AroonOscillatorStrategy
+from strategies.a24_ultimate_oscillator import A24UltimateOscillatorStrategy
+from strategies.a25_pairs_trading import A25PairsTradingStrategy
+from strategies.a26_williams_r import A26WilliamsRStrategy
+from strategies.a27_minervini_trend import A27MinerviniTrendStrategy
+from strategies.a28_true_strength_index import A28TrueStrengthIndexStrategy
+from strategies.a29_stochastic_oscillator import A29StochasticOscillatorStrategy
+from strategies.a30_ibd_rs_rating import A30IBDRSRatingStrategy
+from strategies.a31_money_flow_index import A31MoneyFlowIndexStrategy
+from strategies.a32_keltner_channels import A32KeltnerChannelsStrategy
+from strategies.a33_pivot_points import A33PivotPointsStrategy
+from strategies.a34_linear_regression import A34LinearRegressionStrategy
+from strategies.a35_mlp_neural_network import A35MLPNeuralNetworkStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +66,20 @@ STRATEGY_CLASSES = {
     'a16': A16ROCStrategy,
     'a17': A17CCIStrategy,
     'a18': A18IsolationForestStrategy,
+    'a22': A22SuperTrendStrategy,
+    'a23': A23AroonOscillatorStrategy,
+    'a24': A24UltimateOscillatorStrategy,
+    'a25': A25PairsTradingStrategy,
+    'a26': A26WilliamsRStrategy,
+    'a27': A27MinerviniTrendStrategy,
+    'a28': A28TrueStrengthIndexStrategy,
+    'a29': A29StochasticOscillatorStrategy,
+    'a30': A30IBDRSRatingStrategy,
+    'a31': A31MoneyFlowIndexStrategy,
+    'a32': A32KeltnerChannelsStrategy,
+    'a33': A33PivotPointsStrategy,
+    'a34': A34LinearRegressionStrategy,
+    'a35': A35MLPNeuralNetworkStrategy,
 }
 
 

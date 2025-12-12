@@ -123,7 +123,7 @@ class DataProvider:
                     'data': df.copy()
                 }
                 
-                logger.info(f"✅ 成功获取 {symbol}: {len(df)} 条数据")
+                # logger.info(f"✅ 成功获取 {symbol}: {len(df)} 条数据")
                 return df
                 
             except requests.exceptions.Timeout:

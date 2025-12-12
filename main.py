@@ -288,6 +288,62 @@ def generate_end_of_day_profit_report(target_date=None):
 
             # A14 RSI趋势线策略
             'RSI_TRENDLINE_BUY': 'a14',
+
+            # A22 超级趋势策略
+            'SUPER_TREND_LONG': 'a22',
+            'SUPER_TREND_SHORT': 'a22',
+
+            # A23 Aroon震荡策略
+            'AROON_UPTREND': 'a23',
+            'AROON_DOWNTREND': 'a23',
+
+            # A24 终极震荡策略
+            'ULTIMATE_OVERSOLD': 'a24',
+            'ULTIMATE_OVERBOUGHT': 'a24',
+
+            # A25 配对交易策略（增强版）
+            'PAIRS_LONG': 'a25',
+            'PAIRS_SHORT': 'a25',
+
+            # A26 Williams %R策略
+            'WILLIAMS_OVERSOLD': 'a26',
+            'WILLIAMS_OVERBOUGHT': 'a26',
+
+            # A27 Minervini趋势策略
+            'MINERVINI_BUY': 'a27',
+            'MINERVINI_SELL': 'a27',
+
+            # A28 真实强度指数策略
+            'TSI_BULLISH': 'a28',
+            'TSI_BEARISH': 'a28',
+
+            # A29 随机震荡策略
+            'STOCHASTIC_OVERSOLD': 'a29',
+            'STOCHASTIC_OVERBOUGHT': 'a29',
+
+            # A30 IBD RS评级策略
+            'IBD_HIGH_RS': 'a30',
+            'IBD_LOW_RS': 'a30',
+
+            # A31 资金流量指数策略
+            'MFI_OVERSOLD': 'a31',
+            'MFI_OVERBOUGHT': 'a31',
+
+            # A32 Keltner通道策略
+            'KELTNER_BREAKOUT': 'a32',
+            'KELTNER_PULLBACK': 'a32',
+
+            # A33 枢轴点策略
+            'PIVOT_BREAKOUT': 'a33',
+            'PIVOT_SUPPORT': 'a33',
+
+            # A34 线性回归策略
+            'LINEAR_REGRESSION_UPTREND': 'a34',
+            'LINEAR_REGRESSION_DOWNTREND': 'a34',
+
+            # A35 MLP神经网络策略
+            'MLP_PREDICTION_BUY': 'a35',
+            'MLP_PREDICTION_SELL': 'a35',
         }
 
         # 策略统计数据 - 按策略->股票分组，存储交易详情
@@ -366,7 +422,21 @@ def generate_end_of_day_profit_report(target_date=None):
             'a15': '配对交易策略',
             'a16': 'ROC动量策略',
             'a17': 'CCI顺势策略',
-            'a18': 'IsolationForest异常检测策略'
+            'a18': 'IsolationForest异常检测策略',
+            'a22': '超级趋势策略',
+            'a23': 'Aroon震荡策略',
+            'a24': '终极震荡策略',
+            'a25': '配对交易策略（增强版）',
+            'a26': 'Williams %R策略',
+            'a27': 'Minervini趋势策略',
+            'a28': '真实强度指数策略',
+            'a29': '随机震荡策略',
+            'a30': 'IBD RS评级策略',
+            'a31': '资金流量指数策略',
+            'a32': 'Keltner通道策略',
+            'a33': '枢轴点策略',
+            'a34': '线性回归策略',
+            'a35': 'MLP神经网络策略'
         }
 
         for strategy_code, symbol_stats in strategy_stats.items():
@@ -1414,6 +1484,34 @@ def command_line_interface(system: TradingSystem):
                     system.switch_strategy('a17')
                 elif cmd == 'switch a18':
                     system.switch_strategy('a18')
+                elif cmd == 'switch a22':
+                    system.switch_strategy('a22')
+                elif cmd == 'switch a23':
+                    system.switch_strategy('a23')
+                elif cmd == 'switch a24':
+                    system.switch_strategy('a24')
+                elif cmd == 'switch a25':
+                    system.switch_strategy('a25')
+                elif cmd == 'switch a26':
+                    system.switch_strategy('a26')
+                elif cmd == 'switch a27':
+                    system.switch_strategy('a27')
+                elif cmd == 'switch a28':
+                    system.switch_strategy('a28')
+                elif cmd == 'switch a29':
+                    system.switch_strategy('a29')
+                elif cmd == 'switch a30':
+                    system.switch_strategy('a30')
+                elif cmd == 'switch a31':
+                    system.switch_strategy('a31')
+                elif cmd == 'switch a32':
+                    system.switch_strategy('a32')
+                elif cmd == 'switch a33':
+                    system.switch_strategy('a33')
+                elif cmd == 'switch a34':
+                    system.switch_strategy('a34')
+                elif cmd == 'switch a35':
+                    system.switch_strategy('a35')
                 elif cmd == 'list':
                     system.list_strategies()
                 elif cmd == 'status':
@@ -1464,8 +1562,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='多策略交易系统')
-    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17', 'a18'], default='a1',
-                       help='初始策略 (a1-a7: 核心策略, a8-a17: 技术指标策略)')
+    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17', 'a18', 'a22', 'a23', 'a24', 'a25', 'a26', 'a27', 'a28', 'a29', 'a30', 'a31', 'a32', 'a33', 'a34', 'a35'], default='a1',
+                       help='初始策略 (a1-a7: 核心策略, a8-a18: 技术指标策略, a22-a35: 高级策略)')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='启用命令行交互模式')
     

@@ -305,7 +305,7 @@ class IBTrader:
         获取账户净值
         """
         summary = self.get_account_summary()
-        logger.debug(f"账户摘要内容: {summary}")
+        # logger.debug(f"账户摘要内容: {summary}")
 
         if tag in summary:
             try:

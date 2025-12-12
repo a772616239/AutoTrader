@@ -180,6 +180,7 @@ class A7CTATrendStrategy(BaseStrategy):
         # ---------------- 入场逻辑 (Entry) - 强化过滤 ----------------
         if current_pos == 0:
             
+            
             # 多头条件放宽便于测试：
             long_cond_1 = current_price > prev_upper_entry * 0.995      # 接近突破20日高点 (放宽5点)
             long_cond_2 = current_price > current_trend_ma              # 位于MA200之上
