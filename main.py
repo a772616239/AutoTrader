@@ -291,7 +291,8 @@ def generate_end_of_day_profit_report(target_date=None):
                     'price': price,
                     'size': size,
                     'amount': price * size,
-                    'timestamp': trade['timestamp']
+                    'timestamp': trade['timestamp'],
+                    'position_avg_cost': trade.get('position_avg_cost', 0)
                 }
 
                 if action == 'BUY':
@@ -366,6 +367,12 @@ def generate_end_of_day_profit_report(target_date=None):
                 sell_profit_info = []
                 total_sell_profit = 0.0
                 total_sell_amount = 0.0
+                # 使用trades.json中存储的position_avg_cost（用于持仓成本利润计算）
+                avg_buy_cost = 0
+                if stats['sell_trades']:
+                    # 从卖出交易中获取position_avg_cost
+                    avg_buy_cost = stats['sell_trades'][0].get('position_avg_cost', 0)
+
                 for i, trade in enumerate(stats['sell_trades']):
                     total_sell_amount += trade['amount']
                     if current_price > 0:
@@ -376,6 +383,13 @@ def generate_end_of_day_profit_report(target_date=None):
                         profit_pct = (current_price - trade['price']) / trade['price'] * 100
                         trade_time = trade['timestamp'][11:16]
                         sell_profit_info.append(f"{trade_time} {trade['price']:.2f}→{current_price:.2f} (${total_profit:+.2f}, {profit_pct:+.2f}%)")
+
+                        # 添加持仓成本利润计算（使用trades.json中的position_avg_cost）
+                        position_avg_cost = trade.get('position_avg_cost', 0)
+                        if position_avg_cost > 0:
+                            position_profit_per_share = trade['price'] - position_avg_cost
+                            position_total_profit = position_profit_per_share * trade['size']
+                            sell_profit_info.append(f"  持仓成本利润: ({trade['price']:.2f} - {position_avg_cost:.2f}) × {trade['size']} = ${position_total_profit:+.2f}")
                     else:
                         trade_date = trade['timestamp'][:10]
                         sell_profit_info.append(f"{trade_date} {trade['price']:.2f} (无当前价)")
@@ -471,6 +485,13 @@ def generate_end_of_day_profit_report(target_date=None):
                     sell_profit_info = []
                     total_sell_profit = 0.0
                     total_sell_amount = 0.0
+
+                    # 使用trades.json中存储的position_avg_cost（用于持仓成本利润计算）
+                    avg_buy_cost = 0
+                    if stats['sell_trades']:
+                        # 从卖出交易中获取position_avg_cost
+                        avg_buy_cost = stats['sell_trades'][0].get('position_avg_cost', 0)
+
                     for trade in stats['sell_trades']:
                         total_sell_amount += trade['amount']
                         if current_price > 0:
@@ -480,6 +501,13 @@ def generate_end_of_day_profit_report(target_date=None):
                             profit_pct = (current_price - trade['price']) / trade['price'] * 100
                             trade_time = trade['timestamp'][11:16]
                             sell_profit_info.append(f"{trade_time} {trade['price']:.2f}→{current_price:.2f} (${total_profit:+.2f}, {profit_pct:+.2f}%)")
+
+                            # 添加持仓成本利润计算（使用trades.json中的position_avg_cost）
+                            position_avg_cost = trade.get('position_avg_cost', 0)
+                            if position_avg_cost > 0:
+                                position_profit_per_share = trade['price'] - position_avg_cost
+                                position_total_profit = position_profit_per_share * trade['size']
+                                sell_profit_info.append(f"  持仓成本利润: ({trade['price']:.2f} - {position_avg_cost:.2f}) × {trade['size']} = ${position_total_profit:+.2f}")
                         else:
                             trade_date = trade['timestamp'][:10]
                             sell_profit_info.append(f"{trade_date} {trade['price']:.2f} (无当前价)")

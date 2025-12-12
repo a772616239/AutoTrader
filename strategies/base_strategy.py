@@ -499,6 +499,22 @@ class BaseStrategy:
             'status': 'PENDING',
             'order_type': self.config.get('ib_order_type', 'MKT')
         }
+
+        # 对于卖出交易，添加持仓成本信息
+        if signal['action'] == 'SELL':
+            # 计算平均持仓成本
+            avg_cost = 0.0
+            if signal['symbol'] in self.positions:
+                avg_cost = self.positions[signal['symbol']].get('avg_cost', 0.0)
+            elif self.ib_trader and self.ib_trader.connected:
+                try:
+                    ib_holding = self.ib_trader.get_holding_for_symbol(signal['symbol'])
+                    if ib_holding and 'avg_cost' in ib_holding:
+                        avg_cost = ib_holding['avg_cost']
+                except Exception as e:
+                    logger.debug(f"获取IB持仓成本失败: {e}")
+
+            trade['position_avg_cost'] = avg_cost
         
         try:
             # 清仓时或非交易时间强制使用市价单
