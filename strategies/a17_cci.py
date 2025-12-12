@@ -61,16 +61,19 @@ class A17CCIStrategy(BaseStrategy):
 
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
+            logger.info(f"❌ {symbol} 数据不足，跳过信号生成 - 数据点: {len(data)}, 需要: {self.config['min_data_points']}")
             return signals
 
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+                current_volume = data['Volume'].iloc[-1] if not pd.isna(data['Volume'].iloc[-1]) else 0
+                logger.info(f"❌ {symbol} 成交量不足，跳过信号生成 - 当前成交量: {current_volume:.0f}, 平均成交量: {avg_volume:.0f}, 需要: {self.config['min_volume']}")
                 return signals
 
         # 计算CCI
-        logger.debug(f"📊 {symbol} 开始计算CCI指标")
+        logger.info(f"📊 {symbol} 开始计算CCI指标")
         high_prices = data['High']
         low_prices = data['Low']
         close_prices = data['Close']
@@ -78,6 +81,7 @@ class A17CCIStrategy(BaseStrategy):
 
         if cci.empty:
             logger.warning(f"⚠️ {symbol} CCI计算失败，返回空序列")
+            logger.info(f"❌ {symbol} 指标计算失败，跳过信号生成")
             return signals
 
         current_price = data['Close'].iloc[-1]
@@ -85,6 +89,7 @@ class A17CCIStrategy(BaseStrategy):
 
         if np.isnan(current_cci):
             logger.warning(f"⚠️ {symbol} 当前CCI值为NaN，跳过信号生成")
+            logger.info(f"❌ {symbol} 指标值无效，跳过信号生成")
             return signals
 
         # 获取前一个值用于交叉检测
@@ -92,9 +97,10 @@ class A17CCIStrategy(BaseStrategy):
             prev_cci = cci.iloc[-2]
         else:
             logger.warning(f"⚠️ {symbol} 数据点不足，无法进行交叉检测")
+            logger.info(f"❌ {symbol} 数据不足以进行分析，跳过信号生成")
             return signals
 
-        logger.debug(f"📈 {symbol} CCI计算完成 - 当前CCI: {current_cci:.2f}, 前值: {prev_cci:.2f}, 周期: {self.config['cci_period']}, 当前价格: {current_price:.2f}")
+        logger.info(f"📈 {symbol} CCI计算完成 - 当前CCI: {current_cci:.2f}, 前值: {prev_cci:.2f}, 周期: {self.config['cci_period']}, 当前价格: {current_price:.2f}")
 
         atr = indicators.get('ATR', abs(current_price * 0.02))  # 默认2%的ATR
 
@@ -123,6 +129,7 @@ class A17CCIStrategy(BaseStrategy):
         if signals:
             self.signals_generated += len(signals)
 
+        logger.info(f"📊 {symbol} A17信号生成完成 - 生成信号数量: {len(signals)}")
         return signals
 
     def _detect_cci_signal(self, symbol: str, data: pd.DataFrame,

@@ -65,22 +65,26 @@ class A14RSITrendlineStrategy(BaseStrategy):
 
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
+            logger.info(f"❌ {symbol} 数据不足，跳过信号生成 - 数据点: {len(data)}, 需要: {self.config['min_data_points']}")
             return signals
 
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+                current_volume = data['Volume'].iloc[-1] if not pd.isna(data['Volume'].iloc[-1]) else 0
+                logger.info(f"❌ {symbol} 成交量不足，跳过信号生成 - 当前成交量: {current_volume:.0f}, 平均成交量: {avg_volume:.0f}, 需要: {self.config['min_volume']}")
                 return signals
 
         # 计算指标
-        logger.debug(f"📊 {symbol} 开始计算RSI和趋势指标")
+        logger.info(f"📊 {symbol} 开始计算RSI和趋势指标")
         close_prices = data['Close']
         rsi = calculate_rsi(close_prices, self.config['rsi_period'])
         trend_ma = calculate_moving_average(close_prices, self.config['trend_ma_period'], self.config['trend_ma_type'])
 
         if rsi.empty or trend_ma.empty:
             logger.warning(f"⚠️ {symbol} 指标计算失败，返回空序列")
+            logger.info(f"❌ {symbol} 指标计算失败，跳过信号生成")
             return signals
 
         current_price = data['Close'].iloc[-1]
@@ -91,7 +95,7 @@ class A14RSITrendlineStrategy(BaseStrategy):
         lookback_period = min(self.config['rsi_lookback_days'], len(rsi))
         recent_rsi_avg = rsi.iloc[-lookback_period:].mean()
 
-        logger.debug(f"📈 {symbol} 指标计算完成 - RSI({self.config['rsi_period']}): {current_rsi:.2f}, RSI均值({lookback_period}日): {recent_rsi_avg:.2f}, 趋势MA({self.config['trend_ma_period']}): {current_trend_ma:.2f}, 当前价格: {current_price:.2f}")
+        logger.info(f"📈 {symbol} 指标计算完成 - RSI({self.config['rsi_period']}): {current_rsi:.2f}, RSI均值({lookback_period}日): {recent_rsi_avg:.2f}, 趋势MA({self.config['trend_ma_period']}): {current_trend_ma:.2f}, 当前价格: {current_price:.2f}")
 
         atr = indicators.get('ATR', abs(current_price * 0.02))  # 默认2%的ATR
 
@@ -120,6 +124,7 @@ class A14RSITrendlineStrategy(BaseStrategy):
         if signals:
             self.signals_generated += len(signals)
 
+        logger.info(f"📊 {symbol} A14信号生成完成 - 生成信号数量: {len(signals)}")
         return signals
 
     def _detect_rsi_trendline_signal(self, symbol: str, data: pd.DataFrame,

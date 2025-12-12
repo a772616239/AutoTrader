@@ -72,7 +72,7 @@ class A8RSIOscillatorStrategy(BaseStrategy):
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
                 # 没有足够成交量，降低频率：但不要直接返回——允许退出信号继续被触发
-                logger.debug(f"{symbol} 成交量不足: {avg_volume}")
+                logger.info(f"{symbol} 成交量不足: {avg_volume}")
                 # 继续，但会让开仓信号更谨慎
         # 计算RSI
         close_prices = data['Close']

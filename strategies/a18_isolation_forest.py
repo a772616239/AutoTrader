@@ -113,7 +113,7 @@ class A18IsolationForestStrategy(BaseStrategy):
                 return False
 
             # 训练模型
-            logger.debug(f"🤖 {symbol} 开始训练IsolationForest模型 - 污染率: {self.config.get('contamination', 0.001)}")
+            logger.info(f"🤖 {symbol} 开始训练IsolationForest模型 - 污染率: {self.config.get('contamination', 0.001)}")
             model = IsolationForestModel(
                 train_data,
                 contamination=self.config.get('contamination', 0.001)
@@ -161,22 +161,24 @@ class A18IsolationForestStrategy(BaseStrategy):
         try:
             # 检查数据是否足够
             if len(data) < self.config.get('min_data_points', 50):
-                logger.debug(f"{symbol} 数据不足，跳过信号生成")
+                logger.info(f"❌ {symbol} 数据不足，跳过信号生成 - 数据点: {len(data)}, 需要: {self.config.get('min_data_points', 50)}")
                 return signals
 
             # 检查是否在冷却期
             if self._is_in_cooldown(symbol):
-                logger.debug(f"{symbol} 正在冷却期，跳过信号生成")
+                logger.info(f"❌ {symbol} 正在冷却期，跳过信号生成")
                 return signals
 
             # 检查是否需要重训练模型
             if self._should_retrain_model(symbol):
                 if not self._train_model(symbol, data):
+                    logger.info(f"❌ {symbol} 模型训练失败，跳过信号生成")
                     return signals
 
             model_info = self.models.get(symbol)
             if not model_info:
                 logger.warning(f"{symbol} 模型不存在")
+                logger.info(f"❌ {symbol} 模型不存在，跳过信号生成")
                 return signals
 
             model = model_info['model']
@@ -242,8 +244,9 @@ class A18IsolationForestStrategy(BaseStrategy):
         except Exception as e:
             logger.error(f"生成{symbol}信号时出错: {e}")
             import traceback
-            logger.debug(traceback.format_exc())
+            logger.info(traceback.format_exc())
 
+        logger.info(f"📊 {symbol} A18信号生成完成 - 生成信号数量: {len(signals)}")
         return signals
 
     def calculate_position_size(self, signal: Dict, atr: float = None) -> int:
@@ -289,6 +292,6 @@ class A18IsolationForestStrategy(BaseStrategy):
                                 'confidence': 0.6
                             }
                 except Exception as e:
-                    logger.debug(f"检查{symbol}异常恢复时出错: {e}")
+                    logger.info(f"检查{symbol}异常恢复时出错: {e}")
 
         return None

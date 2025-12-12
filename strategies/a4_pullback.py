@@ -224,7 +224,7 @@ class A4PullbackStrategy(BaseStrategy):
             return None
         # 要求趋势强度达到阈值，避免在非常弱的波动中开空
         if trend_strength < self.config.get('strong_trend_threshold', 0.01):
-            logger.debug(f"{symbol} 趋势强度不足 ({trend_strength:.2%} < {self.config['strong_trend_threshold']:.2%})")
+            logger.info(f"{symbol} 趋势强度不足 ({trend_strength:.2%} < {self.config['strong_trend_threshold']:.2%})")
             return None
         
         # 找出近期高低点
@@ -366,7 +366,7 @@ class A4PullbackStrategy(BaseStrategy):
         注意：不新增 positions 的字段，仅使用临时计算
         """
         if symbol not in self.positions:
-            logger.debug(f"{symbol} 无持仓，跳过平仓检查")
+            logger.info(f"{symbol} 无持仓，跳过平仓检查")
             return None
         
         if current_time is None:

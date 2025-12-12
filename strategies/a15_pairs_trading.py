@@ -62,31 +62,35 @@ class A15PairsTradingStrategy(BaseStrategy):
 
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
+            logger.info(f"❌ {symbol} 数据不足，跳过信号生成 - 数据点: {len(data)}, 需要: {self.config['min_data_points']}")
             return signals
 
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+                current_volume = data['Volume'].iloc[-1] if not pd.isna(data['Volume'].iloc[-1]) else 0
+                logger.info(f"❌ {symbol} 成交量不足，跳过信号生成 - 当前成交量: {current_volume:.0f}, 平均成交量: {avg_volume:.0f}, 需要: {self.config['min_volume']}")
                 return signals
 
         current_price = data['Close'].iloc[-1]
 
         # 简化版：使用SPY作为基准进行相对价值判断
         # 实际配对交易需要找到协整配对，这里简化为与市场基准的相对强弱
-        logger.debug(f"📊 {symbol} 开始配对交易分析")
+        logger.info(f"📊 {symbol} 开始配对交易分析")
         try:
             # 尝试获取配对基准数据（这里简化处理）
             pair_price = self._get_pair_price(symbol, data)
             if pair_price is None:
                 logger.warning(f"⚠️ {symbol} 无法获取配对基准价格")
+                logger.info(f"❌ {symbol} 配对数据获取失败，跳过信号生成")
                 return signals
 
             # 计算相对价差
             price_ratio = current_price / pair_price
             lookback = min(self.config['lookback_period'], len(data) - 1)
 
-            logger.debug(f"🔗 {symbol} 配对分析 - 当前价格: ${current_price:.2f}, 基准价格: ${pair_price:.2f}, 相对比例: {price_ratio:.4f}")
+            logger.info(f"🔗 {symbol} 配对分析 - 当前价格: ${current_price:.2f}, 基准价格: ${pair_price:.2f}, 相对比例: {price_ratio:.4f}")
 
             if len(data) >= lookback:
                 ratios = []
@@ -98,11 +102,11 @@ class A15PairsTradingStrategy(BaseStrategy):
                     ratio_mean = np.mean(ratios)
                     ratio_std = np.std(ratios)
 
-                    logger.debug(f"📈 {symbol} 历史统计 - 均值: {ratio_mean:.4f}, 标准差: {ratio_std:.4f}")
+                    logger.info(f"📈 {symbol} 历史统计 - 均值: {ratio_mean:.4f}, 标准差: {ratio_std:.4f}")
 
                     if ratio_std > 0:
                         z_score = (price_ratio - ratio_mean) / ratio_std
-                        logger.debug(f"🎯 {symbol} Z-Score计算: {z_score:.2f} (当前比例: {price_ratio:.4f}, 均值: {ratio_mean:.4f}, 标准差: {ratio_std:.4f})")
+                        logger.info(f"🎯 {symbol} Z-Score计算: {z_score:.2f} (当前比例: {price_ratio:.4f}, 均值: {ratio_mean:.4f}, 标准差: {ratio_std:.4f})")
 
                         # 生成信号
                         signal = self._detect_pairs_signal(
@@ -120,7 +124,8 @@ class A15PairsTradingStrategy(BaseStrategy):
                                     self.executed_signals.add(signal_hash)
 
         except Exception as e:
-            logger.debug(f"配对交易计算失败 {symbol}: {e}")
+            logger.info(f"配对交易计算失败 {symbol}: {e}")
+            logger.info(f"❌ {symbol} 配对交易计算异常，跳过信号生成")
             return signals
 
         # 检查现有持仓的退出条件
@@ -134,6 +139,7 @@ class A15PairsTradingStrategy(BaseStrategy):
         if signals:
             self.signals_generated += len(signals)
 
+        logger.info(f"📊 {symbol} A15信号生成完成 - 生成信号数量: {len(signals)}")
         return signals
 
     def _get_pair_price(self, symbol: str, data: pd.DataFrame) -> Optional[float]:

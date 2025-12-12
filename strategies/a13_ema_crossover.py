@@ -61,12 +61,15 @@ class A13EMACrossoverStrategy(BaseStrategy):
 
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
+            logger.info(f"❌ {symbol} 数据不足，跳过信号生成 - 数据点: {len(data)}, 需要: {self.config['min_data_points']}")
             return signals
 
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+                current_volume = data['Volume'].iloc[-1] if not pd.isna(data['Volume'].iloc[-1]) else 0
+                logger.info(f"❌ {symbol} 成交量不足，跳过信号生成 - 当前成交量: {current_volume:.0f}, 平均成交量: {avg_volume:.0f}, 需要: {self.config['min_volume']}")
                 return signals
 
         # 计算EMA
@@ -75,6 +78,8 @@ class A13EMACrossoverStrategy(BaseStrategy):
         long_ema = calculate_moving_average(close_prices, self.config['long_ema_period'], 'EMA')
 
         if short_ema.empty or long_ema.empty:
+            logger.warning(f"⚠️ {symbol} EMA计算失败，返回空序列")
+            logger.info(f"❌ {symbol} 指标计算失败，跳过信号生成")
             return signals
 
         current_price = data['Close'].iloc[-1]
@@ -86,6 +91,7 @@ class A13EMACrossoverStrategy(BaseStrategy):
             prev_short_ema = short_ema.iloc[-2]
             prev_long_ema = long_ema.iloc[-2]
         else:
+            logger.info(f"❌ {symbol} 数据不足以进行分析，跳过信号生成")
             return signals
 
         atr = indicators.get('ATR', abs(current_price * 0.02))  # 默认2%的ATR
@@ -118,6 +124,7 @@ class A13EMACrossoverStrategy(BaseStrategy):
         if signals:
             self.signals_generated += len(signals)
 
+        logger.info(f"📊 {symbol} A13信号生成完成 - 生成信号数量: {len(signals)}")
         return signals
 
     def _detect_ema_crossover_signal(self, symbol: str, data: pd.DataFrame,
@@ -130,26 +137,26 @@ class A13EMACrossoverStrategy(BaseStrategy):
 
         # 金叉信号 - 短期EMA上穿长期EMA
         if prev_short_ema <= prev_long_ema and current_short_ema > current_long_ema:
-            logger.debug(f"🔬 {symbol} 检测到EMA金叉条件 - 前值: {prev_short_ema:.2f} <= {prev_long_ema:.2f}, 当前: {current_short_ema:.2f} > {current_long_ema:.2f}")
+            logger.info(f"🔬 {symbol} 检测到EMA金叉条件 - 前值: {prev_short_ema:.2f} <= {prev_long_ema:.2f}, 当前: {current_short_ema:.2f} > {current_long_ema:.2f}")
             confidence = 0.6
 
             # 确认信号强度：交叉幅度越大越强
             crossover_strength = (current_short_ema - current_long_ema) / current_long_ema * 100
-            logger.debug(f"💪 {symbol} 交叉强度计算: {crossover_strength:.2f}%")
+            logger.info(f"💪 {symbol} 交叉强度计算: {crossover_strength:.2f}%")
             if abs(crossover_strength) > 1.0:  # 至少1%的偏离
                 strength_bonus = min(abs(crossover_strength) / 5.0, 0.3)
                 confidence += strength_bonus
-                logger.debug(f"🚀 {symbol} 强度奖励: +{strength_bonus:.3f}")
+                logger.info(f"🚀 {symbol} 强度奖励: +{strength_bonus:.3f}")
 
             # 价格位置确认：价格在短期EMA上方更强
             position_bonus = 0.0
             if current_price > current_short_ema:
                 position_bonus = 0.1
                 confidence += position_bonus
-                logger.debug(f"📈 {symbol} 价格位置奖励: +{position_bonus} (价格在EMA上方)")
+                logger.info(f"📈 {symbol} 价格位置奖励: +{position_bonus} (价格在EMA上方)")
 
             confidence = min(confidence, 0.9)
-            logger.debug(f"🎯 {symbol} 最终买入置信度: {confidence:.3f}")
+            logger.info(f"🎯 {symbol} 最终买入置信度: {confidence:.3f}")
 
             logger.info(f"📈 {symbol} EMA金叉 - 短期EMA: {current_short_ema:.2f}, 长期EMA: {current_long_ema:.2f}, 强度: {crossover_strength:.2f}%, 置信度: {confidence:.2f}")
 

@@ -122,10 +122,10 @@ class BaseStrategy:
     
     def sync_positions_from_ib(self) -> bool:
         """从IB同步持仓信息"""
-        logger.debug(f"🔄 开始从IB同步持仓信息 - 策略: {self.get_strategy_name()}")
+        logger.info(f"🔄 开始从IB同步持仓信息 - 策略: {self.get_strategy_name()}")
 
         if not self.ib_trader:
-            logger.debug("❌ IB交易接口未初始化")
+            logger.info("❌ IB交易接口未初始化")
             return False
 
         try:
@@ -133,17 +133,17 @@ class BaseStrategy:
                 logger.info("IB未连接，跳过持仓同步")
                 return False
 
-            logger.debug("📡 正在获取IB持仓数据...")
+            logger.info("📡 正在获取IB持仓数据...")
             holdings = self.ib_trader.get_holdings()
 
             if not holdings:
-                logger.debug("ℹ️ IB返回空持仓列表")
+                logger.info("ℹ️ IB返回空持仓列表")
                 self.positions.clear()
                 self.equity = self.ib_trader.get_net_liquidation()
                 return True
 
             self.positions.clear()
-            logger.debug(f"📊 处理 {len(holdings)} 个IB持仓")
+            logger.info(f"📊 处理 {len(holdings)} 个IB持仓")
 
             for pos in holdings:
                 try:
@@ -151,7 +151,7 @@ class BaseStrategy:
                     position_size = pos.position
                     avg_cost = pos.avgCost
 
-                    logger.debug(f"📈 同步持仓 - {symbol}: {position_size}股 @ ${avg_cost:.2f}")
+                    logger.info(f"📈 同步持仓 - {symbol}: {position_size}股 @ ${avg_cost:.2f}")
 
                     self.positions[symbol] = {
                         'size': position_size,
@@ -171,7 +171,7 @@ class BaseStrategy:
         except Exception as e:
             logger.error(f"从IB同步持仓失败: {e}")
             import traceback
-            logger.debug(f"详细错误信息: {traceback.format_exc()}")
+            logger.info(f"详细错误信息: {traceback.format_exc()}")
             return False
     
     def check_exit_conditions(self, symbol: str, current_price: float, 
@@ -202,9 +202,9 @@ class BaseStrategy:
                         ib_profit_pct = (current_price - ib_avg_cost) / ib_avg_cost
                     else:
                         ib_profit_pct = (ib_avg_cost - current_price) / ib_avg_cost
-                    logger.debug(f"📊 {symbol} IB持仓成本: ${ib_avg_cost:.2f}, 当前价格: ${current_price:.2f}, 盈利百分比: {ib_profit_pct*100:.2f}%")
+                    logger.info(f"📊 {symbol} IB持仓成本: ${ib_avg_cost:.2f}, 当前价格: ${current_price:.2f}, 盈利百分比: {ib_profit_pct*100:.2f}%")
             except Exception as e:
-                logger.debug(f"获取IB持仓成本失败: {e}")
+                logger.info(f"获取IB持仓成本失败: {e}")
 
         # 计算盈亏（使用IB成本优先，否则使用本地成本）
         if ib_profit_pct is not None:
@@ -270,7 +270,7 @@ class BaseStrategy:
                         'confidence': 1.0
                     }
             except Exception as e:
-                logger.debug(f"解析force_close_time失败: {e}")
+                logger.info(f"解析force_close_time失败: {e}")
         
         # 止损检查（优先检查，保护资金）
         if price_change_pct <= stop_loss_pct:
@@ -332,7 +332,7 @@ class BaseStrategy:
                     if position_value > 0:
                         pnl_pct = (unrealized_pnl / position_value) * 100
                         take_profit_pnl_threshold = self.config.get('take_profit_pnl_threshold', 300.0)  # 默认$300未实现盈利，降低限制
-                        logger.debug(f"📊 {symbol} IB未实现盈利检查: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%), 阈值: ${take_profit_pnl_threshold:.2f}, 持仓价值: ${position_value:.2f}")
+                        logger.info(f"📊 {symbol} IB未实现盈利检查: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%), 阈值: ${take_profit_pnl_threshold:.2f}, 持仓价值: ${position_value:.2f}")
                         if unrealized_pnl >= take_profit_pnl_threshold:
                             logger.info(f"✅ {symbol} 触发IB未实现盈利止盈: ${unrealized_pnl:.2f} ({pnl_pct:.2f}%) >= ${take_profit_pnl_threshold:.2f}")
                             return {
@@ -346,9 +346,9 @@ class BaseStrategy:
                                 'confidence': 1.0
                             }
                 else:
-                    logger.debug(f"⚠️ {symbol} 无法获取IB持仓信息进行未实现盈利检查")
+                    logger.info(f"⚠️ {symbol} 无法获取IB持仓信息进行未实现盈利检查")
             except Exception as e:
-                logger.debug(f"检查IB未实现盈利时出错: {e}")
+                logger.info(f"检查IB未实现盈利时出错: {e}")
         
         return None
     
@@ -535,7 +535,7 @@ class BaseStrategy:
                     if ib_holding and 'avg_cost' in ib_holding:
                         avg_cost = ib_holding['avg_cost']
                 except Exception as e:
-                    logger.debug(f"获取IB持仓成本失败: {e}")
+                    logger.info(f"获取IB持仓成本失败: {e}")
 
             trade['position_avg_cost'] = avg_cost
         
@@ -630,7 +630,7 @@ class BaseStrategy:
 
                 return trade
             else:
-                logger.debug(f"DEBUG: 模拟交易模式 - 更新本地持仓，信号: {signal['symbol']} {signal['action']} {signal['position_size']}")
+                logger.info(f"DEBUG: 模拟交易模式 - 更新本地持仓，信号: {signal['symbol']} {signal['action']} {signal['position_size']}")
 
                 if signal['action'] == 'BUY':
                     # 买入操作：增加持仓
@@ -647,7 +647,7 @@ class BaseStrategy:
                             'avg_cost': new_avg_cost,
                             'entry_time': old_pos.get('entry_time', datetime.now())
                         }
-                        logger.debug(f"DEBUG: 买入 - 原持仓: {old_size}股，新增: {signal['position_size']}股，总计: {new_size}股，平均成本: ${new_avg_cost:.2f}")
+                        logger.info(f"DEBUG: 买入 - 原持仓: {old_size}股，新增: {signal['position_size']}股，总计: {new_size}股，平均成本: ${new_avg_cost:.2f}")
                     else:
                         # 新建持仓
                         self.positions[signal['symbol']] = {
@@ -655,16 +655,16 @@ class BaseStrategy:
                             'avg_cost': current_price,
                             'entry_time': datetime.now()
                         }
-                        logger.debug(f"DEBUG: 新建持仓 - {signal['symbol']}: {signal['position_size']}股 @ ${current_price:.2f}")
+                        logger.info(f"DEBUG: 新建持仓 - {signal['symbol']}: {signal['position_size']}股 @ ${current_price:.2f}")
 
                 elif signal['action'] == 'SELL':
                     # 卖出操作：减少持仓
                     if signal['symbol'] in self.positions:
                         old_pos = self.positions[signal['symbol']]
                         old_size = int(old_pos.get('size', 0))
-                        logger.debug(f"DEBUG: 原持仓: {old_size}股")
+                        logger.info(f"DEBUG: 原持仓: {old_size}股")
                         remaining = max(0, old_size - int(signal['position_size']))
-                        logger.debug(f"DEBUG: 卖出后剩余: {remaining}股")
+                        logger.info(f"DEBUG: 卖出后剩余: {remaining}股")
                         if remaining > 0:
                             self.positions[signal['symbol']] = {
                                 'size': remaining,
@@ -672,7 +672,7 @@ class BaseStrategy:
                                 'entry_time': old_pos.get('entry_time', datetime.now())
                             }
                         else:
-                            logger.debug(f"DEBUG: 持仓清空，删除 {signal['symbol']}")
+                            logger.info(f"DEBUG: 持仓清空，删除 {signal['symbol']}")
                             del self.positions[signal['symbol']]
                     else:
                         logger.warning(f"DEBUG: 模拟模式卖出时无持仓记录: {signal['symbol']}")
@@ -774,7 +774,7 @@ class BaseStrategy:
                                         all_signals[symbol].append(exit_signal)
                                         logger.info(f"  ✅ {symbol} 触发退出条件: {exit_signal.get('reason', '')}")
                             except Exception as e:
-                                logger.debug(f"  无法获取 {symbol} 实时价格: {e}")
+                                logger.info(f"  无法获取 {symbol} 实时价格: {e}")
                         continue
                     
                     current_price = df['Close'].iloc[-1]
@@ -822,7 +822,7 @@ class BaseStrategy:
             except Exception as e:
                 logger.error(f"分析 {symbol} 时出错: {e}")
                 import traceback
-                logger.debug(traceback.format_exc())
+                logger.info(traceback.format_exc())
                 continue
         
         return all_signals

@@ -62,16 +62,19 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         # 基本数据检查
         if data.empty or len(data) < self.config['min_data_points']:
+            logger.info(f"❌ {symbol} 数据不足，跳过信号生成 - 数据点: {len(data)}, 需要: {self.config['min_data_points']}")
             return signals
 
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+                current_volume = data['Volume'].iloc[-1] if not pd.isna(data['Volume'].iloc[-1]) else 0
+                logger.info(f"❌ {symbol} 成交量不足，跳过信号生成 - 当前成交量: {current_volume:.0f}, 平均成交量: {avg_volume:.0f}, 需要: {self.config['min_volume']}")
                 return signals
 
         # 计算Stochastic RSI
-        logger.debug(f"📊 {symbol} 开始计算Stochastic RSI指标")
+        logger.info(f"📊 {symbol} 开始计算Stochastic RSI指标")
         close_prices = data['Close']
         stoch_rsi = calculate_stochastic_rsi(
             close_prices,
@@ -81,6 +84,7 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         if stoch_rsi.empty:
             logger.warning(f"⚠️ {symbol} Stochastic RSI计算失败，返回空序列")
+            logger.info(f"❌ {symbol} 指标计算失败，跳过信号生成")
             return signals
 
         current_price = data['Close'].iloc[-1]
@@ -88,6 +92,7 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         if np.isnan(current_stoch_rsi):
             logger.warning(f"⚠️ {symbol} 当前Stochastic RSI值为NaN，跳过信号生成")
+            logger.info(f"❌ {symbol} 指标值无效，跳过信号生成")
             return signals
 
         # 获取前一个值用于交叉检测
@@ -95,9 +100,10 @@ class A12StochasticRSIStrategy(BaseStrategy):
             prev_stoch_rsi = stoch_rsi.iloc[-2]
         else:
             logger.warning(f"⚠️ {symbol} 数据点不足，无法进行交叉检测")
+            logger.info(f"❌ {symbol} 数据不足以进行分析，跳过信号生成")
             return signals
 
-        logger.debug(f"📈 {symbol} Stochastic RSI计算完成 - 当前值: {current_stoch_rsi:.4f}, 前值: {prev_stoch_rsi:.4f}, RSI周期: {self.config['rsi_period']}, Stoch周期: {self.config['stoch_period']}")
+        logger.info(f"📈 {symbol} Stochastic RSI计算完成 - 当前值: {current_stoch_rsi:.4f}, 前值: {prev_stoch_rsi:.4f}, RSI周期: {self.config['rsi_period']}, Stoch周期: {self.config['stoch_period']}")
 
         atr = indicators.get('ATR', abs(current_price * 0.02))  # 默认2%的ATR
 
@@ -110,13 +116,13 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         # 只在没有持仓时生成买入信号
         if symbol not in self.positions:
-            logger.debug(f"🔍 {symbol} 检查买入信号条件 - 当前价格: ${current_price:.2f}, ATR: ${atr:.4f}")
+            logger.info(f"🔍 {symbol} 检查买入信号条件 - 当前价格: ${current_price:.2f}, ATR: ${atr:.4f}")
             signal = self._detect_stoch_rsi_signal(
                 symbol, data, current_stoch_rsi, prev_stoch_rsi, current_price
             )
             if signal:
                 signal_hash = self._generate_signal_hash(signal)
-                logger.debug(f"🎯 {symbol} 检测到信号 - 类型: {signal['signal_type']}, 哈希: {signal_hash[:8]}")
+                logger.info(f"🎯 {symbol} 检测到信号 - 类型: {signal['signal_type']}, 哈希: {signal_hash[:8]}")
 
                 if not self._is_signal_cooldown(signal_hash):
                     if signal_hash not in self.executed_signals:
@@ -133,16 +139,17 @@ class A12StochasticRSIStrategy(BaseStrategy):
                         else:
                             logger.warning(f"⚠️ {symbol} 仓位计算为0，跳过信号")
                     else:
-                        logger.debug(f"🔄 {symbol} 信号已执行，跳过")
+                        logger.info(f"🔄 {symbol} 信号已执行，跳过")
                 else:
-                    logger.debug(f"⏰ {symbol} 信号冷却中，跳过")
+                    logger.info(f"⏰ {symbol} 信号冷却中，跳过")
             else:
-                logger.debug(f"❌ {symbol} 未检测到有效信号")
+                logger.info(f"❌ {symbol} 未检测到有效信号")
 
         # 记录信号统计
         if signals:
             self.signals_generated += len(signals)
 
+        logger.info(f"📊 {symbol} A12信号生成完成 - 生成信号数量: {len(signals)}")
         return signals
 
     def _detect_stoch_rsi_signal(self, symbol: str, data: pd.DataFrame,
@@ -157,22 +164,22 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         # 超卖 -> 买入信号
         if current_stoch_rsi <= oversold_level:
-            logger.debug(f"📊 {symbol} 检测到超卖条件: {current_stoch_rsi:.4f} <= {oversold_level}")
+            logger.info(f"📊 {symbol} 检测到超卖条件: {current_stoch_rsi:.4f} <= {oversold_level}")
 
             # 计算超卖程度（距离阈值越远信号越强）
             oversold_strength = oversold_level - current_stoch_rsi
             confidence = 0.5 + min(oversold_strength * 2.0, 0.4)  # 最大增加0.4
-            logger.debug(f"💪 {symbol} 超卖强度: {oversold_strength:.4f}, 基础置信度: {confidence:.3f}")
+            logger.info(f"💪 {symbol} 超卖强度: {oversold_strength:.4f}, 基础置信度: {confidence:.3f}")
 
             # 检查是否从超卖区域向上突破（更强的买入信号）
             breakout_bonus = 0.0
             if prev_stoch_rsi <= oversold_level and current_stoch_rsi > prev_stoch_rsi:
                 breakout_bonus = 0.1
                 confidence += breakout_bonus
-                logger.debug(f"🚀 {symbol} 检测到向上突破，置信度增加: +{breakout_bonus}")
+                logger.info(f"🚀 {symbol} 检测到向上突破，置信度增加: +{breakout_bonus}")
 
             confidence = min(confidence, 0.9)
-            logger.debug(f"🎯 {symbol} 最终买入置信度: {confidence:.3f}")
+            logger.info(f"🎯 {symbol} 最终买入置信度: {confidence:.3f}")
 
             logger.info(f"📈 {symbol} Stochastic RSI超卖买入 - StochRSI: {current_stoch_rsi:.3f}, 阈值: {oversold_level}, 强度: {oversold_strength:.3f}, 置信度: {confidence:.2f}")
 
@@ -194,22 +201,22 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         # 超买 -> 卖出信号
         elif current_stoch_rsi >= overbought_level:
-            logger.debug(f"📊 {symbol} 检测到超买条件: {current_stoch_rsi:.4f} >= {overbought_level}")
+            logger.info(f"📊 {symbol} 检测到超买条件: {current_stoch_rsi:.4f} >= {overbought_level}")
 
             # 计算超买程度
             overbought_strength = current_stoch_rsi - overbought_level
             confidence = 0.5 + min(overbought_strength * 2.0, 0.4)  # 最大增加0.4
-            logger.debug(f"💪 {symbol} 超买强度: {overbought_strength:.4f}, 基础置信度: {confidence:.3f}")
+            logger.info(f"💪 {symbol} 超买强度: {overbought_strength:.4f}, 基础置信度: {confidence:.3f}")
 
             # 检查是否从超买区域向下突破（更强的卖出信号）
             breakout_bonus = 0.0
             if prev_stoch_rsi >= overbought_level and current_stoch_rsi < prev_stoch_rsi:
                 breakout_bonus = 0.1
                 confidence += breakout_bonus
-                logger.debug(f"📉 {symbol} 检测到向下突破，置信度增加: +{breakout_bonus}")
+                logger.info(f"📉 {symbol} 检测到向下突破，置信度增加: +{breakout_bonus}")
 
             confidence = min(confidence, 0.9)
-            logger.debug(f"🎯 {symbol} 最终卖出置信度: {confidence:.3f}")
+            logger.info(f"🎯 {symbol} 最终卖出置信度: {confidence:.3f}")
 
             logger.info(f"📉 {symbol} Stochastic RSI超买卖出 - StochRSI: {current_stoch_rsi:.3f}, 阈值: {overbought_level}, 强度: {overbought_strength:.3f}, 置信度: {confidence:.2f}")
 
@@ -229,7 +236,7 @@ class A12StochasticRSIStrategy(BaseStrategy):
                 }
             }
 
-        logger.debug(f"❌ {symbol} 未满足任何信号条件 - StochRSI: {current_stoch_rsi:.4f} (超卖阈值: {oversold_level}, 超买阈值: {overbought_level})")
+        logger.info(f"❌ {symbol} 未满足任何信号条件 - StochRSI: {current_stoch_rsi:.4f} (超卖阈值: {oversold_level}, 超买阈值: {overbought_level})")
         return None
 
     def check_exit_conditions(self, symbol: str, current_price: float,
@@ -237,10 +244,10 @@ class A12StochasticRSIStrategy(BaseStrategy):
         """
         检查卖出条件 - 重写基类方法
         """
-        logger.debug(f"🔍 {symbol} 检查退出条件 - 当前价格: ${current_price:.2f}")
+        logger.info(f"🔍 {symbol} 检查退出条件 - 当前价格: ${current_price:.2f}")
 
         if symbol not in self.positions:
-            logger.debug(f"❌ {symbol} 无持仓，跳过退出检查")
+            logger.info(f"❌ {symbol} 无持仓，跳过退出检查")
             return None
             return None
 
@@ -261,7 +268,7 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         # 止损检查
         stop_loss_pct = -abs(self.config['stop_loss_pct'])
-        logger.debug(f"🛡️ {symbol} 止损检查 - 当前盈亏: {price_change_pct*100:.2f}%, 止损阈值: {stop_loss_pct*100:.2f}%")
+        logger.info(f"🛡️ {symbol} 止损检查 - 当前盈亏: {price_change_pct*100:.2f}%, 止损阈值: {stop_loss_pct*100:.2f}%")
         if price_change_pct <= stop_loss_pct:
             logger.warning(f"⚠️ {symbol} A12触发止损: 亏损{price_change_pct*100:.2f}% (阈值: {stop_loss_pct*100:.2f}%)")
             return {
@@ -277,7 +284,7 @@ class A12StochasticRSIStrategy(BaseStrategy):
 
         # 止盈检查
         take_profit_pct = abs(self.config['take_profit_pct'])
-        logger.debug(f"💰 {symbol} 止盈检查 - 当前盈亏: {price_change_pct*100:.2f}%, 止盈阈值: {take_profit_pct*100:.2f}%")
+        logger.info(f"💰 {symbol} 止盈检查 - 当前盈亏: {price_change_pct*100:.2f}%, 止盈阈值: {take_profit_pct*100:.2f}%")
         if price_change_pct >= take_profit_pct:
             logger.info(f"✅ {symbol} A12触发止盈: 盈利{price_change_pct*100:.2f}% (阈值: {take_profit_pct*100:.2f}%)")
             return {
@@ -294,7 +301,7 @@ class A12StochasticRSIStrategy(BaseStrategy):
         # 最大持仓时间
         holding_minutes = (current_time - entry_time).total_seconds() / 60
         max_holding = self.config['max_holding_minutes']
-        logger.debug(f"⏰ {symbol} 持仓时间检查 - 已持仓: {holding_minutes:.1f}分钟, 最大限制: {max_holding}分钟")
+        logger.info(f"⏰ {symbol} 持仓时间检查 - 已持仓: {holding_minutes:.1f}分钟, 最大限制: {max_holding}分钟")
         if holding_minutes > max_holding:
             logger.info(f"⏰ {symbol} A12触发超时平仓: 持仓{holding_minutes:.0f}分钟 > {max_holding}分钟限制")
             return {
@@ -307,5 +314,5 @@ class A12StochasticRSIStrategy(BaseStrategy):
                 'profit_pct': price_change_pct * 100
             }
 
-        logger.debug(f"✅ {symbol} 未触发任何退出条件，继续持仓")
+        logger.info(f"✅ {symbol} 未触发任何退出条件，继续持仓")
         return None

@@ -666,7 +666,7 @@ class A1MomentumReversalStrategy(BaseStrategy):
         if enhancement_factor > 0.1:
             enhanced_signal['reason'] += f" [增强: +{enhancement_factor*100:.0f}%]"
         
-        logger.debug(f"📊 {symbol} 买入信号增强: {base_confidence:.2f} -> {enhanced_confidence:.2f} "
+        logger.info(f"📊 {symbol} 买入信号增强: {base_confidence:.2f} -> {enhanced_confidence:.2f} "
                    f"(增强分数: {enhancement_score:.2f})")
         
         return enhanced_signal
@@ -717,7 +717,7 @@ class A1MomentumReversalStrategy(BaseStrategy):
             
             # 避免在接近收盘时开新仓
             if self.is_late_session(current_time):
-                logger.debug(f"⏰ {symbol} 接近收盘，避免开新仓")
+                logger.info(f"⏰ {symbol} 接近收盘，避免开新仓")
                 return signals
             
             # 早盘动量信号
