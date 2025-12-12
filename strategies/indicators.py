@@ -206,3 +206,80 @@ def calculate_roc(prices: pd.Series, period: int = 12) -> pd.Series:
     """
     roc = ((prices - prices.shift(period)) / prices.shift(period)) * 100
     return roc
+
+def calculate_super_trend(high: pd.Series, low: pd.Series, close: pd.Series,
+                         atr_period: int = 14, factor: float = 3.0) -> Tuple[pd.Series, pd.Series]:
+    """
+    Calculate Super Trend indicator.
+
+    Super Trend is a trend-following indicator based on ATR.
+    It creates a trailing stop level that can be used to set trailing stop losses.
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+        atr_period: ATR calculation period
+        factor: Multiplier for ATR
+
+    Returns:
+        Tuple[pd.Series, pd.Series]: (Super Trend, Trend Direction)
+        Trend Direction: 1 for uptrend, -1 for downtrend
+    """
+    # Calculate ATR
+    atr = calculate_atr(high, low, close, atr_period)
+
+    # Calculate Basic Bands
+    hl2 = (high + low) / 2
+    basic_upper = hl2 + (factor * atr)
+    basic_lower = hl2 - (factor * atr)
+
+    # Initialize Final Bands
+    final_upper = basic_upper.copy()
+    final_lower = basic_lower.copy()
+
+    # Calculate Final Upper and Lower bands
+    for i in range(1, len(close)):
+        # Final Upper Band
+        if close.iloc[i-1] <= final_upper.iloc[i-1]:
+            final_upper.iloc[i] = min(basic_upper.iloc[i], final_upper.iloc[i-1])
+        else:
+            final_upper.iloc[i] = basic_upper.iloc[i]
+
+        # Final Lower Band
+        if close.iloc[i-1] >= final_lower.iloc[i-1]:
+            final_lower.iloc[i] = max(basic_lower.iloc[i], final_lower.iloc[i-1])
+        else:
+            final_lower.iloc[i] = basic_lower.iloc[i]
+
+    # Calculate Super Trend
+    super_trend = pd.Series(index=close.index, dtype=float)
+    trend_direction = pd.Series(index=close.index, dtype=int)
+
+    for i in range(len(close)):
+        if i == 0:
+            # First value
+            if close.iloc[i] <= final_upper.iloc[i]:
+                super_trend.iloc[i] = final_upper.iloc[i]
+                trend_direction.iloc[i] = 1  # Uptrend
+            else:
+                super_trend.iloc[i] = final_lower.iloc[i]
+                trend_direction.iloc[i] = -1  # Downtrend
+        else:
+            # Subsequent values
+            if super_trend.iloc[i-1] == final_upper.iloc[i-1]:
+                if close.iloc[i] <= final_upper.iloc[i]:
+                    super_trend.iloc[i] = final_upper.iloc[i]
+                    trend_direction.iloc[i] = 1
+                else:
+                    super_trend.iloc[i] = final_lower.iloc[i]
+                    trend_direction.iloc[i] = -1
+            else:  # Previous was lower band
+                if close.iloc[i] >= final_lower.iloc[i]:
+                    super_trend.iloc[i] = final_lower.iloc[i]
+                    trend_direction.iloc[i] = -1
+                else:
+                    super_trend.iloc[i] = final_upper.iloc[i]
+                    trend_direction.iloc[i] = 1
+
+    return super_trend, trend_direction

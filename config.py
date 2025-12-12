@@ -501,6 +501,39 @@ CONFIG = {
         'min_volume': 10000,
         'ib_order_type': 'MKT',
         'ib_limit_offset': 0.01,
+    },
+    'strategy_a22': {  # A22 超级趋势策略配置
+        'initial_capital': 50000.0,
+        'risk_per_trade': 0.015,        # 1.5% 单笔风险
+        'max_position_size': 0.08,       # 8% 最大仓位
+        'per_trade_notional_cap': 5000.0,
+        'max_position_notional': 40000.0,
+
+        # 超级趋势参数
+        'atr_period': 14,                # ATR周期
+        'factor': 3.0,                   # 乘数因子
+        'trend_confirmation': 2,         # 趋势确认周期
+        'min_trend_strength': 0.001,     # 最小趋势强度
+
+        # 风险管理
+        'stop_loss_pct': 0.03,           # 3% 止损
+        'take_profit_pct': 0.06,         # 6% 止盈
+        'max_holding_days': 7,           # 最大持有7天
+        'trailing_stop_pct': 0.02,       # 2% 追踪止损
+
+        # 交易过滤
+        'trading_hours_only': True,
+        'avoid_earnings': True,
+        'min_volume_threshold': 100000,  # 最小成交量
+        'min_price': 5.0,
+        'max_price': None,
+
+        # 防重复交易
+        'signal_cooldown_minutes': 15,   # 15分钟冷却
+
+        # IB交易参数
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
     }
 }
 
@@ -524,6 +557,7 @@ STRATEGY_CONFIG_MAP = {
     'a16': 'strategy_a16',
     'a17': 'strategy_a17',
     'a18': 'strategy_a18',
+    'a22': 'strategy_a22',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a8/a9/a10

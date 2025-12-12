@@ -75,8 +75,8 @@ class A10BollingerBandsStrategy(BaseStrategy):
         close_prices = data['Close']
         upper_band, middle_band, lower_band = calculate_bollinger_bands(
             close_prices,
-            self.config['bb_window'],
-            self.config['bb_std_dev']
+            self.config['bollinger_period'],
+            self.config['bollinger_std']
         )
 
         if upper_band.empty or middle_band.empty or lower_band.empty:

@@ -37,7 +37,7 @@ class IsolationForestModel:
             behaviour: 模型行为参数
         """
         normalized_data = (data - data.mean()) / data.std()
-        self.iso = IsolationForest(contamination=contamination, behaviour=behaviour, random_state=42)
+        self.iso = IsolationForest(contamination=contamination, random_state=42)
         self.iso.fit(normalized_data)
         self.data_mean = data.mean()
         self.data_std = data.std()
@@ -62,7 +62,7 @@ class A18IsolationForestStrategy(BaseStrategy):
         """默认配置"""
         config = super()._default_config()
         config.update({
-            'contamination': 0.001,  # 异常值比例
+            'contamination': 0.05,   # 异常值比例 (5% - 适合股票数据)
             'cooldown_days': 7,      # 交易冷却期（天）
             'min_data_points': 50,   # 最小数据点数量
             'model_retrain_days': 30,  # 模型重训练间隔（天）

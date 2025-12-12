@@ -27,7 +27,7 @@ class A2ZScoreStrategy(BaseStrategy):
             
             # Z-Score参数
             'zscore_lookback': 20,  # Z-Score计算窗口
-            'zscore_entry_threshold': 2.0,  # 入场阈值
+            'zscore_entry_threshold': 1.5,  # 入场阈值 (降低阈值便于测试)
             'zscore_exit_threshold': 0.5,  # 出场阈值
             'price_mean_window': 20,  # 均值计算窗口
             'price_std_window': 20,  # 标准差计算窗口

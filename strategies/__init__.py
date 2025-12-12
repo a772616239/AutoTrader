@@ -16,6 +16,8 @@ from .a14_rsi_trendline import A14RSITrendlineStrategy
 from .a15_pairs_trading import A15PairsTradingStrategy
 from .a16_roc import A16ROCStrategy
 from .a17_cci import A17CCIStrategy
+from .a18_isolation_forest import A18IsolationForestStrategy
+from .a22_super_trend import A22SuperTrendStrategy
 from .base_strategy import BaseStrategy
 
 __all__ = [
@@ -36,5 +38,7 @@ __all__ = [
     'A14RSITrendlineStrategy',
     'A15PairsTradingStrategy',
     'A16ROCStrategy',
-    'A17CCIStrategy'
+    'A17CCIStrategy',
+    'A18IsolationForestStrategy',
+    'A22SuperTrendStrategy'
 ]
