@@ -28,7 +28,7 @@ CONFIG = {
     'INTC',
     'RIVN',
     'COIN',
-    'SQ',
+    # 'SQ',
     'ZM',
     'UBER',
     'UPST',
@@ -535,6 +535,129 @@ CONFIG = {
         # IB交易参数
         'ib_order_type': 'MKT',
         'ib_limit_offset': 0.01,
+    },
+    'strategy_a32': {  # A32 Keltner Channels策略配置
+        'initial_capital': 50000.0,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+
+        # Keltner Channels参数
+        'atr_period': 14,
+        'multiplier': 2.0,
+        'breakout_threshold': 0.1,
+
+        # 风险管理
+        'stop_loss_pct': 0.02,
+        'take_profit_pct': 0.04,
+        'max_holding_minutes': 120,
+
+        # 防重复交易
+        'signal_cooldown_minutes': 20,
+
+        # 交易参数
+        'min_volume': 10000,
+        'min_data_points': 25,
+
+        # IB交易参数
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a33': {  # A33 Pivot Points策略配置
+        'initial_capital': 50000.0,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+
+        # Pivot Points参数
+        'breakout_threshold': 0.001,
+        'use_r2_s2': False,
+
+        # 风险管理
+        'stop_loss_pct': 0.02,
+        'take_profit_pct': 0.04,
+        'max_holding_minutes': 120,
+
+        # 防重复交易
+        'signal_cooldown_minutes': 20,
+
+        # 交易参数
+        'min_volume': 10000,
+        'min_data_points': 25,
+
+        # IB交易参数
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a34': {  # A34 线性回归策略配置
+        'initial_capital': 50000.0,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+
+        # 线性回归参数
+        'lookback_period': 30,
+        'prediction_horizon': 1,
+        'retrain_frequency': 5,
+        'prediction_threshold': 0.02,
+
+        # 风险管理
+        'stop_loss_pct': 0.03,
+        'take_profit_pct': 0.05,
+        'max_holding_minutes': 240,
+
+        # 防重复交易
+        'signal_cooldown_minutes': 30,
+
+        # 交易参数
+        'min_volume': 10000,
+        'min_data_points': 50,
+
+        # IB交易参数
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
+    },
+    'strategy_a35': {  # A35 MLP神经网络策略配置
+        'initial_capital': 50000.0,
+        'risk_per_trade': 0.02,
+        'max_position_size': 0.1,
+        'per_trade_notional_cap': 700.0,
+        'max_position_notional': 60000.0,
+
+        # MLP神经网络参数
+        'lookback_period': 30,
+        'prediction_horizon': 1,
+        'retrain_frequency': 10,
+        'prediction_threshold': 0.025,
+
+        # 神经网络架构
+        'hidden_layers': (100, 50, 25),
+        'activation': 'relu',
+        'solver': 'adam',
+        'max_iter': 1000,
+        'learning_rate': 'adaptive',
+        'alpha': 0.0001,
+        'early_stopping': True,
+        'validation_fraction': 0.2,
+
+        # 风险管理
+        'stop_loss_pct': 0.03,
+        'take_profit_pct': 0.06,
+        'max_holding_minutes': 300,
+
+        # 防重复交易
+        'signal_cooldown_minutes': 45,
+
+        # 交易参数
+        'min_volume': 10000,
+        'min_data_points': 60,
+
+        # IB交易参数
+        'ib_order_type': 'MKT',
+        'ib_limit_offset': 0.01,
     }
 }
 
@@ -559,6 +682,10 @@ STRATEGY_CONFIG_MAP = {
     'a17': 'strategy_a17',
     'a18': 'strategy_a18',
     'a22': 'strategy_a22',
+    'a32': 'strategy_a32',
+    'a33': 'strategy_a33',
+    'a34': 'strategy_a34',
+    'a35': 'strategy_a35',
 }
 
 # 每个标的分配策略示例: 将特定股票映射到 a8/a9/a10
@@ -574,86 +701,86 @@ existing_map = CONFIG.get('symbol_strategy_map', {}) or {}
 # 预设一些需要使用 a2 策略的标的（可按需修改）。仅在用户未显式设置时应用。
 preselect_a2 = {
     # A1 动量反转策略 - 基于早盘动量/午盘反转信号
-    'AMD':  'a1',
-    'META': 'a1',
-    'RIVN': 'a1',
-    'COIN': 'a1',
-    'SQ':   'a1',
-    'ZM':   'a1',
-    'UBER': 'a1',
-    'UPST': 'a1',  # 新增 - 高波动金融科技，适合动量反转
-    'DUOL': 'a1',  # 新增 - 高波动成长股
-    'AUDC': 'a1',  # 新增 - 小盘科技股，情绪驱动
-    'TMDX': 'a1',  # 新增 - 医疗设备股，高波动
+    'AMD':  'a14',
+    'META': 'a14',
+    'RIVN': 'a14',
+    'COIN': 'a14',
+    # 'SQ':   'a14',
+    'ZM':   'a14',
+    'UBER': 'a14',
+    'UPST': 'a14',  # 新增 - 高波动金融科技，适合动量反转
+    'DUOL': 'a14',  # 新增 - 高波动成长股
+    'AUDC': 'a14',  # 新增 - 小盘科技股，情绪驱动
+    'TMDX': 'a14',  # 新增 - 医疗设备股，高波动
 
     # A2 Z-Score均值回归策略 - 基于统计套利
-    'XOM':  'a2',
-    'CVX':  'a2',
-    'JPM':  'a2',
-    'PFE':  'a2',
-    'JNJ':  'a2',
-    'BAC':  'a2',
-    'GS':   'a2',
-    'PEP':  'a2',  # 新增 - 稳定消费品，均值回归强
-    'CSCO': 'a2',  # 新增 - 成熟科技股，稳定波动
-    'TXN':  'a2',  # 新增 - 半导体周期股，均值回归明显
-    'COMM': 'a2',  # 新增 - 通信设备，周期性
-    'UNH':  'a2',  # 新增 - 医疗巨头，稳定大盘股
-    'DINO': 'a2',  # 新增 - 炼油股，周期性均值回归
+    'XOM':  'a15',
+    'CVX':  'a15',
+    'JPM':  'a15',
+    'PFE':  'a15',
+    'JNJ':  'a15',
+    'BAC':  'a15',
+    'GS':   'a15',
+    'PEP':  'a15',  # 新增 - 稳定消费品，均值回归强
+    'CSCO': 'a15',  # 新增 - 成熟科技股，稳定波动
+    'TXN':  'a15',  # 新增 - 半导体周期股，均值回归明显
+    'COMM': 'a15',  # 新增 - 通信设备，周期性
+    'UNH':  'a15',  # 新增 - 医疗巨头，稳定大盘股
+    'DINO': 'a15',  # 新增 - 炼油股，周期性均值回归
 
     # A3 双均线成交量突破策略 - 基于趋势突破
-    'TEAM': 'a3',
-    'GOOGL': 'a3',
-    'CRM':  'a3',
+    'TEAM': 'a16',
+    'GOOGL':'a16',
+    'CRM':  'a16',
+    'AVGO': 'a16',
+    'IBM':  'a16',
+    'NOW':  'a16',
+    'AAPL': 'a16',  # 新增 - 趋势清晰，成交量稳定
+    'ADP':  'a16',  # 新增 - 企业服务，稳定趋势
+    'DV':   'a16',  # 新增 - 数字验证，成长趋势明确
     # 'ORCL': 'a3',
-    'AVGO': 'a3',
-    'IBM':  'a3',
-    'NOW':  'a3',
-    'AAPL': 'a3',  # 新增 - 趋势清晰，成交量稳定
-    'ADP':  'a3',  # 新增 - 企业服务，稳定趋势
-    'DV':   'a3',  # 新增 - 数字验证，成长趋势明确
 
     # A4 回调交易策略 - 基于斐波那契回撤
-    'AMZN': 'a4',
-    'TSLA': 'a4',
-    'NFLX': 'a4',
-    'DIS':  'a4',
-    'NKE':  'a4',
-    'SBUX': 'a4',
-    'BABA': 'a4',  # 新增 - 中概股，经常深度回调
-    'BIDU': 'a4',  # 新增 - 类似BABA，回调幅度大
+    'AMZN': 'a17',
+    'TSLA': 'a17',
+    'NFLX': 'a17',
+    'DIS':  'a17',
+    'NKE':  'a17',
+    'SBUX': 'a17',
+    'BABA': 'a17',  # 新增 - 中概股，经常深度回调
+    'BIDU': 'a17',  # 新增 - 类似BABA，回调幅度大
     # 'LAC':  'a4',  # 新增 - 锂矿股，波动大，回调频繁
 
     # A5 多因子AI融合策略 - 整合流动性、基本面、情绪、动量
-    'NVDA': 'a5',
-    'MSFT': 'a5',
-    'ETN':  'a5',
-    'SNOW': 'a5',
-    'PLTR': 'a5',
-    'DDOG': 'a5',
-    'CRWD': 'a5',
-    'INCY': 'a5',  # 新增 - 生物科技，多因子特征
-    'PRIM': 'a5',  # 新增 - 制造业，多重因素影响
-    'MSTR': 'a5',  # 新增 - 比特币概念，多维度驱动
+    'NVDA': 'a12',
+    'MSFT': 'a12',
+    'ETN':  'a12',
+    'SNOW': 'a12',
+    'PLTR': 'a12',
+    'DDOG': 'a12',
+    'CRWD': 'a12',
+    'INCY': 'a12',  # 新增 - 生物科技，多因子特征
+    'PRIM': 'a12',  # 新增 - 制造业，多重因素影响
+    'MSTR': 'a12',  # 新增 - 比特币概念，多维度驱动
 
     # A6 新闻交易策略 - 基于实时新闻情绪分析
-    'ALHC': 'a6',  # 新增 - 医疗保健，政策敏感
-    'CLSK': 'a6',  # 新增 - 比特币挖矿，加密货币新闻驱动
-    'TSSI': 'a6',  # 新增 - 小盘科技，事件驱动
-    'SMR':  'a6',  # 新增 - 核能概念，政策新闻敏感
-    'SLDP': 'a6',  # 新增 - 固态电池，新闻事件驱动
+    'ALHC': 'a14',  # 新增 - 医疗保健，政策敏感
+    'CLSK': 'a14',  # 新增 - 比特币挖矿，加密货币新闻驱动
+    'TSSI': 'a14',  # 新增 - 小盘科技，事件驱动
+    'SMR':  'a14',  # 新增 - 核能概念，政策新闻敏感
+    'SLDP': 'a14',  # 新增 - 固态电池，新闻事件驱动
 
     # A7 CTA趋势跟踪策略 - 基于唐奇安通道突破
     # 'SMCI': 'a7',
-    'TSM':  'a7',
-    'BA':   'a7',
-    'ASML': 'a7',
-    'LLY':  'a7',
-    'RTX':  'a7',
-    'AMAT': 'a7',
-    'AZN':  'a7',  # 新增 - 大型药企，趋势稳定
-    'STX':  'a7',  # 新增 - 存储周期股，趋势明显
-    'WDC':  'a7',  # 新增 - 同存储行业，趋势性强
+    'TSM':  'a13',
+    'BA':   'a13',
+    'ASML': 'a13',
+    'LLY':  'a13',
+    'RTX':  'a13',
+    'AMAT': 'a13',
+    'AZN':  'a13',  # 新增 - 大型药企，趋势稳定
+    'STX':  'a13',  # 新增 - 存储周期股，趋势明显
+    'WDC':  'a13',  # 新增 - 同存储行业，趋势性强
 }
 
 

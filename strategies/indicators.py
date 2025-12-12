@@ -516,3 +516,344 @@ def calculate_true_strength_index(close: pd.Series, r_period: int = 25,
     tsi = 100 * (ema_s / abs_ema_s)
 
     return tsi
+
+def calculate_stochastic_oscillator(high: pd.Series, low: pd.Series, close: pd.Series,
+                                   k_period: int = 14, d_period: int = 3) -> Tuple[pd.Series, pd.Series]:
+    """
+    Calculate Stochastic Oscillator.
+
+    Stochastic Oscillator is a momentum indicator that shows the location of the close
+    relative to the high-low range over a set number of periods.
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+        k_period: %K period (default 14)
+        d_period: %D period (default 3)
+
+    Returns:
+        Tuple[pd.Series, pd.Series]: (%K, %D) series (0-100)
+    """
+    # Calculate %K
+    lowest_low = low.rolling(window=k_period).min()
+    highest_high = high.rolling(window=k_period).max()
+
+    k_percent = 100 * (close - lowest_low) / (highest_high - lowest_low + 1e-10)
+
+    # Calculate %D (moving average of %K)
+    d_percent = k_percent.rolling(window=d_period).mean()
+
+    return k_percent, d_percent
+
+def calculate_momentum(prices: pd.Series, period: int = 10) -> pd.Series:
+    """
+    Calculate Momentum indicator.
+
+    Momentum measures the rate of change of prices over a specified period.
+
+    Args:
+        prices: Price series
+        period: Momentum period (default 10)
+
+    Returns:
+        pd.Series: Momentum series
+    """
+    momentum = prices - prices.shift(period)
+    return momentum
+
+def calculate_vwap(high: pd.Series, low: pd.Series, close: pd.Series,
+                   volume: pd.Series) -> pd.Series:
+    """
+    Calculate Volume Weighted Average Price (VWAP).
+
+    VWAP is the average price weighted by volume, often used as a benchmark
+    for the current trading session.
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+        volume: Volume series
+
+    Returns:
+        pd.Series: VWAP series
+    """
+    # Calculate typical price
+    typical_price = (high + low + close) / 3
+
+    # Calculate cumulative volume and cumulative volume * price
+    cum_volume = volume.cumsum()
+    cum_vol_price = (typical_price * volume).cumsum()
+
+    # Calculate VWAP
+    vwap = cum_vol_price / cum_volume
+
+    return vwap
+
+def calculate_money_flow_index(high: pd.Series, low: pd.Series, close: pd.Series,
+                              volume: pd.Series, period: int = 14) -> pd.Series:
+    """
+    Calculate Money Flow Index (MFI).
+
+    MFI is a momentum indicator that uses both price and volume data to identify
+    overbought or oversold conditions in an asset.
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+        volume: Volume series
+        period: MFI calculation period (default 14)
+
+    Returns:
+        pd.Series: Money Flow Index series (0-100)
+    """
+    # Calculate Typical Price
+    typical_price = (high + low + close) / 3
+
+    # Calculate Raw Money Flow
+    raw_money_flow = typical_price * volume
+
+    # Calculate Money Flow Ratio
+    # Positive Money Flow: when typical price > previous typical price
+    # Negative Money Flow: when typical price < previous typical price
+
+    price_change = typical_price - typical_price.shift(1)
+
+    positive_money_flow = pd.Series([0.0] * len(typical_price), index=typical_price.index)
+    negative_money_flow = pd.Series([0.0] * len(typical_price), index=typical_price.index)
+
+    positive_mask = price_change > 0
+    negative_mask = price_change < 0
+
+    positive_money_flow[positive_mask] = raw_money_flow[positive_mask]
+    negative_money_flow[negative_mask] = raw_money_flow[negative_mask]
+
+    # Calculate Money Flow Ratio
+    positive_mf_sum = positive_money_flow.rolling(window=period).sum()
+    negative_mf_sum = negative_money_flow.rolling(window=period).sum()
+
+    money_flow_ratio = positive_mf_sum / negative_mf_sum
+
+    # Calculate Money Flow Index
+    mfi = 100 - (100 / (1 + money_flow_ratio))
+
+    return mfi
+
+def calculate_pvi(close: pd.Series, volume: pd.Series) -> pd.Series:
+    """
+    Calculate Positive Volume Index (PVI).
+
+    PVI accumulates volume on days when price rises, helping to identify
+    institutional buying pressure.
+
+    Args:
+        close: Close price series
+        volume: Volume series
+
+    Returns:
+        pd.Series: Positive Volume Index series
+    """
+    price_change = close - close.shift(1)
+    volume_change = volume - volume.shift(1)
+
+    # PVI changes only on positive volume days
+    pvi = pd.Series([1000.0] * len(close), index=close.index)  # Start with 1000
+
+    for i in range(1, len(close)):
+        if volume.iloc[i] > volume.iloc[i-1]:
+            pvi.iloc[i] = pvi.iloc[i-1] + (price_change.iloc[i] / close.iloc[i-1]) * pvi.iloc[i-1]
+        else:
+            pvi.iloc[i] = pvi.iloc[i-1]
+
+    return pvi
+
+def calculate_pvt(close: pd.Series, volume: pd.Series) -> pd.Series:
+    """
+    Calculate Price Volume Trend (PVT).
+
+    PVT combines price and volume to identify trends and reversals.
+
+    Args:
+        close: Close price series
+        volume: Volume series
+
+    Returns:
+        pd.Series: Price Volume Trend series
+    """
+    price_change_pct = close.pct_change()
+    pvt = (price_change_pct * volume).cumsum()
+
+    return pvt
+
+def calculate_balance_of_power(open_price: pd.Series, high: pd.Series,
+                              low: pd.Series, close: pd.Series) -> pd.Series:
+    """
+    Calculate Balance of Power (BOP).
+
+    Balance of Power measures the strength of buyers vs sellers by comparing
+    the close price to the range of the period.
+
+    Args:
+        open_price: Open price series
+        high: High price series
+        low: Low price series
+        close: Close price series
+
+    Returns:
+        pd.Series: Balance of Power series (-1 to 1)
+    """
+    bop = (close - open_price) / (high - low + 1e-10)
+    return bop
+
+def calculate_keltner_channels(high: pd.Series, low: pd.Series, close: pd.Series,
+                              atr_period: int = 14, multiplier: float = 2.0) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    Calculate Keltner Channels.
+
+    Keltner Channels are volatility-based bands that use ATR to set channel width.
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+        atr_period: ATR calculation period (default 14)
+        multiplier: ATR multiplier (default 2.0)
+
+    Returns:
+        Tuple[pd.Series, pd.Series, pd.Series]: (Upper Channel, Middle Channel, Lower Channel)
+    """
+    # Calculate EMA of typical price as middle line
+    typical_price = (high + low + close) / 3
+    middle = typical_price.ewm(span=20, adjust=False).mean()
+
+    # Calculate ATR
+    atr = calculate_atr(high, low, close, atr_period)
+
+    # Calculate channels
+    upper = middle + (multiplier * atr)
+    lower = middle - (multiplier * atr)
+
+    return upper, middle, lower
+
+def calculate_pivot_points(high: pd.Series, low: pd.Series, close: pd.Series) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
+    """
+    Calculate Pivot Points.
+
+    Pivot Points are support and resistance levels calculated from previous period's data.
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+
+    Returns:
+        Tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
+        (Pivot Point, R1, S1, R2, S2)
+    """
+    # Calculate pivot point
+    pivot = (high.shift(1) + low.shift(1) + close.shift(1)) / 3
+
+    # Calculate support and resistance levels
+    r1 = (2 * pivot) - low.shift(1)
+    s1 = (2 * pivot) - high.shift(1)
+    r2 = pivot + (high.shift(1) - low.shift(1))
+    s2 = pivot - (high.shift(1) - low.shift(1))
+
+    return pivot, r1, s1, r2, s2
+
+def calculate_triangular_moving_average(close: pd.Series, period: int = 14) -> pd.Series:
+    """
+    Calculate Triangular Moving Average (TRIMA).
+
+    Triangular Moving Average applies multiple smoothing to reduce noise.
+
+    Args:
+        close: Close price series
+        period: Calculation period (default 14)
+
+    Returns:
+        pd.Series: Triangular Moving Average series
+    """
+    # First SMA
+    sma1 = close.rolling(window=period).mean()
+
+    # Second SMA of the first SMA
+    trima = sma1.rolling(window=period).mean()
+
+    return trima
+
+def calculate_gmma(close: pd.Series) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+    """
+    Calculate Guppy Multiple Moving Averages (GMMA).
+
+    GMMA uses two groups of EMAs to identify trend direction and strength.
+
+    Args:
+        close: Close price series
+
+    Returns:
+        Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+        (Short EMAs, Long EMAs, Short Average, Long Average)
+    """
+    # Short-term EMAs (3, 5, 8, 10, 12, 15)
+    short_emas = []
+    for period in [3, 5, 8, 10, 12, 15]:
+        short_emas.append(close.ewm(span=period, adjust=False).mean())
+
+    # Long-term EMAs (30, 35, 40, 45, 50, 60)
+    long_emas = []
+    for period in [30, 35, 40, 45, 50, 60]:
+        long_emas.append(close.ewm(span=period, adjust=False).mean())
+
+    # Calculate averages
+    short_avg = sum(short_emas) / len(short_emas)
+    long_avg = sum(long_emas) / len(long_emas)
+
+    return short_avg, long_avg, sum(short_emas), sum(long_emas)
+
+def calculate_acceleration_bands(high: pd.Series, low: pd.Series, close: pd.Series,
+                                period: int = 20, width: float = 0.0002) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    Calculate Acceleration Bands.
+
+    Acceleration Bands use a simple moving average and add bands based on volatility.
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+        period: Moving average period (default 20)
+        width: Band width multiplier (default 0.0002)
+
+    Returns:
+        Tuple[pd.Series, pd.Series, pd.Series]: (Upper Band, Middle Band, Lower Band)
+    """
+    # Calculate middle band (SMA)
+    middle = close.rolling(window=period).mean()
+
+    # Calculate acceleration bands
+    upper = middle * (1 + width)
+    lower = middle * (1 - width)
+
+    return upper, middle, lower
+
+def calculate_price_channels(high: pd.Series, low: pd.Series, period: int = 20) -> Tuple[pd.Series, pd.Series]:
+    """
+    Calculate Price Channels.
+
+    Price Channels are formed by the highest high and lowest low over a period.
+
+    Args:
+        high: High price series
+        low: Low price series
+        period: Lookback period (default 20)
+
+    Returns:
+        Tuple[pd.Series, pd.Series]: (Upper Channel, Lower Channel)
+    """
+    upper_channel = high.rolling(window=period).max()
+    lower_channel = low.rolling(window=period).min()
+
+    return upper_channel, lower_channel

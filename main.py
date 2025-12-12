@@ -45,6 +45,20 @@ from strategies.a15_pairs_trading import A15PairsTradingStrategy
 from strategies.a16_roc import A16ROCStrategy
 from strategies.a17_cci import A17CCIStrategy
 from strategies.a18_isolation_forest import A18IsolationForestStrategy
+from strategies.a22_super_trend import A22SuperTrendStrategy
+from strategies.a23_aroon_oscillator import A23AroonOscillatorStrategy
+from strategies.a24_ultimate_oscillator import A24UltimateOscillatorStrategy
+from strategies.a25_pairs_trading import A25PairsTradingStrategy
+from strategies.a26_williams_r import A26WilliamsRStrategy
+from strategies.a27_minervini_trend import A27MinerviniTrendStrategy
+from strategies.a28_true_strength_index import A28TrueStrengthIndexStrategy
+from strategies.a29_stochastic_oscillator import A29StochasticOscillatorStrategy
+from strategies.a30_ibd_rs_rating import A30IBDRSRatingStrategy
+from strategies.a31_money_flow_index import A31MoneyFlowIndexStrategy
+from strategies.a32_keltner_channels import A32KeltnerChannelsStrategy
+from strategies.a33_pivot_points import A33PivotPointsStrategy
+from strategies.a34_linear_regression import A34LinearRegressionStrategy
+from strategies.a35_mlp_neural_network import A35MLPNeuralNetworkStrategy
 
 from strategy_manager import StrategyManager
 
@@ -600,7 +614,21 @@ class StrategyFactory:
         'a15': A15PairsTradingStrategy,
         'a16': A16ROCStrategy,
         'a17': A17CCIStrategy,
-        'a18': A18IsolationForestStrategy
+        'a18': A18IsolationForestStrategy,
+        'a22': A22SuperTrendStrategy,
+        'a23': A23AroonOscillatorStrategy,
+        'a24': A24UltimateOscillatorStrategy,
+        'a25': A25PairsTradingStrategy,
+        'a26': A26WilliamsRStrategy,
+        'a27': A27MinerviniTrendStrategy,
+        'a28': A28TrueStrengthIndexStrategy,
+        'a29': A29StochasticOscillatorStrategy,
+        'a30': A30IBDRSRatingStrategy,
+        'a31': A31MoneyFlowIndexStrategy,
+        'a32': A32KeltnerChannelsStrategy,
+        'a33': A33PivotPointsStrategy,
+        'a34': A34LinearRegressionStrategy,
+        'a35': A35MLPNeuralNetworkStrategy
     }
     
     @classmethod
@@ -649,6 +677,20 @@ class StrategyFactory:
             'a16': 'ROC动量策略 - 基于价格变化率的动量指标',
             'a17': 'CCI顺势策略 - 基于顺势指标的超买超卖策略',
             'a18': 'IsolationForest异常检测策略 - 基于机器学习的异常价格检测',
+            'a22': '超级趋势策略 - 基于ATR和趋势跟踪的突破策略',
+            'a23': 'Aroon震荡策略 - 基于Aroon指标的趋势和震荡分析',
+            'a24': '终极震荡策略 - 结合动量、体积和价格的综合指标',
+            'a25': '配对交易策略 - 基于协整关系的统计套利策略（增强版）',
+            'a26': 'Williams %R策略 - 基于威廉指标的超买超卖策略',
+            'a27': 'Minervini趋势策略 - 基于Mark Minervini八条趋势原则',
+            'a28': '真实强度指数策略 - 结合价格和成交量的动量指标',
+            'a29': '随机震荡策略 - 基于随机指标的超买超卖策略',
+            'a30': 'IBD RS评级策略 - 基于Investor\'s Business Daily相对强度',
+            'a31': '资金流量指数策略 - 基于成交量和价格的资金流向分析',
+            'a32': 'Keltner通道策略 - 基于ATR的波动率通道策略',
+            'a33': '枢轴点策略 - 基于支撑阻力位的突破策略',
+            'a34': '线性回归策略 - 基于价格趋势线的统计分析',
+            'a35': 'MLP神经网络策略 - 基于多层感知器的机器学习预测',
         }
         return descriptions.get(strategy_name, '未知策略')
 

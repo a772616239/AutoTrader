@@ -49,7 +49,13 @@ class BaseStrategy:
         self.start_time = datetime.now()
         
         logger.info(f"策略 {self.get_strategy_name()} 初始化完成")
-    
+
+        # 风险管理状态
+        self.daily_pnl = 0.0
+        self.daily_start_equity = self.equity
+        self.portfolio_drawdown = 0.0
+        self.risk_management_paused = False
+
     def _default_config(self) -> Dict:
         """默认配置 - 子类应该重写此方法"""
         return {
@@ -64,6 +70,17 @@ class BaseStrategy:
                 'start': '09:30',
                 'end': '16:00'
             },
+            # Kelly准则配置
+            'use_kelly_criterion': False,  # 是否使用Kelly准则计算仓位
+            'kelly_fraction': 1.0,  # Kelly准则的倍数 (1.0=全Kelly, 0.5=半Kelly)
+            'kelly_min_fraction': 0.1,  # Kelly仓位的最小比例
+            'kelly_max_fraction': 1.0,  # Kelly仓位的最大比例
+            # 风险管理配置
+            'risk_management_enabled': True,  # 启用风险管理
+            'max_drawdown_limit': 0.15,  # 最大回撤限制 (15%)
+            'daily_loss_limit': 0.05,  # 单日最大亏损限制 (5%)
+            'position_concentration_limit': 0.25,  # 单股票集中度限制 (25%)
+            'correlation_risk_limit': 0.8,  # 相关性风险限制
         }
     
     def get_strategy_name(self) -> str:
@@ -93,6 +110,147 @@ class BaseStrategy:
             current = datetime.now().time()  # 假设本地时间就是美东时间
 
         return start <= current <= end
+
+    def calculate_kelly_criterion(self, win_rate: float, win_loss_ratio: float) -> float:
+        """
+        计算Kelly准则
+
+        Kelly准则用于确定最优仓位大小，以最大化长期增长率。
+        公式: K = (胜率 * (赔率+1) - 1) / 赔率
+
+        Args:
+            win_rate: 胜率 (0-1)
+            win_loss_ratio: 平均盈利/平均亏损比率
+
+        Returns:
+            float: Kelly仓位比例 (0-1)
+        """
+        if win_loss_ratio <= 0:
+            return 0.0
+
+        kelly = win_rate - ((1 - win_rate) / win_loss_ratio)
+
+        # 应用Kelly倍数和限制
+        kelly_fraction = self.config.get('kelly_fraction', 1.0)
+        kelly_min = self.config.get('kelly_min_fraction', 0.1)
+        kelly_max = self.config.get('kelly_max_fraction', 1.0)
+
+        kelly *= kelly_fraction
+        kelly = max(kelly_min, min(kelly_max, kelly))
+
+        return kelly
+
+    def calculate_dynamic_kelly(self, symbol: str, signal_confidence: float = 0.5) -> float:
+        """
+        基于历史表现计算动态Kelly准则
+
+        Args:
+            symbol: 股票代码
+            signal_confidence: 信号置信度
+
+        Returns:
+            float: 动态Kelly仓位比例
+        """
+        try:
+            # 从交易历史计算胜率和盈亏比
+            symbol_trades = [t for t in self.trade_history if t.get('symbol') == symbol and t.get('status') == 'EXECUTED']
+
+            if len(symbol_trades) < 10:  # 需要足够的历史数据
+                # 使用默认值
+                win_rate = 0.55
+                win_loss_ratio = 1.5
+            else:
+                # 计算实际胜率
+                winning_trades = [t for t in symbol_trades if t.get('profit_pct', 0) > 0]
+                win_rate = len(winning_trades) / len(symbol_trades)
+
+                # 计算平均盈亏比
+                if winning_trades:
+                    avg_win = np.mean([t['profit_pct'] for t in winning_trades])
+                    losing_trades = [t for t in symbol_trades if t.get('profit_pct', 0) <= 0]
+                    if losing_trades:
+                        avg_loss = abs(np.mean([t['profit_pct'] for t in losing_trades]))
+                        win_loss_ratio = avg_win / avg_loss if avg_loss > 0 else 2.0
+                    else:
+                        win_loss_ratio = 2.0  # 没有亏损交易
+                else:
+                    win_loss_ratio = 1.0  # 没有盈利交易
+
+            # 计算基础Kelly值
+            base_kelly = self.calculate_kelly_criterion(win_rate, win_loss_ratio)
+
+            # 根据信号置信度调整
+            adjusted_kelly = base_kelly * signal_confidence
+
+            logger.info(f"🎯 {symbol} 动态Kelly计算 - 胜率: {win_rate:.2f}, 盈亏比: {win_loss_ratio:.2f}, "
+                       f"基础Kelly: {base_kelly:.3f}, 调整后: {adjusted_kelly:.3f}")
+
+            return adjusted_kelly
+
+        except Exception as e:
+            logger.error(f"计算动态Kelly时出错: {e}")
+            return 0.1  # 返回保守的默认值
+
+    def check_risk_limits(self) -> bool:
+        """
+        检查风险限制
+
+        Returns:
+            bool: 是否允许继续交易
+        """
+        if not self.config.get('risk_management_enabled', True):
+            return True
+
+        try:
+            # 检查最大回撤限制
+            max_drawdown = self.config.get('max_drawdown_limit', 0.15)
+            if self.portfolio_drawdown >= max_drawdown:
+                logger.warning(f"⚠️ 达到最大回撤限制: {self.portfolio_drawdown:.2%} >= {max_drawdown:.2%}")
+                self.risk_management_paused = True
+                return False
+
+            # 检查单日亏损限制
+            daily_loss_limit = self.config.get('daily_loss_limit', 0.05)
+            daily_pnl_pct = self.daily_pnl / self.daily_start_equity
+            if daily_pnl_pct <= -daily_loss_limit:
+                logger.warning(f"⚠️ 达到单日亏损限制: {daily_pnl_pct:.2%} <= {-daily_loss_limit:.2%}")
+                self.risk_management_paused = True
+                return False
+
+            # 检查持仓集中度
+            concentration_limit = self.config.get('position_concentration_limit', 0.25)
+            for symbol, position in self.positions.items():
+                position_value = abs(position['size']) * position['avg_cost']
+                concentration = position_value / self.equity
+                if concentration >= concentration_limit:
+                    logger.warning(f"⚠️ {symbol} 持仓集中度过高: {concentration:.2%} >= {concentration_limit:.2%}")
+                    return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"检查风险限制时出错: {e}")
+            return True  # 出错时允许继续交易
+
+    def update_portfolio_drawdown(self):
+        """更新投资组合回撤"""
+        try:
+            if not self.trade_history:
+                return
+
+            # 计算当前投资组合价值
+            portfolio_value = self.equity
+
+            # 找到历史最高价值
+            peak_value = self.daily_start_equity  # 简化计算，使用日初价值作为基准
+
+            # 计算回撤
+            if peak_value > 0:
+                self.portfolio_drawdown = (peak_value - portfolio_value) / peak_value
+                self.portfolio_drawdown = max(0, self.portfolio_drawdown)  # 确保非负
+
+        except Exception as e:
+            logger.error(f"更新投资组合回撤时出错: {e}")
 
     def _is_pre_market_hours(self) -> bool:
         """检查是否在盘前时段（北京时间16:00-21:30）"""
@@ -359,10 +517,15 @@ class BaseStrategy:
         return None
     
     def calculate_position_size(self, signal: Dict, atr: float = None) -> int:
-        """计算仓位大小"""
+        """计算仓位大小 - 支持Kelly准则和风险管理"""
         if atr is None:
             atr = signal['price'] * 0.02
-        
+
+        # 检查风险管理限制
+        if not self.check_risk_limits():
+            logger.warning("⚠️ 风险管理限制，拒绝开新仓位")
+            return 0
+
         # 从IB获取可用资金
         if self.ib_trader:
             try:
@@ -375,28 +538,43 @@ class BaseStrategy:
                     logger.warning(f"IB可用资金为0，使用默认equity进行模拟交易: {self.equity}")
             except Exception as e:
                 logger.info(f"获取IB可用资金失败: {e}, 使用默认equity进行模拟交易: {self.equity}")
-        
+
         if self.config.get('max_active_positions'):
             if len(self.positions) >= int(self.config['max_active_positions']):
                 return 0
 
-        risk_amount = self.equity * self.config['risk_per_trade']
-        risk_amount *= signal.get('confidence', 0.5)
-        
+        # 计算基础风险金额
+        base_risk_amount = self.equity * self.config['risk_per_trade']
+        base_risk_amount *= signal.get('confidence', 0.5)
+
+        # Kelly准则调整
+        kelly_multiplier = 1.0
+        if self.config.get('use_kelly_criterion', False):
+            symbol = signal.get('symbol', 'UNKNOWN')
+            kelly_fraction = self.calculate_dynamic_kelly(symbol, signal.get('confidence', 0.5))
+            kelly_multiplier = kelly_fraction
+            logger.info(f"🎯 {symbol} 应用Kelly准则: 基础风险 ${base_risk_amount:.2f}, Kelly倍数 {kelly_multiplier:.3f}")
+
+        risk_amount = base_risk_amount * kelly_multiplier
+
         risk_per_share = atr * self.config.get('stop_loss_atr_multiple', 1.5)
         if risk_per_share <= 0:
             return 0
-        
+
         shares = int(risk_amount / risk_per_share)
         shares = max(1, shares)
-        
+
         # 最大仓位限制 - 基于$10,000美元单笔上限
         equity_buffered = self.equity * (1 - float(self.config.get('min_cash_buffer', 0.0)))
         per_trade_cap = float(self.config.get('per_trade_notional_cap', 10000.0))
         max_shares_value = min(per_trade_cap, equity_buffered)
         max_shares = int(max_shares_value / signal['price'])
         result = min(shares, max_shares)
-        logger.info(f"[{self.get_strategy_name()}] 计算仓位大小: 风险金额 ${risk_amount:,.2f}, 每股风险 ${risk_per_share:.2f}, 初始股数 {shares}, 最大股数 {max_shares}, 最终股数 {result} equity_buffered {equity_buffered}")
+
+        logger.info(f"[{self.get_strategy_name()}] 计算仓位大小: 基础风险 ${base_risk_amount:.2f}, "
+                   f"Kelly倍数 {kelly_multiplier:.3f}, 最终风险 ${risk_amount:.2f}, "
+                   f"每股风险 ${risk_per_share:.2f}, 初始股数 {shares}, 最大股数 {max_shares}, 最终股数 {result}")
+
         try:
             logger.info(
                 f"仓位计算: 价格 {signal['price']:.2f}, 权益 {self.equity:,.2f}, 风险股数 {shares}, "
@@ -749,7 +927,15 @@ class BaseStrategy:
         """运行分析周期"""
         all_signals = {}
         self.executed_signals.clear()
-        
+
+        # 更新风险管理状态
+        self.update_portfolio_drawdown()
+
+        # 检查是否因风险管理而暂停交易
+        if self.risk_management_paused:
+            logger.warning("⚠️ 风险管理暂停交易")
+            return all_signals
+
         # 从IB同步持仓和资金
         self.sync_positions_from_ib()
         

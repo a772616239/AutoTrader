@@ -1,0 +1,17 @@
+[
+  {
+    "symbol":"DDOG",
+    "score":41.9504898733,
+    "rsi_value":27.5220617445,
+    "signal_type":"oversold",
+    "confidence":0.4195048987,
+    "details":{
+      "current_rsi":27.5220617445,
+      "avg_rsi":21.6099020253,
+      "signal_strength":41.9504898733,
+      "threshold":30
+    },
+    "strategy":"rsi_momentum",
+    "screened_at":"2025-12-12T20:33:29.891906"
+  }
+]
