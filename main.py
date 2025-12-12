@@ -38,6 +38,13 @@ from strategies.a8_rsi_oscillator import A8RSIOscillatorStrategy
 from strategies.a9_macd_crossover import A9MACDCrossoverStrategy
 from strategies.a10_bollinger_bands import A10BollingerBandsStrategy
 from strategies.a11_moving_average_crossover import A11MovingAverageCrossoverStrategy
+from strategies.a12_stochastic_rsi import A12StochasticRSIStrategy
+from strategies.a13_ema_crossover import A13EMACrossoverStrategy
+from strategies.a14_rsi_trendline import A14RSITrendlineStrategy
+from strategies.a15_pairs_trading import A15PairsTradingStrategy
+from strategies.a16_roc import A16ROCStrategy
+from strategies.a17_cci import A17CCIStrategy
+from strategies.a18_isolation_forest import A18IsolationForestStrategy
 
 from strategy_manager import StrategyManager
 
@@ -256,6 +263,17 @@ def generate_end_of_day_profit_report(target_date=None):
             # A11 移动平均交叉策略
             'MA_GOLDEN_CROSS': 'a11',
             'MA_DEATH_CROSS': 'a11',
+
+            # A12 Stochastic RSI策略
+            'STOCH_RSI_OVERSOLD': 'a12',
+            'STOCH_RSI_OVERBOUGHT': 'a12',
+
+            # A13 EMA交叉策略
+            'EMA_GOLDEN_CROSS': 'a13',
+            'EMA_DEATH_CROSS': 'a13',
+
+            # A14 RSI趋势线策略
+            'RSI_TRENDLINE_BUY': 'a14',
         }
 
         # 策略统计数据 - 按策略->股票分组，存储交易详情
@@ -327,7 +345,14 @@ def generate_end_of_day_profit_report(target_date=None):
             'a8': 'RSI震荡策略',
             'a9': 'MACD交叉策略',
             'a10': '布林带策略',
-            'a11': '移动平均交叉'
+            'a11': '移动平均交叉',
+            'a12': 'Stochastic RSI策略',
+            'a13': 'EMA交叉策略',
+            'a14': 'RSI趋势线策略',
+            'a15': '配对交易策略',
+            'a16': 'ROC动量策略',
+            'a17': 'CCI顺势策略',
+            'a18': 'IsolationForest异常检测策略'
         }
 
         for strategy_code, symbol_stats in strategy_stats.items():
@@ -568,8 +593,14 @@ class StrategyFactory:
         'a8': A8RSIOscillatorStrategy,
         'a9': A9MACDCrossoverStrategy,
         'a10': A10BollingerBandsStrategy,
-        'a11': A11MovingAverageCrossoverStrategy
-        
+        'a11': A11MovingAverageCrossoverStrategy,
+        'a12': A12StochasticRSIStrategy,
+        'a13': A13EMACrossoverStrategy,
+        'a14': A14RSITrendlineStrategy,
+        'a15': A15PairsTradingStrategy,
+        'a16': A16ROCStrategy,
+        'a17': A17CCIStrategy,
+        'a18': A18IsolationForestStrategy
     }
     
     @classmethod
@@ -607,6 +638,17 @@ class StrategyFactory:
             'a5': '多因子AI融合策略 - 整合流动性、基本面、情绪、动量',
             'a6': '新闻交易策略 - 基于实时新闻情绪分析',
             'a7': 'CTA趋势跟踪策略 - 基于唐奇安通道突破',
+            'a8': 'RSI震荡策略 - 基于相对强弱指数超买超卖',
+            'a9': 'MACD交叉策略 - 基于MACD线条交叉信号',
+            'a10': '布林带策略 - 基于布林带价格突破',
+            'a11': '均线交叉策略 - 基于移动平均线交叉',
+            'a12': 'Stochastic RSI策略 - 结合随机指标和RSI的增强震荡策略',
+            'a13': 'EMA交叉策略 - 基于指数移动平均线交叉的多资产组合策略',
+            'a14': 'RSI趋势线策略 - 基于RSI和长期趋势的筛选策略',
+            'a15': '配对交易策略 - 基于协整关系的统计套利策略',
+            'a16': 'ROC动量策略 - 基于价格变化率的动量指标',
+            'a17': 'CCI顺势策略 - 基于顺势指标的超买超卖策略',
+            'a18': 'IsolationForest异常检测策略 - 基于机器学习的异常价格检测',
         }
         return descriptions.get(strategy_name, '未知策略')
 
@@ -1253,6 +1295,7 @@ class TradingSystem:
         logger.info("  - 在控制台输入 'switch a5' 切换到多因子AI融合策略")
         logger.info("  - 在控制台输入 'switch a6' 切换到新闻交易策略")
         logger.info("  - 在控制台输入 'switch a7' 切换到CTA趋势跟踪策略")
+        logger.info("  - 在控制台输入 'switch a8-a18' 切换到技术指标策略")
         logger.info("  - 在控制台输入 'list' 查看所有策略")
         logger.info("  - 按 Ctrl+C 停止系统\n")
         
@@ -1315,6 +1358,20 @@ def command_line_interface(system: TradingSystem):
                     system.switch_strategy('a10')
                 elif cmd == 'switch a11':
                     system.switch_strategy('a11')
+                elif cmd == 'switch a12':
+                    system.switch_strategy('a12')
+                elif cmd == 'switch a13':
+                    system.switch_strategy('a13')
+                elif cmd == 'switch a14':
+                    system.switch_strategy('a14')
+                elif cmd == 'switch a15':
+                    system.switch_strategy('a15')
+                elif cmd == 'switch a16':
+                    system.switch_strategy('a16')
+                elif cmd == 'switch a17':
+                    system.switch_strategy('a17')
+                elif cmd == 'switch a18':
+                    system.switch_strategy('a18')
                 elif cmd == 'list':
                     system.list_strategies()
                 elif cmd == 'status':
@@ -1328,6 +1385,17 @@ def command_line_interface(system: TradingSystem):
                     print("  switch a5    - 切换到多因子AI融合策略")
                     print("  switch a6    - 切换到新闻交易策略")
                     print("  switch a7    - 切换到CTA趋势跟踪策略")
+                    print("  switch a8    - 切换到RSI震荡策略")
+                    print("  switch a9    - 切换到MACD交叉策略")
+                    print("  switch a10   - 切换到布林带策略")
+                    print("  switch a11   - 切换到均线交叉策略")
+                    print("  switch a12   - 切换到Stochastic RSI策略")
+                    print("  switch a13   - 切换到EMA交叉策略")
+                    print("  switch a14   - 切换到RSI趋势线策略")
+                    print("  switch a15   - 切换到配对交易策略")
+                    print("  switch a16   - 切换到ROC动量策略")
+                    print("  switch a17   - 切换到CCI顺势策略")
+                    print("  switch a18   - 切换到IsolationForest异常检测策略")
                     print("  list         - 列出所有可用策略")
                     print("  status       - 显示当前状态")
                     print("  help         - 显示帮助信息")
@@ -1354,8 +1422,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='多策略交易系统')
-    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11'], default='a1',
-                       help='初始策略 (a1: 动量反转, a2: Z-Score, a3: 双均线成交量突破, a4: 回调交易, a5: 多因子AI融合, a6: 新闻, a7: CTA趋势)')
+    parser.add_argument('--strategy', '-s', choices=['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17', 'a18'], default='a1',
+                       help='初始策略 (a1-a7: 核心策略, a8-a17: 技术指标策略)')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='启用命令行交互模式')
     

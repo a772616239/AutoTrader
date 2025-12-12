@@ -128,17 +128,81 @@ def calculate_bollinger_bands(prices: pd.Series, window: int = 20,
 def calculate_donchian_channels(high: pd.Series, low: pd.Series, window: int = 20) -> Tuple[pd.Series, pd.Series, pd.Series]:
     """
     Calculate Donchian Channels.
-    
+
     Args:
         high: High price series
         low: Low price series
         window: Lookback window size
-        
+
     Returns:
         Tuple[pd.Series, pd.Series, pd.Series]: (Upper Channel, Middle Channel, Lower Channel)
     """
     upper = high.rolling(window=window).max()
     lower = low.rolling(window=window).min()
     middle = (upper + lower) / 2
-    
+
     return upper, middle, lower
+
+def calculate_stochastic_rsi(prices: pd.Series, rsi_period: int = 14, stoch_period: int = 14) -> pd.Series:
+    """
+    Calculate Stochastic RSI.
+
+    Args:
+        prices: Price series
+        rsi_period: RSI calculation period
+        stoch_period: Stochastic calculation period
+
+    Returns:
+        pd.Series: Stochastic RSI series (0-1)
+    """
+    # First calculate RSI
+    rsi = calculate_rsi(prices, rsi_period)
+
+    # Calculate Stochastic RSI
+    rsi_min = rsi.rolling(window=stoch_period).min()
+    rsi_max = rsi.rolling(window=stoch_period).max()
+
+    stoch_rsi = (rsi - rsi_min) / (rsi_max - rsi_min + 1e-10)
+
+    return stoch_rsi
+
+def calculate_cci(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 20) -> pd.Series:
+    """
+    Calculate Commodity Channel Index (CCI).
+
+    Args:
+        high: High price series
+        low: Low price series
+        close: Close price series
+        period: CCI calculation period
+
+    Returns:
+        pd.Series: CCI series
+    """
+    # Typical Price
+    tp = (high + low + close) / 3
+
+    # Simple Moving Average of TP
+    sma_tp = tp.rolling(window=period).mean()
+
+    # Mean Deviation
+    mean_dev = tp.rolling(window=period).apply(lambda x: abs(x - x.mean()).mean())
+
+    # CCI calculation
+    cci = (tp - sma_tp) / (0.015 * mean_dev + 1e-10)
+
+    return cci
+
+def calculate_roc(prices: pd.Series, period: int = 12) -> pd.Series:
+    """
+    Calculate Rate of Change (ROC).
+
+    Args:
+        prices: Price series
+        period: ROC calculation period
+
+    Returns:
+        pd.Series: ROC series (percentage change)
+    """
+    roc = ((prices - prices.shift(period)) / prices.shift(period)) * 100
+    return roc

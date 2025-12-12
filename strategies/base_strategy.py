@@ -122,33 +122,56 @@ class BaseStrategy:
     
     def sync_positions_from_ib(self) -> bool:
         """从IB同步持仓信息"""
+        logger.debug(f"🔄 开始从IB同步持仓信息 - 策略: {self.get_strategy_name()}")
+
         if not self.ib_trader:
+            logger.debug("❌ IB交易接口未初始化")
             return False
-        
+
         try:
             if not self.ib_trader.connected:
                 logger.info("IB未连接，跳过持仓同步")
                 return False
 
+            logger.debug("📡 正在获取IB持仓数据...")
             holdings = self.ib_trader.get_holdings()
+
+            if not holdings:
+                logger.debug("ℹ️ IB返回空持仓列表")
+                self.positions.clear()
+                self.equity = self.ib_trader.get_net_liquidation()
+                return True
+
             self.positions.clear()
-            
+            logger.debug(f"📊 处理 {len(holdings)} 个IB持仓")
+
             for pos in holdings:
-                symbol = pos.contract.symbol
-                self.positions[symbol] = {
-                    'size': pos.position,
-                    'avg_cost': pos.avgCost,
-                    'contract': pos.contract,
-                    'entry_time': datetime.now()  # 如果无法获取真实开仓时间，使用当前时间
-                }
-            
+                try:
+                    symbol = pos.contract.symbol
+                    position_size = pos.position
+                    avg_cost = pos.avgCost
+
+                    logger.debug(f"📈 同步持仓 - {symbol}: {position_size}股 @ ${avg_cost:.2f}")
+
+                    self.positions[symbol] = {
+                        'size': position_size,
+                        'avg_cost': avg_cost,
+                        'contract': pos.contract,
+                        'entry_time': datetime.now()  # 如果无法获取真实开仓时间，使用当前时间
+                    }
+                except Exception as e:
+                    logger.warning(f"处理持仓 {pos.contract.symbol if hasattr(pos, 'contract') else 'Unknown'} 时出错: {e}")
+                    continue
+
             # 同步净资产
             self.equity = self.ib_trader.get_net_liquidation()
             logger.info(f"✅ 持仓同步完成: {len(self.positions)} 个持仓, 净资产: ${self.equity:,.2f}")
             return True
-            
+
         except Exception as e:
             logger.error(f"从IB同步持仓失败: {e}")
+            import traceback
+            logger.debug(f"详细错误信息: {traceback.format_exc()}")
             return False
     
     def check_exit_conditions(self, symbol: str, current_price: float, 
@@ -901,9 +924,23 @@ class BaseStrategy:
     def generate_report(self) -> Dict:
         """生成交易报告"""
         total_trades = len(self.trade_history)
-        
+
         self.sync_positions_from_ib()
-        
+
+        # 计算性能统计
+        winning_trades = sum(1 for trade in self.trade_history if trade.get('status') == 'EXECUTED' and trade.get('profit_pct', 0) > 0)
+        losing_trades = sum(1 for trade in self.trade_history if trade.get('status') == 'EXECUTED' and trade.get('profit_pct', 0) < 0)
+        win_rate = (winning_trades / max(total_trades, 1)) * 100
+
+        # 计算平均持有时间
+        holding_times = []
+        for trade in self.trade_history:
+            if trade.get('status') == 'EXECUTED':
+                # 这里可以计算实际持有时间，暂时使用配置的默认值
+                holding_times.append(self.config.get('max_holding_minutes', 60))
+
+        avg_holding_time = sum(holding_times) / max(len(holding_times), 1)
+
         report = {
             'timestamp': datetime.now().isoformat(),
             'strategy_name': self.get_strategy_name(),
@@ -915,9 +952,17 @@ class BaseStrategy:
             'open_positions': list(self.positions.keys()),
             'signal_cache_size': len(self.signal_cache),
             'ib_connected': self.ib_trader.connected if self.ib_trader else False,
+            # 性能统计
+            'win_rate': win_rate,
+            'winning_trades': winning_trades,
+            'losing_trades': losing_trades,
+            'avg_holding_time_minutes': avg_holding_time,
+            'runtime_minutes': (datetime.now() - self.start_time).total_seconds() / 60,
         }
-        
+
         logger.info(f"📋 {self.get_strategy_name()} 报告 - 净资产: ${self.equity:,.2f}, "
-                   f"总交易: {total_trades}, 持仓: {len(self.positions)}")
-        
+                   f"总交易: {total_trades}, 胜率: {win_rate:.1f}%, 持仓: {len(self.positions)}")
+        logger.info(f"📊 性能统计 - 盈利交易: {winning_trades}, 亏损交易: {losing_trades}, "
+                   f"平均持有时间: {avg_holding_time:.1f}分钟, 运行时间: {report['runtime_minutes']:.1f}分钟")
+
         return report

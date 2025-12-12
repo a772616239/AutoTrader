@@ -23,6 +23,13 @@ from strategies.a8_rsi_oscillator import A8RSIOscillatorStrategy
 from strategies.a9_macd_crossover import A9MACDCrossoverStrategy
 from strategies.a10_bollinger_bands import A10BollingerBandsStrategy
 from strategies.a11_moving_average_crossover import A11MovingAverageCrossoverStrategy
+from strategies.a12_stochastic_rsi import A12StochasticRSIStrategy
+from strategies.a13_ema_crossover import A13EMACrossoverStrategy
+from strategies.a14_rsi_trendline import A14RSITrendlineStrategy
+from strategies.a15_pairs_trading import A15PairsTradingStrategy
+from strategies.a16_roc import A16ROCStrategy
+from strategies.a17_cci import A17CCIStrategy
+from strategies.a18_isolation_forest import A18IsolationForestStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +45,13 @@ STRATEGY_CLASSES = {
     'a9': A9MACDCrossoverStrategy,
     'a10': A10BollingerBandsStrategy,
     'a11': A11MovingAverageCrossoverStrategy,
+    'a12': A12StochasticRSIStrategy,
+    'a13': A13EMACrossoverStrategy,
+    'a14': A14RSITrendlineStrategy,
+    'a15': A15PairsTradingStrategy,
+    'a16': A16ROCStrategy,
+    'a17': A17CCIStrategy,
+    'a18': A18IsolationForestStrategy,
 }
 
 
