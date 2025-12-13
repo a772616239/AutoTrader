@@ -67,7 +67,7 @@ class A17CCIStrategy(BaseStrategy):
         # 检查成交量
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
-            if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
+            if pd.isna(avg_volume) or avg_volume < self.config['min_volume']*0.13:
                 current_volume = data['Volume'].iloc[-1] if not pd.isna(data['Volume'].iloc[-1]) else 0
                 logger.info(f"❌ {symbol} 成交量不足，跳过信号生成 - 当前成交量: {current_volume:.0f}, 平均成交量: {avg_volume:.0f}, 需要: {self.config['min_volume']}")
                 return signals

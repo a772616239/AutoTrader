@@ -104,7 +104,7 @@ CONFIG = {
             'start': '09:30',
             'end': '16:00'
         },
-        'enable_trading': True,  # 是否启用交易（False时仅测算，不提交订单）
+        'enable_trading': False,  # 是否启用交易（False时仅测算，不提交订单）
         'allow_short_selling': False,  # 是否允许无持仓卖出（空头交易）
         'same_day_sell_only': False,  # 是否限制当日不能买入
         'sell_only_mode': True,  # 是否只能提交卖出单，禁止买入
@@ -114,7 +114,7 @@ CONFIG = {
         'max_symbols_per_cycle': 50,
         'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
-        'sell_exempt_from_cap': False   ,  # 卖出是否不受per_trade_notional_cap单笔限额限制
+        'sell_exempt_from_cap': True   ,  # 卖出是否不受per_trade_notional_cap单笔限额限制
     },
     'logging': {
         'debug_mode': True,  # 调试模式：每次运行生成新日志文件，启用DEBUG级别日志

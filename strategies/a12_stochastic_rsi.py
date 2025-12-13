@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Stochastic RSI策略 (A12)
-基于随机强弱指数的超买超卖信号
+基于随机强弱指数的超买超卖信号,日内交易
 """
 import pandas as pd
 import numpy as np

@@ -835,8 +835,9 @@ class BaseStrategy:
             elif signal['position_size'] > current_pos:
                 signal['position_size'] = current_pos
 
-            # 检查卖出名义价值上限（如果开关开启）
-            if not CONFIG['trading'].get('sell_exempt_from_cap', True):
+            # 检查卖出名义价值上限（如果开关开启，且非sell_only_mode）
+            sell_only_mode = CONFIG['trading'].get('sell_only_mode', False)
+            if  not CONFIG['trading'].get('sell_exempt_from_cap', True):
                 per_trade_cap = float(self.config.get('per_trade_notional_cap', 10000.0))
                 notional_value = signal['position_size'] * current_price
                 if notional_value > per_trade_cap:
@@ -975,9 +976,14 @@ class BaseStrategy:
                 self.trade_history.append(trade)
                 self.trades_executed += 1
 
-                # 若为 PENDING，则记录警告信息
-                if mapped == 'PENDING':
+                # 设置执行结果原因
+                if mapped == 'EXECUTED':
+                    trade['reason'] = f"订单已执行 - {signal['action']} {signal['position_size']}股 {signal['symbol']}"
+                elif mapped == 'PENDING':
+                    trade['reason'] = f"订单已提交，等待执行 - {signal['action']} {signal['position_size']}股 {signal['symbol']}"
                     logger.info(f"⚠️  订单状态异常或待处理 - ID: {trade.get('order_id')}, 状态: {ib_status_str}")
+                else:
+                    trade['reason'] = f"订单状态: {mapped} - {signal['action']} {signal['position_size']}股 {signal['symbol']}"
 
                 return trade
             else:
@@ -1045,6 +1051,10 @@ class BaseStrategy:
                 action_icon = "🟢" if signal['action'] == 'BUY' else "🔴"
                 logger.info(f"{action_icon} 执行交易: {signal['symbol']} {signal['action']} "
                            f"@{current_price:.2f}, 数量: {signal['position_size']}")
+
+                # 设置模拟交易的执行结果原因
+                trade['reason'] = f"模拟交易已执行 - {signal['action']} {signal['position_size']}股 {signal['symbol']}"
+                trade['status'] = 'EXECUTED'
 
                 return trade
             # else:
