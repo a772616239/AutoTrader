@@ -170,7 +170,9 @@ class A4PullbackStrategy(BaseStrategy):
             return None
         
         # 成交量确认
-        if self.config['volume_confirmation']:
+        from config import CONFIG
+        skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
+        if not skip_volume_check and self.config['volume_confirmation']:
             if len(data) >= 10:
                 avg_volume = data['Volume'].iloc[-10:].mean()
                 current_volume = data['Volume'].iloc[-1]
@@ -255,7 +257,9 @@ class A4PullbackStrategy(BaseStrategy):
             return None
         
         # 成交量确认
-        if self.config['volume_confirmation']:
+        from config import CONFIG
+        skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
+        if not skip_volume_check and self.config['volume_confirmation']:
             if len(data) >= 10:
                 avg_volume = data['Volume'].iloc[-10:].mean()
                 current_volume = data['Volume'].iloc[-1]

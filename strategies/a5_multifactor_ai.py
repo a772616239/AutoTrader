@@ -364,37 +364,40 @@ class A5MultiFactorAI(BaseStrategy):
                     return signals
             
             # 成交量过滤 - 基于历史相对值
+            from config import CONFIG
+            skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
             volume_filter_passed = True
-            if len(data) >= self.volume_lookback_period:
-                # 计算历史平均成交量
-                historical_volumes = data[vol_col].tail(self.volume_lookback_period)
-                avg_historical_volume = historical_volumes.mean()
-                
-                if avg_historical_volume > 0:
-                    volume_ratio = current_volume / avg_historical_volume
-                    if volume_ratio < self.min_volume_ratio:
-                        logger.info(
-                            f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 历史平均 {avg_historical_volume:.0f} "
-                            f"的 {self.min_volume_ratio:.0%} (比例={volume_ratio:.2f})"
-                        )
-                        volume_filter_passed = False
+            if not skip_volume_check:
+                if len(data) >= self.volume_lookback_period:
+                    # 计算历史平均成交量
+                    historical_volumes = data[vol_col].tail(self.volume_lookback_period)
+                    avg_historical_volume = historical_volumes.mean()
+
+                    if avg_historical_volume > 0:
+                        volume_ratio = current_volume / avg_historical_volume
+                        if volume_ratio < self.min_volume_ratio:
+                            logger.info(
+                                f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 历史平均 {avg_historical_volume:.0f} "
+                                f"的 {self.min_volume_ratio:.0%} (比例={volume_ratio:.2f})"
+                            )
+                            volume_filter_passed = False
+                    else:
+                        # 历史平均成交量为0，使用绝对最小值（如果配置了）
+                        if self.min_volume_absolute and current_volume < self.min_volume_absolute:
+                            logger.info(
+                                f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 绝对最小值 {self.min_volume_absolute:.0f} "
+                                f"(历史平均为0)"
+                            )
+                            volume_filter_passed = False
                 else:
-                    # 历史平均成交量为0，使用绝对最小值（如果配置了）
+                    # 数据不足，使用绝对最小值（如果配置了）
                     if self.min_volume_absolute and current_volume < self.min_volume_absolute:
                         logger.info(
                             f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 绝对最小值 {self.min_volume_absolute:.0f} "
-                            f"(历史平均为0)"
+                            f"(数据不足{self.volume_lookback_period}天)"
                         )
                         volume_filter_passed = False
-            else:
-                # 数据不足，使用绝对最小值（如果配置了）
-                if self.min_volume_absolute and current_volume < self.min_volume_absolute:
-                    logger.info(
-                        f"[{symbol}] A5 过滤: 成交量 {current_volume:.0f} < 绝对最小值 {self.min_volume_absolute:.0f} "
-                        f"(数据不足{self.volume_lookback_period}天)"
-                    )
-                    volume_filter_passed = False
-            
+
             if not volume_filter_passed:
                 return signals
             

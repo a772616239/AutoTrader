@@ -189,9 +189,12 @@ class A3DualMAVolumeStrategy(BaseStrategy):
             return None
         
         # 最小成交量检查
-        current_volume = data['Volume'].iloc[-1]
-        if current_volume < self.config['min_volume_threshold']:
-            return None
+        from config import CONFIG
+        skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
+        if not skip_volume_check:
+            current_volume = data['Volume'].iloc[-1]
+            if current_volume < self.config['min_volume_threshold']:
+                return None
         
         # 综合置信度
         volume_confidence = min(volume_ratio / self.config['volume_surge_ratio'], 1.0)

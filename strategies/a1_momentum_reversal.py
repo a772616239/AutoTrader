@@ -681,7 +681,9 @@ class A1MomentumReversalStrategy(BaseStrategy):
             return signals
         
         # 检查成交量
-        if 'Volume' in data.columns:
+        from config import CONFIG
+        skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
+        if not skip_volume_check and 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if avg_volume < self.config['min_volume']:
                 return signals
