@@ -15,6 +15,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List
 from collections import defaultdict
+from config import STRATEGY_CONFIG_MAP
 try:
     import pytz
     HAS_PYTZ = True
@@ -27,39 +28,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from trading.ib_trader import IBTrader
 from data.data_provider import DataProvider
-from strategies.a1_momentum_reversal import A1MomentumReversalStrategy
-from strategies.a2_zscore import A2ZScoreStrategy
-from strategies.a3_dual_ma_volume import A3DualMAVolumeStrategy
-from strategies.a4_pullback import A4PullbackStrategy
-from strategies.a5_multifactor_ai import A5MultiFactorAI
-from strategies.a6_news_trading import A6NewsTrading
-from strategies.a7_cta_trend import A7CTATrendStrategy
-from strategies.a8_rsi_oscillator import A8RSIOscillatorStrategy
-from strategies.a9_macd_crossover import A9MACDCrossoverStrategy
-from strategies.a10_bollinger_bands import A10BollingerBandsStrategy
-from strategies.a11_moving_average_crossover import A11MovingAverageCrossoverStrategy
-from strategies.a12_stochastic_rsi import A12StochasticRSIStrategy
-from strategies.a13_ema_crossover import A13EMACrossoverStrategy
-from strategies.a14_rsi_trendline import A14RSITrendlineStrategy
-from strategies.a15_pairs_trading import A15PairsTradingStrategy
-from strategies.a16_roc import A16ROCStrategy
-from strategies.a17_cci import A17CCIStrategy
-from strategies.a18_isolation_forest import A18IsolationForestStrategy
-from strategies.a22_super_trend import A22SuperTrendStrategy
-from strategies.a23_aroon_oscillator import A23AroonOscillatorStrategy
-from strategies.a24_ultimate_oscillator import A24UltimateOscillatorStrategy
-from strategies.a25_pairs_trading import A25PairsTradingStrategy
-from strategies.a26_williams_r import A26WilliamsRStrategy
-from strategies.a27_minervini_trend import A27MinerviniTrendStrategy
-from strategies.a28_true_strength_index import A28TrueStrengthIndexStrategy
-from strategies.a29_stochastic_oscillator import A29StochasticOscillatorStrategy
-from strategies.a30_ibd_rs_rating import A30IBDRSRatingStrategy
-from strategies.a31_money_flow_index import A31MoneyFlowIndexStrategy
-from strategies.a32_keltner_channels import A32KeltnerChannelsStrategy
-from strategies.a33_pivot_points import A33PivotPointsStrategy
-from strategies.a34_linear_regression import A34LinearRegressionStrategy
-from strategies.a35_mlp_neural_network import A35MLPNeuralNetworkStrategy
-
 from strategy_manager import StrategyManager
 
 warnings.filterwarnings('ignore')
@@ -665,65 +633,33 @@ def generate_end_of_day_profit_report(target_date=None):
 # ==================== 策略工厂 ====================
 class StrategyFactory:
     """策略工厂，用于创建和切换策略"""
-    
-    STRATEGIES = {
-        'a1': A1MomentumReversalStrategy,
-        'a2': A2ZScoreStrategy,
-        'a3': A3DualMAVolumeStrategy,
-        'a4': A4PullbackStrategy,
-        'a5': A5MultiFactorAI,
-        'a6': A6NewsTrading,
-        'a7': A7CTATrendStrategy,
-        'a8': A8RSIOscillatorStrategy,
-        'a9': A9MACDCrossoverStrategy,
-        'a10': A10BollingerBandsStrategy,
-        'a11': A11MovingAverageCrossoverStrategy,
-        'a12': A12StochasticRSIStrategy,
-        'a13': A13EMACrossoverStrategy,
-        'a14': A14RSITrendlineStrategy,
-        'a15': A15PairsTradingStrategy,
-        'a16': A16ROCStrategy,
-        'a17': A17CCIStrategy,
-        'a18': A18IsolationForestStrategy,
-        'a22': A22SuperTrendStrategy,
-        'a23': A23AroonOscillatorStrategy,
-        'a24': A24UltimateOscillatorStrategy,
-        'a25': A25PairsTradingStrategy,
-        'a26': A26WilliamsRStrategy,
-        'a27': A27MinerviniTrendStrategy,
-        'a28': A28TrueStrengthIndexStrategy,
-        'a29': A29StochasticOscillatorStrategy,
-        'a30': A30IBDRSRatingStrategy,
-        'a31': A31MoneyFlowIndexStrategy,
-        'a32': A32KeltnerChannelsStrategy,
-        'a33': A33PivotPointsStrategy,
-        'a34': A34LinearRegressionStrategy,
-        'a35': A35MLPNeuralNetworkStrategy
-    }
-    
+
     @classmethod
     def create_strategy(cls, strategy_name: str, config: Dict = None, ib_trader = None):
         """
         创建策略实例
-        
+
         参数:
             strategy_name: 策略名称 ('a1' 或 'a2')
             config: 策略配置
             ib_trader: IB交易接口
-            
+
         返回:
             策略实例
         """
-        if strategy_name not in cls.STRATEGIES:
-            raise ValueError(f"未知的策略: {strategy_name}。可用策略: {list(cls.STRATEGIES.keys())}")
-        
-        strategy_class = cls.STRATEGIES[strategy_name]
+        from strategy_manager import STRATEGY_CLASSES
+
+        if strategy_name not in STRATEGY_CLASSES:
+            raise ValueError(f"未知的策略: {strategy_name}。可用策略: {list(STRATEGY_CLASSES.keys())}")
+
+        strategy_class = STRATEGY_CLASSES[strategy_name]
         return strategy_class(config=config, ib_trader=ib_trader)
     
     @classmethod
     def list_strategies(cls) -> List[str]:
         """获取所有可用策略列表"""
-        return list(cls.STRATEGIES.keys())
+        from strategy_manager import STRATEGY_CLASSES
+        return list(STRATEGY_CLASSES.keys())
     
     @classmethod
     def get_strategy_description(cls, strategy_name: str) -> str:
@@ -1380,7 +1316,7 @@ class TradingSystem:
                         result = exec_strategy.execute_signal(sig, current_price)
                         
                         # 对所有策略都生成信号（使用相同的df和indicators）
-                        from config import STRATEGY_CONFIG_MAP
+                     
                         all_strategies = list(STRATEGY_CONFIG_MAP.keys())
                         all_signals = {}
                         for strategy_name in all_strategies:
@@ -1468,7 +1404,7 @@ class TradingSystem:
         logger.info("🚀 _generate_preselect_signals方法被调用")
         try:
             # 从config获取所有preselect_a2股票
-            preselect_symbols = list(CONFIG.get('symbol_strategy_map', {}).keys())
+            preselect_symbols = list(config_module.CONFIG.get('symbol_strategy_map', {}).keys())
             logger.info(f"📊 获取到preselect_symbols: {len(preselect_symbols)} 个")
             if not preselect_symbols:
                 logger.info("⚠️ 未找到preselect_a2股票配置")
@@ -1503,7 +1439,7 @@ class TradingSystem:
                         try:
                             # 获取策略配置
                             cfg_key = STRATEGY_CONFIG_MAP.get(strategy_name)
-                            strat_cfg = CONFIG.get(cfg_key, {}) if cfg_key else {}
+                            strat_cfg = config_module.CONFIG.get(cfg_key, {}) if cfg_key else {}
 
                             # 创建策略实例 - 使用strategy_manager中的STRATEGY_CLASSES
                             try:
@@ -1644,7 +1580,14 @@ class TradingSystem:
 
         logger.info(f"  IB连接: {'✅' if report['ib_connected'] else '❌'}")
 
-        total_signals = sum(len(sigs) for sigs in self.last_signals.values())
+        # 处理 self.last_signals 可能是字典或列表的情况
+        if isinstance(self.last_signals, dict):
+            total_signals = sum(len(sigs) for sigs in self.last_signals.values())
+        elif isinstance(self.last_signals, list):
+            total_signals = len(self.last_signals)
+        else:
+            total_signals = 0
+
         if total_signals > 0:
             logger.info(f"  本期信号: {total_signals}")
     
