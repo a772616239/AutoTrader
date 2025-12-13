@@ -33,7 +33,7 @@ class A30IBDRSRatingStrategy(BaseStrategy):
 
                 # IBD RS参数
                 'rs_lookback_period': 252,  # 相对强度回望期间 (1年)
-                'rs_rating_threshold': 80,  # RS评级阈值
+                'rs_rating_threshold': 70,  # RS评级阈值（放宽限制）
                 'momentum_weight': 0.6,     # 近期动量权重
                 'trend_weight': 0.4,        # 长期趋势权重
 
@@ -46,7 +46,7 @@ class A30IBDRSRatingStrategy(BaseStrategy):
                 # 交易过滤
                 'trading_hours_only': True,
                 'avoid_earnings': True,
-                'min_volume_threshold': 200000,  # 最小成交量
+                'min_volume_threshold': 5000,  # 最小成交量（放宽限制）
                 'min_price': 10.0,
                 'max_price': None,
 

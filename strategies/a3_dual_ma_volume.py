@@ -32,14 +32,14 @@ class A3DualMAVolumeStrategy(BaseStrategy):
             'slow_ma_period': 21,
             'ema_or_sma': 'EMA',
             
-            # 成交量参数
+            # 成交量参数（放宽限制）
             'volume_sma_period': 20,
-            'volume_surge_ratio': 1.3,
-            'min_volume_threshold': 500000,
+            'volume_surge_ratio': 1.1,
+            'min_volume_threshold': 5000,
             
-            # 入场条件
-            'entry_confirmation_bars': 2,
-            'price_above_slow_ma': True,
+            # 入场条件（放宽限制）
+            'entry_confirmation_bars': 1,
+            'price_above_slow_ma': False,
             'use_atr_stop_loss': True,
             'atr_stop_multiple': 1.5,
             
@@ -49,11 +49,11 @@ class A3DualMAVolumeStrategy(BaseStrategy):
             'max_holding_minutes': 60,
             'trailing_stop_pct': 0.02,
             
-            # 时间过滤
-            'trading_start_time': '09:45',
-            'trading_end_time': '15:30',
-            'avoid_open_hour': True,
-            'avoid_close_hour': True,
+            # 时间过滤（放宽限制）
+            'trading_start_time': '09:30',
+            'trading_end_time': '15:00',
+            'avoid_open_hour': False,
+            'avoid_close_hour': False,
             
             # 风险管理
             'max_daily_loss_pct': 0.05,
@@ -163,7 +163,7 @@ class A3DualMAVolumeStrategy(BaseStrategy):
     def detect_buy_signal(self, symbol: str, data: pd.DataFrame, 
                          indicators_dict: Dict) -> Optional[Dict]:
         """检测买入信号"""
-        min_required = max(self.config['fast_ma_period'], self.config['slow_ma_period']) + 5
+        min_required = max(self.config['fast_ma_period'], self.config['slow_ma_period']) + 2
         if len(data) < min_required:
             return None
         
@@ -319,7 +319,7 @@ class A3DualMAVolumeStrategy(BaseStrategy):
         """分析流程"""
         signals = []
         
-        if data.empty or len(data) < 30:
+        if data.empty or len(data) < 20:
             return signals
         
         # 1. 优先检查持仓的风控 (止损/止盈)

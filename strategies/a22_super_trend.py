@@ -36,7 +36,7 @@ class A22SuperTrendStrategy(BaseStrategy):
                 'atr_period': 14,  # ATR周期
                 'factor': 3.0,  # 乘数因子
                 'trend_confirmation': 2,  # 趋势确认周期
-                'min_trend_strength': 0.001,  # 最小趋势强度
+                'min_trend_strength': 0.0005,  # 最小趋势强度（放宽限制）
 
                 # 风险管理
                 'stop_loss_pct': 0.03,  # 3% 止损
@@ -47,7 +47,7 @@ class A22SuperTrendStrategy(BaseStrategy):
                 # 交易过滤
                 'trading_hours_only': True,
                 'avoid_earnings': True,
-                'min_volume_threshold': 100000,  # 最小成交量
+                'min_volume_threshold': 50000,  # 最小成交量（放宽限制）
                 'min_price': 5.0,
                 'max_price': None,
 
@@ -104,7 +104,7 @@ class A22SuperTrendStrategy(BaseStrategy):
         if 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(10).mean().iloc[-1]
             current_volume = data['Volume'].iloc[-1]
-            if current_volume < avg_volume * 1.2:  # 成交量至少放大20%
+            if current_volume < avg_volume * 1.1:  # 成交量至少放大10%（放宽限制）
                 return None
 
         # 价格过滤

@@ -29,9 +29,9 @@ class A1MomentumReversalStrategy(BaseStrategy):
             'midday_session': ('10:30', '14:30'),
             'afternoon_session': ('14:30', '15:00'),
             
-            # 信号参数
-            'rsi_overbought': 72,
-            'rsi_oversold': 28,
+            # 信号参数（放宽RSI限制）
+            'rsi_overbought': 75,
+            'rsi_oversold': 25,
             'price_deviation_threshold': 2.5,
             'volume_surge_multiplier': 1.5,
             'min_price_change_for_momentum': 0.005,  # 动量确认的最小价格变化
@@ -75,8 +75,8 @@ class A1MomentumReversalStrategy(BaseStrategy):
             'same_symbol_cooldown': 15,
             
             # 交易参数
-            'min_volume': 10000,
-            'min_data_points': 30,
+            'min_volume': 5000,
+            'min_data_points': 20,
             'commission_rate': 0.0005,
             
             # IB交易参数
@@ -815,9 +815,9 @@ class A1MomentumReversalStrategy(BaseStrategy):
         
         latest = data.iloc[-1]
         
-        # RSI条件
+        # RSI条件（放宽限制）
         rsi = indicators.get('RSI', 50)
-        if not (50 <= rsi <= 67):
+        if not (45 <= rsi <= 75):
             return None
         
         # 价格偏离均线
@@ -826,13 +826,13 @@ class A1MomentumReversalStrategy(BaseStrategy):
             return None
         
         price_deviation = (latest['Close'] - indicators[ma_key]) / indicators[ma_key] * 100
-        if abs(price_deviation) < 0.3:
+        if abs(price_deviation) < 0.1:
             return None
         
-        # 成交量确认
+        # 成交量确认（放宽限制）
         if 'Volume' in data.columns and len(data) >= 5:
             recent_volume = data['Volume'].iloc[-5:].mean()
-            if latest['Volume'] < recent_volume * 1.05:
+            if latest['Volume'] < recent_volume * 1.0:
                 return None
         
         # 计算信号强度
@@ -896,12 +896,12 @@ class A1MomentumReversalStrategy(BaseStrategy):
         if not ((is_overbought and near_high) or (is_oversold and near_low)):
             return None
         
-        # 成交量确认
+        # 成交量确认（放宽限制）
         volume_ok = True
         if 'Volume' in data.columns and len(data) >= 10:
             avg_volume = data['Volume'].iloc[-10:].mean()
             volume_ratio = latest['Volume'] / avg_volume
-            volume_ok = 0.5 < volume_ratio < 2.5
+            volume_ok = 0.3 < volume_ratio < 3.0
         
         if not volume_ok:
             return None

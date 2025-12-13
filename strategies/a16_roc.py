@@ -32,10 +32,10 @@ class A16ROCStrategy(BaseStrategy):
                 'per_trade_notional_cap': 700.0,  # 单笔交易美元上限
                 'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
 
-                # ROC参数
+                # ROC参数（放宽限制）
                 'roc_period': 12,
-                'bullish_threshold': 10,  # ROC > 10% 为强势上涨
-                'bearish_threshold': -10,  # ROC < -10% 为强势下跌
+                'bullish_threshold': 5,  # ROC > 5% 为强势上涨
+                'bearish_threshold': -5,  # ROC < -5% 为强势下跌
 
                 # 风险管理
                 'stop_loss_pct': 0.03,  # 止损百分比
@@ -45,9 +45,9 @@ class A16ROCStrategy(BaseStrategy):
                 # 防重复交易
                 'signal_cooldown_minutes': 15,
 
-                # 交易参数
-                'min_volume': 4000,
-                'min_data_points': 25,  # 需要足够数据计算ROC
+                # 交易参数（放宽限制）
+                'min_volume': 2000,
+                'min_data_points': 20,  # 需要足够数据计算ROC
 
                 # IB交易参数
                 'ib_order_type': 'MKT',

@@ -62,9 +62,9 @@ class A18IsolationForestStrategy(BaseStrategy):
         """默认配置"""
         config = super()._default_config()
         config.update({
-            'contamination': 0.05,   # 异常值比例 (5% - 适合股票数据)
-            'cooldown_days': 7,      # 交易冷却期（天）
-            'min_data_points': 50,   # 最小数据点数量
+            'contamination': 0.1,   # 异常值比例 (10% - 放宽限制)
+            'cooldown_days': 3,      # 交易冷却期（天）
+            'min_data_points': 30,   # 最小数据点数量
             'model_retrain_days': 30,  # 模型重训练间隔（天）
             'stop_loss_pct': 0.02,   # 止损百分比
             'take_profit_pct': 0.05, # 止盈百分比

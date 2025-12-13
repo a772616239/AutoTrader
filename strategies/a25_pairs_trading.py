@@ -47,7 +47,7 @@ class A25PairsTradingStrategy(BaseStrategy):
                 # 交易过滤
                 'trading_hours_only': True,
                 'avoid_earnings': True,
-                'min_volume_threshold': 500000,  # 最小成交量
+                'min_volume_threshold': 5000,  # 最小成交量（放宽限制）
                 'min_price': 10.0,
                 'max_price': None,
 

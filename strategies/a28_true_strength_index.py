@@ -46,7 +46,7 @@ class A28TrueStrengthIndexStrategy(BaseStrategy):
                 # 交易过滤
                 'trading_hours_only': True,
                 'avoid_earnings': True,
-                'min_volume_threshold': 100000,  # 最小成交量
+                'min_volume_threshold': 5000,  # 最小成交量（放宽限制）
                 'min_price': 5.0,
                 'max_price': None,
 

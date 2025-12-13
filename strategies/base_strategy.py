@@ -376,7 +376,7 @@ class BaseStrategy:
                 if new_trades:
                     existing_trades.extend(new_trades)
                     with open(file_path, 'w') as f:
-                        json.dump(existing_trades[-200:], f, indent=2)  # 保留最近200条
+                        json.dump(existing_trades[-2000:], f, indent=2)  # 保留最近1000条
                     logger.info(f"✅ 补全了 {len(new_trades)} 个IB订单到trades.json")
                 else:
                     logger.info("ℹ️ 无需补全IB订单")
@@ -1098,7 +1098,7 @@ class BaseStrategy:
                 
                 # 写入文件
                 with open(file_path, 'w') as f:
-                    json.dump(existing_trades[-100:], f, indent=2) # 只保留最近100条
+                    json.dump(existing_trades[-2000:], f, indent=2) # 只保留最近1000条
             except Exception as e:
                 logger.error(f"保存交易记录失败: {e}")
     

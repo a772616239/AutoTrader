@@ -33,8 +33,8 @@ class A31MoneyFlowIndexStrategy(BaseStrategy):
 
                 # Money Flow Index参数
                 'mfi_period': 14,  # MFI周期
-                'overbought_level': 80,  # 超买水平
-                'oversold_level': 20,   # 超卖水平
+                'overbought_level': 75,  # 超买水平（放宽限制）
+                'oversold_level': 25,   # 超卖水平（放宽限制）
 
                 # 风险管理
                 'stop_loss_pct': 0.03,  # 3% 止损
@@ -45,7 +45,7 @@ class A31MoneyFlowIndexStrategy(BaseStrategy):
                 # 交易过滤
                 'trading_hours_only': True,
                 'avoid_earnings': True,
-                'min_volume_threshold': 100000,  # 最小成交量
+                'min_volume_threshold': 5000,  # 最小成交量（放宽限制）
                 'min_price': 5.0,
                 'max_price': None,
 

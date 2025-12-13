@@ -32,10 +32,10 @@ class A15PairsTradingStrategy(BaseStrategy):
                 'per_trade_notional_cap': 500.0,  # 单笔交易美元上限（更严格）
                 'max_position_notional': 30000.0,  # 单股总仓位上限（美元，更严格）
 
-                # 配对参数（简化版 - 使用固定配对）
+                # 配对参数（简化版 - 使用固定配对，放宽限制）
                 'pair_symbol': 'SPY',  # 配对基准（实际应动态选择协整配对）
                 'lookback_period': 60,  # 价差计算回溯期
-                'entry_threshold': 2.0,  # 价差标准差阈值
+                'entry_threshold': 1.5,  # 价差标准差阈值
                 'exit_threshold': 0.5,   # 平仓阈值
 
                 # 风险管理
@@ -43,12 +43,12 @@ class A15PairsTradingStrategy(BaseStrategy):
                 'take_profit_pct': 0.08,  # 较宽松的止盈
                 'max_holding_minutes': 240,  # 较长持有时间
 
-                # 防重复交易
-                'signal_cooldown_minutes': 30,
+                # 防重复交易（放宽限制）
+                'signal_cooldown_minutes': 15,
 
-                # 交易参数
-                'min_volume': 10000,
-                'min_data_points': 70,  # 需要足够数据计算价差
+                # 交易参数（放宽限制）
+                'min_volume': 5000,
+                'min_data_points': 50,  # 需要足够数据计算价差
 
                 # IB交易参数
                 'ib_order_type': 'MKT',

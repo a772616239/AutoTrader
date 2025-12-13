@@ -32,9 +32,9 @@ class A14RSITrendlineStrategy(BaseStrategy):
                 'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
                 'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
 
-                # RSI参数
+                # RSI参数（放宽限制）
                 'rsi_period': 14,
-                'rsi_oversold_threshold': 33,  # 超卖阈值
+                'rsi_oversold_threshold': 35,  # 超卖阈值
                 'rsi_lookback_days': 2,  # RSI回溯天数
 
                 # 趋势参数
@@ -46,12 +46,12 @@ class A14RSITrendlineStrategy(BaseStrategy):
                 'take_profit_pct': 0.06,  # 适中止盈
                 'max_holding_minutes': 480,  # 8小时
 
-                # 防重复交易
-                'signal_cooldown_minutes': 30,
+                # 防重复交易（放宽限制）
+                'signal_cooldown_minutes': 15,
 
-                # 交易参数
-                'min_volume': 10000,
-                'min_data_points': 220,  # 需要足够数据计算200日均线
+                # 交易参数（放宽限制）
+                'min_volume': 5000,
+                'min_data_points': 150,  # 需要足够数据计算200日均线
 
                 # IB交易参数
                 'ib_order_type': 'MKT',
@@ -152,8 +152,8 @@ class A14RSITrendlineStrategy(BaseStrategy):
         confidence += min(trend_strength / 10.0, 0.2)  # 趋势强度贡献
         confidence += min(rsi_oversold_strength / 10.0, 0.3)  # RSI超卖贡献
 
-        # 确保价格在均线上方有一定距离
-        if trend_strength < 1.0:  # 至少1%的偏离
+        # 确保价格在均线上方有一定距离（放宽限制）
+        if trend_strength < 0.5:  # 至少0.5%的偏离
             confidence -= 0.1
 
         confidence = min(max(confidence, 0.3), 0.9)

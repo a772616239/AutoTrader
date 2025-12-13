@@ -32,10 +32,10 @@ class A10BollingerBandsStrategy(BaseStrategy):
                 'per_trade_notional_cap': 4000.0,  # 单笔交易美元上限
                 'max_position_notional': 60000.0,  # 单股总仓位上限（美元）
 
-                # 布林带参数
+                # 布林带参数（放宽限制）
                 'bollinger_period': 20,
                 'bollinger_std': 2.0,
-                'breakout_threshold': 0.1,  # 突破百分比阈值
+                'breakout_threshold': 0.05,  # 突破百分比阈值
 
                 # 风险管理
                 'stop_loss_pct': 0.02,  # 降低限制
@@ -44,12 +44,12 @@ class A10BollingerBandsStrategy(BaseStrategy):
                 'trailing_stop_activation': 0.04,
                 'trailing_stop_distance': 0.025,
 
-                # 防重复交易
-                'signal_cooldown_minutes': 20,
+                # 防重复交易（放宽限制）
+                'signal_cooldown_minutes': 10,
 
-                # 交易参数
-                'min_volume': 10000,
-                'min_data_points': 25,  # 需要足够数据计算布林带
+                # 交易参数（放宽限制）
+                'min_volume': 5000,
+                'min_data_points': 20,  # 需要足够数据计算布林带
 
                 # IB交易参数
                 'ib_order_type': 'MKT',
