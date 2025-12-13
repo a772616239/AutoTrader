@@ -115,6 +115,7 @@ CONFIG = {
         'close_all_positions_before_market_close': False,  # 是否在收盘前清仓所有持仓（已启用）
         'close_positions_time': '15:45',  # 清仓时间（美东时间，默认收盘前15分钟）
         'sell_exempt_from_cap': True   ,  # 卖出是否不受per_trade_notional_cap单笔限额限制
+        'skip_volume_check': True,  # 是否跳过成交量检测（用于测试或特殊情况）
     },
     'logging': {
         'debug_mode': True,  # 调试模式：每次运行生成新日志文件，启用DEBUG级别日志
