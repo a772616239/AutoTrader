@@ -18,46 +18,41 @@ class A24UltimateOscillatorStrategy(BaseStrategy):
 
     def _default_config(self) -> Dict:
         """默认配置"""
-        from config import CONFIG
-        strategy_key = 'strategy_a24'
-        if strategy_key in CONFIG:
-            return CONFIG[strategy_key]
-        else:
-            return {
-                # 资金管理
-                'initial_capital': 50000.0,
-                'risk_per_trade': 0.015,  # 1.5% 单笔风险
-                'max_position_size': 0.08,  # 8% 最大仓位
-                'per_trade_notional_cap': 5000.0,
-                'max_position_notional': 40000.0,
+        return {
+            # 资金管理
+            'initial_capital': 50000.0,
+            'risk_per_trade': 0.015,  # 1.5% 单笔风险
+            'max_position_size': 0.08,  # 8% 最大仓位
+            'per_trade_notional_cap': 5000.0,
+            'max_position_notional': 40000.0,
 
-                # Ultimate Oscillator参数
-                'short_period': 7,   # 短期周期
-                'medium_period': 14, # 中期周期
-                'long_period': 28,   # 长期周期
-                'overbought_level': 70,  # 超买水平
-                'oversold_level': 30,   # 超卖水平
+            # Ultimate Oscillator参数
+            'short_period': 7,   # 短期周期
+            'medium_period': 14, # 中期周期
+            'long_period': 28,   # 长期周期
+            'overbought_level': 70,  # 超买水平
+            'oversold_level': 30,   # 超卖水平
 
-                # 风险管理
-                'stop_loss_pct': 0.03,  # 3% 止损
-                'take_profit_pct': 0.06,  # 6% 止盈
-                'max_holding_days': 7,  # 最大持有7天
-                'trailing_stop_pct': 0.02,  # 2% 追踪止损
+            # 风险管理
+            'stop_loss_pct': 0.03,  # 3% 止损
+            'take_profit_pct': 0.06,  # 6% 止盈
+            'max_holding_days': 7,  # 最大持有7天
+            'trailing_stop_pct': 0.02,  # 2% 追踪止损
 
-                # 交易过滤
-                'trading_hours_only': True,
-                'avoid_earnings': True,
-                'min_volume_threshold': 50000,  # 最小成交量（放宽限制）
-                'min_price': 5.0,
-                'max_price': None,
+            # 交易过滤
+            'trading_hours_only': True,
+            'avoid_earnings': True,
+            'min_volume_threshold': 50000,  # 最小成交量（放宽限制）
+            'min_price': 5.0,
+            'max_price': None,
 
-                # 防重复交易
-                'signal_cooldown_minutes': 15,  # 15分钟冷却
+            # 防重复交易
+            'signal_cooldown_minutes': 15,  # 15分钟冷却
 
-                # IB交易参数
-                'ib_order_type': 'MKT',
-                'ib_limit_offset': 0.01,
-            }
+            # IB交易参数
+            'ib_order_type': 'MKT',
+            'ib_limit_offset': 0.01,
+        }
 
     def get_strategy_name(self) -> str:
         """获取策略名称"""
