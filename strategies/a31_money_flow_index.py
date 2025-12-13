@@ -94,9 +94,12 @@ class A31MoneyFlowIndexStrategy(BaseStrategy):
             return None
 
         # 成交量确认 - MFI本身就是成交量指标，这里检查成交量变化
-        volume_change = (data['Volume'].iloc[-1] - data['Volume'].iloc[-5:-1].mean()) / data['Volume'].iloc[-5:-1].mean()
-        if volume_change < 0.1:  # 成交量至少增加10%
-            return None
+        from config import CONFIG
+        skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
+        if not skip_volume_check:
+            volume_change = (data['Volume'].iloc[-1] - data['Volume'].iloc[-5:-1].mean()) / data['Volume'].iloc[-5:-1].mean()
+            if volume_change < 0.1:  # 成交量至少增加10%
+                return None
 
         # 价格过滤
         if current_price < self.config['min_price']:

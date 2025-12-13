@@ -65,7 +65,9 @@ class A33PivotPointsStrategy(BaseStrategy):
             return signals
 
         # 检查成交量 - 盘前时段跳过成交量检查
-        if not self._is_pre_market_hours() and 'Volume' in data.columns:
+        from config import CONFIG
+        skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
+        if not skip_volume_check and not self._is_pre_market_hours() and 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(window=10).mean().iloc[-1]
             if pd.isna(avg_volume) or avg_volume < self.config['min_volume']:
                 return signals

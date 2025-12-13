@@ -89,7 +89,9 @@ class A23AroonOscillatorStrategy(BaseStrategy):
             return None
 
         # 成交量确认
-        if 'Volume' in data.columns:
+        from config import CONFIG
+        skip_volume_check = CONFIG.get('trading', {}).get('skip_volume_check', False)
+        if not skip_volume_check and 'Volume' in data.columns:
             avg_volume = data['Volume'].rolling(10).mean().iloc[-1]
             current_volume = data['Volume'].iloc[-1]
             if current_volume < avg_volume * 1.2:  # 成交量至少放大20%
