@@ -52,9 +52,15 @@ class A7CTATrendStrategy(BaseStrategy):
             return []
 
         current_price = data['Close'].iloc[-1]
-        
-        # 0. 检查通用出场条件 (止损/止盈) - 假设此方法已在 BaseStrategy 中定义
-        exit_signal = self.check_exit_conditions(symbol, current_price) 
+
+        # 0. 优先检查强制止损止盈条件
+        current_time = datetime.now()
+        forced_exit = self.check_forced_exit_conditions(symbol, current_price, current_time, data)
+        if forced_exit:
+            return [forced_exit]
+
+        # 1. 检查通用出场条件 (止损/止盈)
+        exit_signal = self.check_exit_conditions(symbol, current_price)
         if exit_signal:
             return [exit_signal]
             

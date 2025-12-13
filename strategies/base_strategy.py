@@ -468,17 +468,127 @@ class BaseStrategy:
             logger.info(f"详细错误信息: {traceback.format_exc()}")
             return False
     
-    def check_exit_conditions(self, symbol: str, current_price: float, 
+    def check_forced_exit_conditions(self, symbol: str, current_price: float,
+                                   current_time: datetime = None, data: pd.DataFrame = None) -> Optional[Dict]:
+        """
+        强制止损止盈检查 - 日内交易专用，优先级最高
+
+        强制规则：
+        1. 强制止损：亏损超过2%立即止损（不考虑其他条件）
+        2. 强制止盈：盈利超过5%立即止盈（不考虑其他条件）
+        3. 强制时间限制：持仓超过4小时强制平仓
+        4. 强制波动止损：价格波动超过3%且持续下跌时止损
+
+        此方法在所有策略中优先调用，确保风险控制
+        """
+        if symbol not in self.positions:
+            return None
+
+        if current_time is None:
+            current_time = datetime.now()
+
+        position = self.positions[symbol]
+        avg_cost = position['avg_cost']
+        position_size = position['size']
+        entry_time = position.get('entry_time', current_time - timedelta(minutes=60))
+
+        # 计算当前盈亏百分比
+        if position_size > 0:
+            price_change_pct = (current_price - avg_cost) / avg_cost
+        else:
+            price_change_pct = (avg_cost - current_price) / avg_cost
+
+        # === 强制止损：亏损超过2% ===
+        forced_stop_loss_pct = -0.02  # 2%强制止损
+        if price_change_pct <= forced_stop_loss_pct:
+            logger.critical(f"🚨 {symbol} 强制止损触发: 亏损{price_change_pct*100:.2f}% >= 2% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
+            return {
+                'symbol': symbol,
+                'signal_type': 'FORCED_STOP_LOSS',
+                'action': 'SELL' if position_size > 0 else 'BUY',
+                'price': current_price,
+                'reason': f"强制止损: 亏损{price_change_pct*100:.2f}% >= 2%",
+                'position_size': abs(position_size),
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0,
+                'forced': True  # 标记为强制信号
+            }
+
+        # === 强制止盈：盈利超过5% ===
+        forced_take_profit_pct = 0.05  # 5%强制止盈
+        if price_change_pct >= forced_take_profit_pct:
+            logger.info(f"🎯 {symbol} 强制止盈触发: 盈利{price_change_pct*100:.2f}% >= 5% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
+            return {
+                'symbol': symbol,
+                'signal_type': 'FORCED_TAKE_PROFIT',
+                'action': 'SELL' if position_size > 0 else 'BUY',
+                'price': current_price,
+                'reason': f"强制止盈: 盈利{price_change_pct*100:.2f}% >= 5%",
+                'position_size': abs(position_size),
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0,
+                'forced': True
+            }
+
+        # === 强制时间限制：持仓超过4小时 ===
+        max_holding_hours = 4  # 4小时强制平仓
+        holding_hours = (current_time - entry_time).total_seconds() / 3600
+        if holding_hours > max_holding_hours:
+            logger.warning(f"⏰ {symbol} 强制时间限制: 持仓{holding_hours:.1f}小时 > {max_holding_hours}小时")
+            return {
+                'symbol': symbol,
+                'signal_type': 'FORCED_TIME_EXIT',
+                'action': 'SELL' if position_size > 0 else 'BUY',
+                'price': current_price,
+                'reason': f"强制时间限制: 持仓{holding_hours:.1f}小时 > {max_holding_hours}小时",
+                'position_size': abs(position_size),
+                'profit_pct': price_change_pct * 100,
+                'confidence': 1.0,
+                'forced': True
+            }
+
+        # === 强制波动止损：基于ATR的动态止损 ===
+        if data is not None and len(data) >= 20:
+            try:
+                # 计算ATR
+                high_low = data['High'] - data['Low']
+                high_close = (data['High'] - data['Close'].shift(1)).abs()
+                low_close = (data['Low'] - data['Close'].shift(1)).abs()
+                true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+                atr = true_range.rolling(window=14).mean().iloc[-1]
+
+                if atr > 0:
+                    # ATR动态止损：2倍ATR
+                    atr_stop_loss = 2.0 * atr / avg_cost
+                    if price_change_pct <= -atr_stop_loss:
+                        logger.warning(f"📊 {symbol} ATR动态止损: 亏损{price_change_pct*100:.2f}% > {atr_stop_loss*100:.2f}% (ATR: ${atr:.2f})")
+                        return {
+                            'symbol': symbol,
+                            'signal_type': 'FORCED_ATR_STOP_LOSS',
+                            'action': 'SELL' if position_size > 0 else 'BUY',
+                            'price': current_price,
+                            'reason': f"ATR动态止损: 亏损{price_change_pct*100:.2f}% > {atr_stop_loss*100:.2f}%",
+                            'position_size': abs(position_size),
+                            'profit_pct': price_change_pct * 100,
+                            'confidence': 1.0,
+                            'forced': True
+                        }
+            except Exception as e:
+                logger.debug(f"ATR计算失败: {e}")
+
+        return None
+
+    def check_exit_conditions(self, symbol: str, current_price: float,
                              current_time: datetime = None) -> Optional[Dict]:
         """
         检查卖出条件 - 子类可以重写此方法
         """
         if symbol not in self.positions:
             return None
-        
+
         if current_time is None:
             current_time = datetime.now()
-        
+
         position = self.positions[symbol]
         avg_cost = position['avg_cost']
         position_size = position['size']
@@ -514,11 +624,11 @@ class BaseStrategy:
                 price_change_pct = (current_price - avg_cost) / avg_cost
             else:
                 price_change_pct = (avg_cost - current_price) / avg_cost
-        
+
         # 简单的退出条件 - 使用配置或默认值
         stop_loss_pct = -abs(self.config.get('stop_loss_pct', 0.015))  # 确保为负值，降低限制
         take_profit_pct = abs(self.config.get('take_profit_pct', 0.025))  # 确保为正值，降低限制
-        
+
         # 检查最大持有时间（优先检查分钟级别，适用于日内交易）
         max_holding_minutes = self.config.get('max_holding_minutes', None)
         if max_holding_minutes:
@@ -534,7 +644,7 @@ class BaseStrategy:
                     'profit_pct': price_change_pct * 100,
                     'confidence': 1.0
                 }
-        
+
         # 检查最大持有天数（适用于多日持仓策略）
         max_holding_days = self.config.get('max_holding_days', None)
         if max_holding_days:
@@ -550,7 +660,7 @@ class BaseStrategy:
                     'profit_pct': price_change_pct * 100,
                     'confidence': 1.0
                 }
-        
+
         # 收盘前强制平仓检查（适用于日内交易策略）
         force_close_time = self.config.get('force_close_time', None)
         if force_close_time:
@@ -570,7 +680,7 @@ class BaseStrategy:
                     }
             except Exception as e:
                 logger.info(f"解析force_close_time失败: {e}")
-        
+
         # 止损检查（优先检查，保护资金）
         if price_change_pct <= stop_loss_pct:
             logger.warning(f"⚠️ {symbol} 触发止损: 亏损{price_change_pct*100:.2f}% (成本: ${avg_cost:.2f}, 当前: ${current_price:.2f})")
@@ -584,7 +694,7 @@ class BaseStrategy:
                 'profit_pct': price_change_pct * 100,
                 'confidence': 1.0  # 止损信号置信度最高
             }
-        
+
         # 增强止盈检查 - 基于盈利百分比的多级判断
         take_profit_levels = self.config.get('take_profit_levels', [
             {'threshold': 0.02, 'confidence': 0.7, 'reason': '小幅盈利止盈'},
@@ -648,7 +758,7 @@ class BaseStrategy:
                     logger.info(f"⚠️ {symbol} 无法获取IB持仓信息进行未实现盈利检查")
             except Exception as e:
                 logger.info(f"检查IB未实现盈利时出错: {e}")
-        
+
         return None
     
     def calculate_position_size(self, signal: Dict, atr: float = None) -> int:
@@ -1143,8 +1253,17 @@ class BaseStrategy:
                                 self.ib_trader.ib.sleep(0.3)
                                 current_price = ticker.last if ticker.last > 0 else ticker.close
                                 self.ib_trader.ib.cancelMktData(contract)
-                                
+
                                 if current_price > 0:
+                                    # 优先检查强制止损止盈
+                                    forced_exit = self.check_forced_exit_conditions(symbol, current_price, current_time)
+                                    if forced_exit:
+                                        if symbol not in all_signals:
+                                            all_signals[symbol] = []
+                                        all_signals[symbol].append(forced_exit)
+                                        logger.critical(f"  🚨 {symbol} 强制退出: {forced_exit.get('reason', '')}")
+                                        continue
+
                                     exit_signal = self.check_exit_conditions(symbol, current_price)
                                     if exit_signal:
                                         if symbol not in all_signals:
@@ -1154,8 +1273,18 @@ class BaseStrategy:
                             except Exception as e:
                                 logger.info(f"  无法获取 {symbol} 实时价格: {e}")
                         continue
-                    
+
                     current_price = df['Close'].iloc[-1]
+
+                    # 优先检查强制止损止盈
+                    forced_exit = self.check_forced_exit_conditions(symbol, current_price, current_time, df)
+                    if forced_exit:
+                        if symbol not in all_signals:
+                            all_signals[symbol] = []
+                        all_signals[symbol].append(forced_exit)
+                        logger.critical(f"  🚨 {symbol} 强制退出: {forced_exit.get('reason', '')}")
+                        continue
+
                     exit_signal = self.check_exit_conditions(symbol, current_price)
                     if exit_signal:
                         if symbol not in all_signals:

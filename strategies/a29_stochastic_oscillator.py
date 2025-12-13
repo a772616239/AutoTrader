@@ -200,13 +200,21 @@ class A29StochasticOscillatorStrategy(BaseStrategy):
 
         # 优先检查持仓的退出条件
         if symbol in self.positions:
+            current_time = datetime.now()
+            current_price = data['Close'].iloc[-1]
+
+            # 优先检查强制止损止盈
+            forced_exit = self.check_forced_exit_conditions(symbol, current_price, current_time, data)
+            if forced_exit:
+                signals.append(forced_exit)
+                return signals  # 强制退出直接返回
+
             exit_signal = self.detect_sell_signal(symbol, data, indicators)
             if exit_signal:
                 signals.append(exit_signal)
                 return signals  # 触发卖出直接返回
 
             # 检查传统退出条件
-            current_price = data['Close'].iloc[-1]
             traditional_exit = self.check_exit_conditions(symbol, current_price)
             if traditional_exit:
                 signals.append(traditional_exit)

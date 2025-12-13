@@ -357,6 +357,14 @@ class A5MultiFactorAI(BaseStrategy):
             
             # 1. 检查持仓止损止盈 (优先处理)
             if symbol in self.positions:
+                current_time = datetime.now()
+
+                # 优先检查强制止损止盈
+                forced_exit = self.check_forced_exit_conditions(symbol, current_price, current_time, data)
+                if forced_exit:
+                    signals.append(forced_exit)
+                    return signals  # 强制退出直接返回
+
                 exit_signal = self.check_exit_conditions(symbol, current_price)
                 if exit_signal:
                     signals.append(exit_signal)

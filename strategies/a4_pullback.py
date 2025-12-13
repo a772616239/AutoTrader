@@ -312,6 +312,16 @@ class A4PullbackStrategy(BaseStrategy):
         # 检查是否有持仓需要卖出
         if symbol in self.positions:
             current_price = data['Close'].iloc[-1]
+            current_time = datetime.now()
+
+            # 优先检查强制止损止盈
+            forced_exit = self.check_forced_exit_conditions(symbol, current_price, current_time, data)
+            if forced_exit:
+                forced_exit['position_size'] = abs(self.positions[symbol]['size'])
+                logger.critical(f"🚨 {symbol} 强制退出: {forced_exit['reason']}")
+                signals.append(forced_exit)
+                return signals  # 强制退出直接返回
+
             # 将 data 传入 check_exit_conditions，以便做更多基于历史数据的平仓判断
             exit_signal = self.check_exit_conditions(symbol, current_price, data)
             if exit_signal:
