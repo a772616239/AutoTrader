@@ -1236,7 +1236,13 @@ class TradingSystem:
             signals = {}
         else:
             # 单策略模式 - force_market_orders已在策略初始化时设置
-            signals = self.strategy.run_analysis_cycle(self.data_provider, symbols)
+            try:
+                signals = self.strategy.run_analysis_cycle(self.data_provider, symbols)
+            except Exception as e:
+                logger.error(f"策略运行出错: {e}")
+                import traceback
+                logger.error(f"详细错误: {traceback.format_exc()}")
+                signals = {}
         
         # 处理信号：流式模式下主线程即时消费 signal_queue 并执行下单
         if symbol_map and self.ib_trader:
@@ -1257,7 +1263,10 @@ class TradingSystem:
                             break
                         else:
                             continue
-
+                    indicators_get=sig.get('indicators_get')
+                    df=sig.get('df')
+                    data_provider=sig.get('data_provider')
+                    
                     # 立刻为该信号创建带 IB 的策略执行实例并下单
                     origin = sig.get('origin_strategy') or symbol_map.get(sym) or self.current_strategy_name
                     try:
@@ -1265,7 +1274,6 @@ class TradingSystem:
                         strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
                     except Exception:
                         strat_cfg = {}
-
                     try:
                         exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_trader)
                     except Exception:
@@ -1304,10 +1312,49 @@ class TradingSystem:
 
                     try:
                         result = exec_strategy.execute_signal(sig, current_price)
-                        logger.info(f"执行信号结果: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
+                        logger.info(f"执行信号结果1: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
                     except Exception as e:
                         logger.error(f"执行信号出错 {sym}: {e}")
+                        
+                   # 所有策略都生成信号（使用相同的df和indicators）
+                    from config import STRATEGY_CONFIG_MAP
+                    all_strategies = list(STRATEGY_CONFIG_MAP.keys())
+                    all_signals = {}
+                    
+                    for strategy_name in all_strategies:
+                        try:
+                            # 获取策略配置
+                            cfg_key = STRATEGY_CONFIG_MAP.get(strategy_name)
+                            strat_cfg = config_module.CONFIG.get(cfg_key, {}) if cfg_key else {}
+                            # 创建策略实例
+                            from main import StrategyFactory
+                            exec_strategy = StrategyFactory.create_strategy(strategy_name, config=strat_cfg, ib_trader=self.ib_trader)
+                            # 使用该策略生成信号
+                            signals = exec_strategy.generate_signals(sym, df, indicators_get)
+                            if signals:
+                                if sym not in all_signals:
+                                    all_signals[sym] = []
+                                all_signals[sym].extend(signals)
+                                logger.info(f"[base_strategy]  {sym} + {strategy_name} 生成 {len(signals)} 个信号")
+                        except Exception as e:
+                            logger.info(f"[base_strategy]策略 {strategy_name} 处理 {sym} 时出错: {e}")
+                            continue
+                   
+                     # 对preselect_a2的所有股票生成信号并保存到新文件
+                     
+                    try:
+                        logger.info(f"🔄 [base_strategy]开始执行preselect信号生成，当前all_signals长度: {sum(len(signals) for signals in all_signals.values())}")
+                        self._generate_preselect_signals(data_provider, all_signals)
+                        logger.info(f"✅ [base_strategy]preselect信号生成完成，更新后all_signals长度: {sum(len(signals) for signals in all_signals.values())}")
+                        self._save_signals_to_csv(all_signals)
+                    except Exception as e:
+                        logger.info(f"[base_strategy]执行preselect信号生成时出错: {e}")
+                        import traceback
+                        logger.info(f"[base_strategy]: {traceback.format_exc()}")
+                    logger.info(f"🏁 [base_strategy]run_analysis_cycle 执行完成，返回信号数量: {sum(len(signals) for signals in all_signals.values())}")
+                    
 
+                        
                 # 所有 futures 完成后，drain队列以处理残留
                 while True:
                     try:
@@ -1315,20 +1362,87 @@ class TradingSystem:
                     except Empty:
                         break
                     try:
+                        
+
+                        
+                        
                         origin = sig.get('origin_strategy') or symbol_map.get(sym) or self.current_strategy_name
                         cfg_key = global_config.STRATEGY_CONFIG_MAP.get(origin)
                         strat_cfg = global_config.CONFIG.get(cfg_key, {}) if cfg_key else {}
                         exec_strategy = StrategyFactory.create_strategy(origin, config=strat_cfg, ib_trader=self.ib_trader)
-                        exec_strategy.force_market_orders = force_market_orders
+                        # exec_strategy.force_market_orders = force_market_orders
+                        self.force_market_orders = not self._within_trading_hours()
                         exec_strategy.sync_positions_from_ib()
                         current_price = sig.get('price') or 0
                         atr = None
                         new_size = exec_strategy.calculate_position_size(sig, atr)
                         sig['position_size'] = new_size
                         result = exec_strategy.execute_signal(sig, current_price)
-                        logger.info(f"执行信号结果: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
+                        
+                        # 对所有策略都生成信号（使用相同的df和indicators）
+                        from config import STRATEGY_CONFIG_MAP
+                        all_strategies = list(STRATEGY_CONFIG_MAP.keys())
+                        all_signals = {}
+                        for strategy_name in all_strategies:
+                            try:
+                                # 获取策略配置
+                                cfg_key = STRATEGY_CONFIG_MAP.get(strategy_name)
+                                strat_cfg = config_module.CONFIG.get(cfg_key, {}) if cfg_key else {}
+
+                                # 创建策略实例
+                                from main import StrategyFactory
+                                exec_strategy = StrategyFactory.create_strategy(strategy_name, config=strat_cfg, ib_trader=self.ib_trader)
+
+                                # 使用该策略生成信号
+                                signals = exec_strategy.generate_signals(sym, df, indicators_get)
+
+                                if signals:
+                                    if sym not in all_signals:
+                                        all_signals[sym] = []
+                                    all_signals[sym].extend(signals)
+                                    logger.info(f"[base_strategy]  {sym} + {strategy_name} 生成 {len(signals)} 个信号")
+
+                            except Exception as e:
+                                logger.info(f"[base_strategy]策略 {strategy_name} 处理 {sym} 时出错: {e}")
+                                continue
+
+                        # 执行当前策略生成的信号（如果有的话）
+                        current_signals = self.generate_signals(sym, df, indicators_get)
+                        if current_signals:
+                            if sym not in all_signals:
+                                all_signals[sym] = []
+                            all_signals[sym].extend(current_signals)
+
+                            # 执行信号
+                            for signal in current_signals:
+                                # 使用信号中的价格，确保与仓位计算时价格一致
+                                current_price = signal.get('price', df['Close'].iloc[-1])
+                                try:
+                                    result = self.execute_signal(signal, current_price, self.force_market_orders)
+                                    logger.info(f"[base_strategy]信号执行结果: {result}")
+                                except Exception as e:
+                                    logger.info(f"[base_strategy]执行信号时出错: {e}")
+                                    continue
+                         # 对preselect_a2的所有股票生成信号并保存到新文件
+                         
+                        try:
+                            logger.info(f"🔄 [base_strategy]开始执行preselect信号生成，当前all_signals长度: {sum(len(signals) for signals in all_signals.values())}")
+                            self._generate_preselect_signals(data_provider, all_signals)
+                            logger.info(f"✅ [base_strategy]preselect信号生成完成，更新后all_signals长度: {sum(len(signals) for signals in all_signals.values())}")
+
+                            self._save_signals_to_csv(all_signals)
+                        except Exception as e:
+                            logger.info(f"[base_strategy]执行preselect信号生成时出错: {e}")
+                            import traceback
+                            logger.info(f"[base_strategy]: {traceback.format_exc()}")
+
+                        logger.info(f"🏁 [base_strategy]run_analysis_cycle 执行完成，返回信号数量: {sum(len(signals) for signals in all_signals.values())}")
+                        
+                        
+                        logger.info(f"get_nowait执行信号结果: {sym} {sig['action']} -> {result.get('status')}, 原因: {result.get('reason','')}")
                     except Exception as e:
                         logger.error(f"处理残留信号出错 {sym}: {e}")
+                    
             finally:
                 try:
                     # 等待 futures 完成并关闭 executor
@@ -1349,26 +1463,187 @@ class TradingSystem:
         logger.info(f"交易周期 #{self.cycle_count} 完成")
         logger.info('='*60)
     
+    def _generate_preselect_signals(self, data_provider, all_signals: Dict[str, List[Dict]]):
+        """对preselect_a2的所有股票生成信号并保存到新文件"""
+        logger.info("🚀 _generate_preselect_signals方法被调用")
+        try:
+            # 从config获取所有preselect_a2股票
+            preselect_symbols = list(CONFIG.get('symbol_strategy_map', {}).keys())
+            logger.info(f"📊 获取到preselect_symbols: {len(preselect_symbols)} 个")
+            if not preselect_symbols:
+                logger.info("⚠️ 未找到preselect_a2股票配置")
+                return
+
+            # 获取所有可用的策略
+            from config import STRATEGY_CONFIG_MAP
+            all_strategies = list(STRATEGY_CONFIG_MAP.keys())
+            logger.info(f"📊 获取到all_strategies: {len(all_strategies)} 个")
+            if not all_strategies:
+                logger.warning("⚠️ 未找到策略配置映射")
+                return
+
+            logger.info(f"🔍 开始生成preselect_a2信号: {len(preselect_symbols)} 个股票 × {len(all_strategies)} 个策略...")
+
+            preselect_signals = []
+
+            for symbol in preselect_symbols:
+                try:
+                    # 获取股票数据
+                    df = data_provider.get_intraday_data(symbol, interval='5m', lookback=300)
+
+                    if df.empty or len(df) < 30:
+                        logger.debug(f"跳过 {symbol}，数据不足")
+                        continue
+
+                    # 获取技术指标（所有策略共享相同的indicators）
+                    indicators = data_provider.get_technical_indicators(symbol, '1d', '5m')
+
+                    # 对每个策略都生成信号
+                    for strategy_name in all_strategies:
+                        try:
+                            # 获取策略配置
+                            cfg_key = STRATEGY_CONFIG_MAP.get(strategy_name)
+                            strat_cfg = CONFIG.get(cfg_key, {}) if cfg_key else {}
+
+                            # 创建策略实例 - 使用strategy_manager中的STRATEGY_CLASSES
+                            try:
+                                from main import StrategyFactory
+                                exec_strategy = StrategyFactory.create_strategy(strategy_name, config=strat_cfg, ib_trader=self.ib_trader)
+                            except ImportError:
+                                # 直接使用strategy_manager中的STRATEGY_CLASSES
+                                from strategy_manager import STRATEGY_CLASSES
+                                strategy_class = STRATEGY_CLASSES.get(strategy_name)
+                                if strategy_class:
+                                    exec_strategy = strategy_class(config=strat_cfg, ib_trader=self.ib_trader)
+                                else:
+                                    continue
+
+                            # 使用该策略生成信号
+                            signals = exec_strategy.generate_signals(symbol, df, indicators)
+
+                            if signals:
+                                # 为每个信号添加策略信息
+                                for signal in signals:
+                                    signal_copy = signal.copy()
+                                    signal_copy['strategy'] = strategy_name
+                                    signal_copy['symbol'] = symbol
+                                    signal_copy['generated_at'] = datetime.now().isoformat()
+                                    preselect_signals.append(signal_copy)
+
+                                    # 同时添加到all_signals中（用于当前周期的信号处理）
+                                    if symbol not in all_signals:
+                                        all_signals[symbol] = []
+                                    all_signals[symbol].append(signal_copy)
+
+                                logger.debug(f"  {symbol} + {strategy_name} 生成 {len(signals)} 个信号")
+
+                        except Exception as e:
+                            logger.debug(f"策略 {strategy_name} 处理 {symbol} 时出错: {e}")
+                            continue
+
+                except Exception as e:
+                    logger.warning(f"处理 {symbol} 时出错: {e}")
+                    continue
+
+            logger.info(f"✅ preselect_a2信号生成完成，共收集 {len(preselect_signals)} 个信号")
+
+            # 保存到新的CSV文件
+            self._save_preselect_signals_to_csv(preselect_signals)
+
+        except Exception as e:
+            logger.error(f"生成preselect_a2信号失败: {e}")
+
+    def _save_preselect_signals_to_csv(self, signals: List[Dict]):
+        """保存preselect_a2信号到CSV文件"""
+        try:
+            import pandas as pd
+            import os
+
+            if not signals:
+                logger.info("没有preselect_a2信号需要保存")
+                return
+
+            # 转换为DataFrame
+            df = pd.DataFrame(signals)
+
+            # 确保必要的列存在
+            required_cols = ['symbol', 'strategy', 'signal_type', 'action', 'price', 'confidence', 'generated_at']
+            for col in required_cols:
+                if col not in df.columns:
+                    df[col] = None
+
+            # 重新排列列顺序
+            df = df[required_cols + [col for col in df.columns if col not in required_cols]]
+
+            # 保存到CSV文件
+            filename = f'preselect_signals_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            df.to_csv(filename, index=False)
+            logger.info(f"preselect_a2信号已保存到 {filename}，共 {len(signals)} 个信号")
+
+        except Exception as e:
+            logger.error(f"保存preselect_a2信号到CSV失败: {e}")
+
+    def _save_signals_to_csv(self, all_signals: Dict[str, List[Dict]]):
+        """保存所有生成的信号到CSV文件（用于信号监控）"""
+        logger.info("💾 _save_signals_to_csv方法被调用")
+        try:
+            import pandas as pd
+            import os
+
+            # 展平信号数据
+            flattened_signals = []
+            for symbol, signals in all_signals.items():
+                for signal in signals:
+                    signal_copy = signal.copy()
+                    signal_copy['symbol'] = symbol
+                    signal_copy['generated_at'] = datetime.now().isoformat()
+                    flattened_signals.append(signal_copy)
+
+            logger.info(f"📊 展平后信号数量: {len(flattened_signals)}")
+            if not flattened_signals:
+                logger.info("没有信号需要保存")
+                return
+
+            # 转换为DataFrame
+            df = pd.DataFrame(flattened_signals)
+
+            # 确保必要的列存在
+            required_cols = ['symbol', 'strategy', 'signal_type', 'action', 'price', 'confidence', 'generated_at']
+            for col in required_cols:
+                if col not in df.columns:
+                    df[col] = None
+
+            # 重新排列列顺序
+            df = df[required_cols + [col for col in df.columns if col not in required_cols]]
+
+            # 保存到CSV
+            filename = 'signals_monitor.csv'
+            df.to_csv(filename, index=False)
+            logger.info(f"信号已保存到 {filename}，共 {len(flattened_signals)} 个信号")
+
+        except Exception as e:
+            logger.error(f"保存信号到CSV失败: {e}")
+
     def _status_report(self):
         """状态报告"""
         if not self.strategy:
             return
-        
+
         report = self.strategy.generate_report()
-        
+
         logger.info(f"\n📈 系统状态:")
         logger.info(f"  策略: {report['strategy_name']}")
         logger.info(f"  净资产: ${report['equity']:,.2f}")
         logger.info(f"  总交易: {report['total_trades']}")
         logger.info(f"  持仓数量: {report['positions_open']}")
-        
+
         if report['positions_open'] > 0:
             logger.info(f"  持仓标的: {', '.join(report['open_positions'][:5])}")
             if len(report['open_positions']) > 5:
                 logger.info(f"    ... 共 {len(report['open_positions'])} 个持仓")
-        
+
         logger.info(f"  IB连接: {'✅' if report['ib_connected'] else '❌'}")
-        
+
         total_signals = sum(len(sigs) for sigs in self.last_signals.values())
         if total_signals > 0:
             logger.info(f"  本期信号: {total_signals}")

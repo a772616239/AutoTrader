@@ -650,53 +650,62 @@ CONFIG = {
         'max_position_notional': 60000.0,
 
         # Minervini参数
-        'trend_period': 200,
-        'volume_period': 50,
-        'base_period': 30,
-        'consolidation_period': 10,
+        'sma_50_period': 50,
+        'sma_150_period': 150,
+        'sma_200_period': 200,
+        'rs_lookback': 252,
+        'rs_percentile': 70,
+        'min_price_increase': 1.3,
+        'max_price_decline': 0.75,
 
         # 风险管理
-        'stop_loss_pct': 0.03,
-        'take_profit_pct': 0.06,
-        'max_holding_days': 30,
+        'stop_loss_pct': 0.08,
+        'take_profit_pct': 0.15,
+        'max_holding_days': 60,
+        'trailing_stop_pct': 0.05,
+
+        # 交易过滤
+        'trading_hours_only': True,
+        'avoid_earnings': True,
+        'min_volume_threshold': 5000,
+        'min_price': 10.0,
+        'max_price': None,
 
         # 防重复交易
-        'signal_cooldown_minutes': 60,
-
-        # 交易参数
-        'min_volume': 5000,
-        'min_data_points': 220,
+        'signal_cooldown_minutes': 1440,
 
         # IB交易参数
         'ib_order_type': 'MKT',
         'ib_limit_offset': 0.01,
     },
-    'strategy_a28': {  # A28 真实强度指数策略配置
+    'strategy_a28': {  # A28 True Strength Index策略配置
         'initial_capital': 50000.0,
-        'risk_per_trade': 0.02,
-        'max_position_size': 0.1,
-        'per_trade_notional_cap': 700.0,
-        'max_position_notional': 60000.0,
+        'risk_per_trade': 0.015,        # 1.5% 单笔风险
+        'max_position_size': 0.08,       # 8% 最大仓位
+        'per_trade_notional_cap': 5000.0,
+        'max_position_notional': 40000.0,
 
-        # RSI参数
-        'rsi_period': 14,
-        'stoch_period': 14,
-        'k_period': 3,
-        'd_period': 3,
-        'overbought_level': 80,
-        'oversold_level': 20,
+        # True Strength Index参数
+        'tsi_r_period': 25,              # 第一次平滑周期
+        'tsi_s_period': 13,              # 第二次平滑周期
+        'overbought_level': 25,          # 超买水平
+        'oversold_level': -25,           # 超卖水平
 
         # 风险管理
-        'stop_loss_pct': 0.02,
-        'take_profit_pct': 0.04,
-        'max_holding_minutes': 120,
+        'stop_loss_pct': 0.03,           # 3% 止损
+        'take_profit_pct': 0.06,         # 6% 止盈
+        'max_holding_days': 10,          # 最大持有10天
+        'trailing_stop_pct': 0.02,       # 2% 追踪止损
+
+        # 交易过滤
+        'trading_hours_only': True,
+        'avoid_earnings': True,
+        'min_volume_threshold': 5000,    # 最小成交量（放宽限制）
+        'min_price': 5.0,
+        'max_price': None,
 
         # 防重复交易
-        'signal_cooldown_minutes': 15,
-
-        # 交易参数
-        'min_volume': 5000,
-        'min_data_points': 25,
+        'signal_cooldown_minutes': 15,   # 15分钟冷却
 
         # IB交易参数
         'ib_order_type': 'MKT',
@@ -710,9 +719,8 @@ CONFIG = {
         'max_position_notional': 60000.0,
 
         # Stochastic参数
-        'stoch_period': 14,
-        'smooth_k': 3,
-        'smooth_d': 3,
+        'k_period': 14,
+        'd_period': 3,
         'overbought_level': 80,
         'oversold_level': 20,
 
@@ -740,21 +748,26 @@ CONFIG = {
         'max_position_notional': 60000.0,
 
         # IBD RS参数
-        'rs_period': 52,
-        'rs_threshold': 80,
-        'volume_threshold': 1.5,
+        'rs_lookback_period': 252,
+        'rs_rating_threshold': 70,
+        'momentum_weight': 0.6,
+        'trend_weight': 0.4,
 
         # 风险管理
-        'stop_loss_pct': 0.03,
-        'take_profit_pct': 0.06,
+        'stop_loss_pct': 0.05,
+        'take_profit_pct': 0.10,
         'max_holding_days': 30,
+        'trailing_stop_pct': 0.03,
+
+        # 交易过滤
+        'trading_hours_only': True,
+        'avoid_earnings': True,
+        'min_volume_threshold': 5000,
+        'min_price': 10.0,
+        'max_price': None,
 
         # 防重复交易
-        'signal_cooldown_minutes': 60,
-
-        # 交易参数
-        'min_volume': 5000,
-        'min_data_points': 60,
+        'signal_cooldown_minutes': 1440,
 
         # IB交易参数
         'ib_order_type': 'MKT',

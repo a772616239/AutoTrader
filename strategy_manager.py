@@ -227,6 +227,10 @@ class StrategyManager:
                         for s in sigs:
                             try:
                                 s['origin_strategy'] = strategy_name
+                                s['df'] = df
+                                s['indicators_get'] = indicators
+                                s['data_provider'] = self.data_provider
+                                
                             except Exception:
                                 pass
                             # 立即推送到主线程队列，供主线程即时处理

@@ -1,0 +1,3 @@
+symbol,strategy,signal_type,action,price,confidence,generated_at,reason,indicators,position_size,signal_hash
+COMM,,PIVOT_S1_BREAKOUT,SELL,19.44,0.8999999999999999,2025-12-13T19:38:12.008382,Pivot S1跌破: 19.44 < 19.75,"{'pivot': np.float64(19.7502), 'r1': np.float64(19.7502), 's1': np.float64(19.7502), 'breakout_strength': np.float64(0.01570617006410053), 'breakout_level': 's1'}",36,a220e9c9
+COMM,,MLP_NN_SELL,SELL,19.44,0.2858575943739238,2025-12-13T19:38:12.008385,MLP神经网络预测下跌: -7.15%,"{'predicted_change': -0.07146439859348094, 'predicted_price': np.float64(18.05073209134273), 'model_trained': '2025-12-13T19:38:12.005713', 'network_layers': (100, 50, 25)}",36,dc961e98
