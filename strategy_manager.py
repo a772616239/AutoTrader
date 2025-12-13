@@ -138,6 +138,19 @@ class StrategyManager:
             if strategy_name == 'a6' and hasattr(strategy, 'data_provider'):
                 strategy.data_provider = self.data_provider
 
+            # 检查A6策略是否可用
+            if strategy_name == 'a6':
+                if (hasattr(strategy, 'polygon_api_key') and
+                    strategy.polygon_api_key in ['YOUR_API_KEY_HERE', 'YOUR_POLYGON_API_KEY_HERE']):
+                    logger.warning("⚠️ A6策略不可用：需要有效的Polygon API密钥，切换到默认策略a1")
+                    cls = STRATEGY_CLASSES.get('a1')
+                    if cls:
+                        strategy = cls(config=strat_cfg, ib_trader=None)
+                        strategy_name = 'a1'  # 更新策略名称以便后续处理
+                    else:
+                        logger.error("默认策略a1也不存在")
+                        return {}
+
             # 对分配给该策略的每个 symbol 单独拉取数据并调用 generate_signals（不下单）
             out: Dict[str, List[Dict]] = {}
             for sym in syms:
@@ -210,6 +223,19 @@ class StrategyManager:
             # 特殊处理：为A6新闻策略设置数据提供器
             if strategy_name == 'a6' and hasattr(strategy, 'data_provider'):
                 strategy.data_provider = self.data_provider
+
+            # 检查A6策略是否可用
+            if strategy_name == 'a6':
+                if (hasattr(strategy, 'polygon_api_key') and
+                    strategy.polygon_api_key in ['YOUR_API_KEY_HERE', 'YOUR_POLYGON_API_KEY_HERE']):
+                    logger.warning("⚠️ A6策略不可用：需要有效的Polygon API密钥，切换到默认策略a1")
+                    cls = STRATEGY_CLASSES.get('a1')
+                    if cls:
+                        strategy = cls(config=strat_cfg, ib_trader=None)
+                        strategy_name = 'a1'  # 更新策略名称以便后续处理
+                    else:
+                        logger.error("默认策略a1也不存在")
+                        return {}
 
             for sym in syms:
                 try:
